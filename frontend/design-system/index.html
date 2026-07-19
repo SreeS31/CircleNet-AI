@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CircleNet-AI Design System</title>
+    <link rel="stylesheet" href="./styles/tokens.css" />
+    <link rel="stylesheet" href="./styles/components.css" />
+    <link rel="stylesheet" href="./styles/layout.css" />
+    <link rel="stylesheet" href="./styles/utilities.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container nav-bar">
+        <div class="brand">CircleNet-AI</div>
+        <nav class="nav-links">
+          <a href="#tokens">Tokens</a>
+          <a href="#components">Components</a>
+          <a href="#layout">Layout</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container hero-grid">
+          <div>
+            <span class="pill">Design System v0.1</span>
+            <h1>Enterprise-ready interface patterns for a scalable AI platform.</h1>
+            <p>
+              The design foundation introduces a consistent visual language for landing pages,
+              dashboards, and product experiences.
+            </p>
+            <div class="button-row">
+              <a class="btn btn-primary" href="#components">Review components</a>
+              <a class="btn btn-secondary" href="./README.md">Read docs</a>
+            </div>
+          </div>
+          <div class="hero-card">
+            <h3>System Snapshot</h3>
+            <ul>
+              <li>Accessible color system</li>
+              <li>Reusable UI components</li>
+              <li>Responsive layout utilities</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="tokens" class="section">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Tokens</p>
+            <h2>Visual foundation</h2>
+          </div>
+          <div class="color-grid">
+            <div class="swatch swatch-primary"><span>Primary</span></div>
+            <div class="swatch swatch-secondary"><span>Secondary</span></div>
+            <div class="swatch swatch-accent"><span>Accent</span></div>
+            <div class="swatch swatch-surface"><span>Surface</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="components" class="section">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Components</p>
+            <h2>Reusable building blocks</h2>
+          </div>
+          <div class="card-grid">
+            <article class="card">
+              <h3>Buttons</h3>
+              <div class="button-row">
+                <button class="btn btn-primary">Primary</button>
+                <button class="btn btn-secondary">Secondary</button>
+              </div>
+            </article>
+            <article class="card">
+              <h3>Inputs</h3>
+              <label class="field">
+                <span>Email</span>
+                <input type="email" placeholder="name@company.com" />
+              </label>
+            </article>
+            <article class="card">
+              <h3>Alerts</h3>
+              <div class="alert alert-info">System update available for review.</div>
+              <div class="alert alert-success">Deployment completed successfully.</div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="layout" class="section">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Layout</p>
+            <h2>Structured and adaptive</h2>
+          </div>
+          <div class="grid-two">
+            <div class="card">
+              <h3>Content Block</h3>
+              <p>Use this spacing and sizing system to create balanced layouts across product screens.</p>
+            </div>
+            <div class="card">
+              <h3>Dashboard Example</h3>
+              <div class="badge-row">
+                <span class="badge">AI Ready</span>
+                <span class="badge badge-accent">Secure</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
