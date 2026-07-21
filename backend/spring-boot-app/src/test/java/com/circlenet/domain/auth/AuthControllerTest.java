@@ -118,6 +118,29 @@ class AuthControllerTest {
       .andExpect(status().isUnauthorized());
   }
 
+  @Test
+  void shouldRevokeRefreshTokenExplicitly() throws Exception {
+    createUser("auth-revoke-user", "auth-revoke@circlenet.ai", "secret123");
+
+    MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new LoginPayload("auth-revoke@circlenet.ai", "secret123"))))
+      .andExpect(status().isOk())
+      .andReturn();
+
+    TokenPayload loginPayload = objectMapper.readValue(loginResult.getResponse().getContentAsString(), TokenPayload.class);
+
+    mockMvc.perform(post("/api/auth/revoke")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new RefreshPayload(loginPayload.refreshToken))))
+      .andExpect(status().isNoContent());
+
+    mockMvc.perform(post("/api/auth/refresh")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new RefreshPayload(loginPayload.refreshToken))))
+      .andExpect(status().isUnauthorized());
+  }
+
   private void createUser(String username, String email, String password) throws Exception {
     mockMvc.perform(post("/api/users")
         .contentType(MediaType.APPLICATION_JSON)

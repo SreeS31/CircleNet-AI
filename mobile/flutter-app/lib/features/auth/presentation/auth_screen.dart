@@ -117,6 +117,35 @@ class _AuthScreenState extends State<AuthScreen> {
     });
   }
 
+  Future<void> _revokeSession() async {
+    final session = _session;
+    if (session == null) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _statusMessage = 'Revoking session...';
+    });
+
+    try {
+      await _authApi.revoke(RefreshRequest(refreshToken: session.refreshToken));
+    } catch (_) {
+      // Clear local session even when remote revoke call fails.
+    }
+
+    await _sessionStore.clear();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _session = null;
+      _loading = false;
+      _statusMessage = 'Session revoked';
+    });
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -190,6 +219,11 @@ class _AuthScreenState extends State<AuthScreen> {
       appBar: AppBar(
         title: const Text('CircleNet-AI Auth'),
         actions: [
+          if (_session != null)
+            TextButton(
+              onPressed: _loading ? null : _revokeSession,
+              child: const Text('Revoke'),
+            ),
           if (_session != null)
             TextButton(
               onPressed: _loading ? null : _logout,

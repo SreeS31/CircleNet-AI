@@ -51,6 +51,7 @@ For this workspace, SDK is installed at:
    - Called after successful Sign In and session restore
 
 Sign In is now wired to real backend token endpoints with local session persistence and refresh on app start.
+The app bar now includes explicit `Revoke` and `Logout` actions when a session is active.
 
 ## Test
 
