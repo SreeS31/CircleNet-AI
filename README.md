@@ -54,6 +54,18 @@ This milestone delivers the core repository scaffolding for a production-ready e
 - `make ai-install` - Install AI service dependencies
 - `make ai-run` - Run AI service locally
 - `make ai-test` - Run AI service test suite
+- `make mobile-get` - Install Flutter mobile dependencies
+- `make mobile-test` - Run Flutter mobile tests
+
+## Milestone 6: Mobile Foundation
+
+Milestone 6 starts with an initial Flutter module under `mobile/flutter-app`.
+
+Current capabilities:
+
+- Flutter app scaffold with Material 3 baseline theme
+- Initial home screen shell for platform workflows
+- Baseline widget test for app rendering
 
 ## Milestone 5: AI Module Foundation
 
