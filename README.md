@@ -51,6 +51,21 @@ This milestone delivers the core repository scaffolding for a production-ready e
 - `make docker-up` - Start local infrastructure services
 - `make docker-down` - Stop local infrastructure services
 - `make ci` - Run repository validation steps
+- `make ai-install` - Install AI service dependencies
+- `make ai-run` - Run AI service locally
+- `make ai-test` - Run AI service test suite
+
+## Milestone 5: AI Module Foundation
+
+Milestone 5 starts with an initial AI service module under `ai/agent-service`.
+
+Current capabilities:
+
+- FastAPI service scaffold with health endpoints
+- Versioned API namespace (`/api/v1`)
+- Strongly typed request/response models
+- Config-driven behavior via environment variables
+- Test baseline for service health checks
 
 ## Quality Standards
 

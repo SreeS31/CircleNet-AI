@@ -37,3 +37,5 @@ pnpm-debug.log*
 # Test and coverage
 coverage/
 .pytest_cache/
+__pycache__/
+*.pyc

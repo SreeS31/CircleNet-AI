@@ -1,6 +1,19 @@
 version: "3.9"
 
 services:
+  ai-agent:
+    build:
+      context: ./ai/agent-service
+      dockerfile: Dockerfile
+    container_name: circlenet-ai-agent
+    environment:
+      AI_ENV: local
+      AI_SERVICE_NAME: circlenet-ai-agent
+      AI_API_PREFIX: /api/v1
+      AI_LOG_LEVEL: INFO
+    ports:
+      - "8081:8081"
+
   postgres:
     image: postgres:17-alpine
     container_name: circlenet-postgres
