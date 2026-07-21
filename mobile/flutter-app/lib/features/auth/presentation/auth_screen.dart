@@ -22,6 +22,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   AuthMode _authMode = AuthMode.signIn;
+  AuthTokenBundle? _session;
   bool _loading = false;
   String _statusMessage = 'Ready';
 
@@ -70,17 +71,50 @@ class _AuthScreenState extends State<AuthScreen> {
         RefreshRequest(refreshToken: existingSession.refreshToken),
       );
       await _sessionStore.save(refreshed);
+      _session = refreshed;
+
+      final summary = await _authApi.fetchDashboardSummary(refreshed.accessToken);
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _statusMessage = 'Session restored';
+        _statusMessage = 'Session restored | users=${summary.userCount} circles=${summary.circleCount}';
       });
     } catch (_) {
       await _sessionStore.clear();
+      _session = null;
     }
+  }
+
+  Future<void> _logout() async {
+    final session = _session;
+    if (session == null) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _statusMessage = 'Signing out...';
+    });
+
+    try {
+      await _authApi.logout(RefreshRequest(refreshToken: session.refreshToken));
+    } catch (_) {
+      // Clear local session even when remote logout call fails.
+    }
+
+    await _sessionStore.clear();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _session = null;
+      _loading = false;
+      _statusMessage = 'Signed out';
+    });
   }
 
   Future<void> _submit() async {
@@ -118,13 +152,17 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         );
         await _sessionStore.save(tokenBundle);
+        _session = tokenBundle;
+
+        final summary = await _authApi.fetchDashboardSummary(tokenBundle.accessToken);
 
         if (!mounted) {
           return;
         }
 
         setState(() {
-          _statusMessage = 'Signed in successfully';
+          _statusMessage =
+              'Signed in successfully | users=${summary.userCount} circles=${summary.circleCount}';
         });
       }
     } catch (error) {
@@ -149,7 +187,16 @@ class _AuthScreenState extends State<AuthScreen> {
     final isSignUp = _authMode == AuthMode.signUp;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('CircleNet-AI Auth')),
+      appBar: AppBar(
+        title: const Text('CircleNet-AI Auth'),
+        actions: [
+          if (_session != null)
+            TextButton(
+              onPressed: _loading ? null : _logout,
+              child: const Text('Logout'),
+            ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Form(

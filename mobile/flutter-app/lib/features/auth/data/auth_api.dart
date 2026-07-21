@@ -52,6 +52,43 @@ class AuthApi {
     return AuthTokenBundle.fromJson(data);
   }
 
+  Future<void> logout(RefreshRequest request) async {
+    final response = await _apiClient.post(AppConfig.authLogoutPath, request.toJson());
+    if (!response.isSuccess) {
+      throw AuthApiException(
+        'Logout failed with status ${response.statusCode}',
+      );
+    }
+  }
+
+  Future<void> revoke(RefreshRequest request) async {
+    final response = await _apiClient.post(AppConfig.authRevokePath, request.toJson());
+    if (!response.isSuccess) {
+      throw AuthApiException(
+        'Revoke failed with status ${response.statusCode}',
+      );
+    }
+  }
+
+  Future<DashboardSummary> fetchDashboardSummary(String accessToken) async {
+    final response = await _apiClient.get(
+      AppConfig.dashboardSummaryPath,
+      bearerToken: accessToken,
+    );
+    if (!response.isSuccess) {
+      throw AuthApiException(
+        'Dashboard summary failed with status ${response.statusCode}',
+      );
+    }
+
+    final data = response.decodeJson();
+    if (data is! Map<String, dynamic>) {
+      throw const AuthApiException('Invalid dashboard summary payload');
+    }
+
+    return DashboardSummary.fromJson(data);
+  }
+
   Future<RegisterUserResult> registerUser(RegisterUserRequest request) async {
     final response = await _apiClient.post(AppConfig.usersPath, request.toJson());
 

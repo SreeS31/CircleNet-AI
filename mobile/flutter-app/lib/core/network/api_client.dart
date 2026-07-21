@@ -9,24 +9,32 @@ class ApiClient {
   final String baseUrl;
   final http.Client _httpClient;
 
-  Future<ApiResponse> get(String path) async {
+  Future<ApiResponse> get(String path, {String? bearerToken}) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = await _httpClient.get(uri, headers: _headers());
+    final response = await _httpClient.get(uri, headers: _headers(bearerToken: bearerToken));
     return ApiResponse.fromHttp(response);
   }
 
-  Future<ApiResponse> post(String path, Map<String, dynamic> body) async {
+  Future<ApiResponse> post(
+    String path,
+    Map<String, dynamic> body, {
+    String? bearerToken,
+  }) async {
     final uri = Uri.parse('$baseUrl$path');
     final response = await _httpClient.post(
       uri,
-      headers: _headers(),
+      headers: _headers(bearerToken: bearerToken),
       body: jsonEncode(body),
     );
     return ApiResponse.fromHttp(response);
   }
 
-  Map<String, String> _headers() {
-    return const {'Content-Type': 'application/json'};
+  Map<String, String> _headers({String? bearerToken}) {
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (bearerToken != null && bearerToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $bearerToken';
+    }
+    return headers;
   }
 }
 

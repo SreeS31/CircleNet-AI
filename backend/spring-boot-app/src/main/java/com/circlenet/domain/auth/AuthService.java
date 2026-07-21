@@ -77,6 +77,24 @@ public class AuthService {
     return issueNewSession(user, storedToken.getToken());
   }
 
+  public void logout(AuthRefreshRequest request) {
+    revoke(request);
+  }
+
+  public void revoke(AuthRefreshRequest request) {
+    Claims claims = jwtTokenService.parseAndValidate(request.getRefreshToken(), "refresh");
+    Long userId = Long.parseLong(claims.getSubject());
+
+    AuthTokenEntity storedToken = authTokenRepository.findByToken(request.getRefreshToken())
+      .orElseThrow(() -> new IllegalArgumentException("Refresh token not recognized"));
+
+    if (!"refresh".equals(storedToken.getTokenType()) || !userId.equals(storedToken.getUserId())) {
+      throw new IllegalArgumentException("Invalid refresh token context");
+    }
+
+    authTokenRepository.deleteByToken(request.getRefreshToken());
+  }
+
   private AuthTokenResponse issueNewSession(UserEntity user, String oldRefreshToken) {
     String accessToken = jwtTokenService.createAccessToken(user);
     String refreshToken = jwtTokenService.createRefreshToken(user);

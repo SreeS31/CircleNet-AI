@@ -45,4 +45,24 @@ public class AuthController {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
   }
+
+  @PostMapping("/logout")
+  public ResponseEntity<Void> logout(@Valid @RequestBody AuthRefreshRequest request) {
+    try {
+      authService.logout(request);
+      return ResponseEntity.noContent().build();
+    } catch (IllegalArgumentException ex) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+  }
+
+  @PostMapping("/revoke")
+  public ResponseEntity<Void> revoke(@Valid @RequestBody AuthRefreshRequest request) {
+    try {
+      authService.revoke(request);
+      return ResponseEntity.noContent().build();
+    } catch (IllegalArgumentException ex) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+  }
 }

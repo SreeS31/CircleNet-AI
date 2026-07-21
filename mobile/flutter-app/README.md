@@ -36,9 +36,19 @@ For this workspace, SDK is installed at:
 - POST /api/auth/refresh
    - Request fields: refreshToken
    - Response fields: tokenType, accessToken, refreshToken, expiresIn
+- POST /api/auth/logout
+   - Request fields: refreshToken
+   - Revokes current refresh token
+- POST /api/auth/revoke
+   - Request fields: refreshToken
+   - Explicit refresh token revocation endpoint
 - POST /api/users
    - Request fields: username, email, password
    - Used for Sign Up flow in current milestone
+
+- GET /api/dashboard/summary
+   - Requires Authorization bearer access token
+   - Called after successful Sign In and session restore
 
 Sign In is now wired to real backend token endpoints with local session persistence and refresh on app start.
 

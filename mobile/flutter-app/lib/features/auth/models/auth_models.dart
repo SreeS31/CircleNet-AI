@@ -54,6 +54,32 @@ class AuthTokenBundle {
   }
 }
 
+class DashboardSummary {
+  DashboardSummary({
+    required this.userCount,
+    required this.personCount,
+    required this.circleCount,
+    required this.relationshipCount,
+    required this.permissionCount,
+  });
+
+  final int userCount;
+  final int personCount;
+  final int circleCount;
+  final int relationshipCount;
+  final int permissionCount;
+
+  factory DashboardSummary.fromJson(Map<String, dynamic> json) {
+    return DashboardSummary(
+      userCount: (json['userCount'] as num?)?.toInt() ?? 0,
+      personCount: (json['personCount'] as num?)?.toInt() ?? 0,
+      circleCount: (json['circleCount'] as num?)?.toInt() ?? 0,
+      relationshipCount: (json['relationshipCount'] as num?)?.toInt() ?? 0,
+      permissionCount: (json['permissionCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class RegisterUserRequest {
   RegisterUserRequest({
     required this.username,
