@@ -1,4 +1,5 @@
 import 'package:circlenet_mobile/features/auth/data/auth_api.dart';
+import 'package:circlenet_mobile/features/auth/data/session_store.dart';
 import 'package:circlenet_mobile/features/auth/models/auth_models.dart';
 import 'package:flutter/material.dart';
 
@@ -13,6 +14,7 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final AuthApi _authApi = AuthApi();
+  final SessionStore _sessionStore = SessionStore();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final TextEditingController _usernameController = TextEditingController();
@@ -27,6 +29,7 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     _probeAuthService();
+    _restoreSessionIfAvailable();
   }
 
   @override
@@ -53,6 +56,30 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() {
         _statusMessage = 'Auth service unavailable';
       });
+    }
+  }
+
+  Future<void> _restoreSessionIfAvailable() async {
+    final existingSession = await _sessionStore.load();
+    if (existingSession == null) {
+      return;
+    }
+
+    try {
+      final refreshed = await _authApi.refresh(
+        RefreshRequest(refreshToken: existingSession.refreshToken),
+      );
+      await _sessionStore.save(refreshed);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _statusMessage = 'Session restored';
+      });
+    } catch (_) {
+      await _sessionStore.clear();
     }
   }
 
@@ -84,13 +111,20 @@ class _AuthScreenState extends State<AuthScreen> {
           _statusMessage = 'Registration created for ${result.username} (#${result.id})';
         });
       } else {
-        // Backend currently exposes only /api/auth/health. Keep the sign-in UI in place
-        // and maintain explicit behavior until login endpoint is introduced.
+        final tokenBundle = await _authApi.login(
+          LoginRequest(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          ),
+        );
+        await _sessionStore.save(tokenBundle);
+
         if (!mounted) {
           return;
         }
+
         setState(() {
-          _statusMessage = 'Sign-in endpoint pending backend implementation';
+          _statusMessage = 'Signed in successfully';
         });
       }
     } catch (error) {

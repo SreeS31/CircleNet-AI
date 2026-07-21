@@ -11,6 +11,12 @@ This module contains the initial Spring Boot backend foundation for the CircleNe
 - Relationship endpoints
 - Permission endpoints
 
+## Authentication API
+
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `GET /api/auth/health`
+
 ## Run locally
 
 ```bash
@@ -58,6 +64,7 @@ The backend now uses Flyway versioned migrations as the canonical database sourc
 	- dev/V2__seed_initial_data.sql
 	- common/V3__add_indexes_and_foreign_keys.sql
 	- common/V4__add_data_quality_constraints.sql
+	- common/V5__add_auth_tokens_table.sql
 
 Flyway runs automatically on startup for all profiles.
 

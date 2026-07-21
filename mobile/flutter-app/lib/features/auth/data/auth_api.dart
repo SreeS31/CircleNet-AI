@@ -20,6 +20,38 @@ class AuthApi {
     return AuthHealth(status: response.body.trim());
   }
 
+  Future<AuthTokenBundle> login(LoginRequest request) async {
+    final response = await _apiClient.post(AppConfig.authLoginPath, request.toJson());
+    if (!response.isSuccess) {
+      throw AuthApiException(
+        'Login failed with status ${response.statusCode}',
+      );
+    }
+
+    final data = response.decodeJson();
+    if (data is! Map<String, dynamic>) {
+      throw const AuthApiException('Invalid login response payload');
+    }
+
+    return AuthTokenBundle.fromJson(data);
+  }
+
+  Future<AuthTokenBundle> refresh(RefreshRequest request) async {
+    final response = await _apiClient.post(AppConfig.authRefreshPath, request.toJson());
+    if (!response.isSuccess) {
+      throw AuthApiException(
+        'Refresh failed with status ${response.statusCode}',
+      );
+    }
+
+    final data = response.decodeJson();
+    if (data is! Map<String, dynamic>) {
+      throw const AuthApiException('Invalid refresh response payload');
+    }
+
+    return AuthTokenBundle.fromJson(data);
+  }
+
   Future<RegisterUserResult> registerUser(RegisterUserRequest request) async {
     final response = await _apiClient.post(AppConfig.usersPath, request.toJson());
 

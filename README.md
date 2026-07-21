@@ -66,6 +66,7 @@ Current capabilities:
 - Flutter app scaffold with Material 3 baseline theme
 - Auth flow screens for Sign In and Sign Up
 - API client integration with backend auth health and user registration contracts
+- JWT login and refresh integration with local mobile session persistence
 - Baseline widget test for app rendering
 
 ## Milestone 5: AI Module Foundation

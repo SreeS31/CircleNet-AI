@@ -30,11 +30,17 @@ For this workspace, SDK is installed at:
 
 - GET /api/auth/health
    - Expected response: auth-service-ready
+- POST /api/auth/login
+   - Request fields: email, password
+   - Response fields: tokenType, accessToken, refreshToken, expiresIn
+- POST /api/auth/refresh
+   - Request fields: refreshToken
+   - Response fields: tokenType, accessToken, refreshToken, expiresIn
 - POST /api/users
    - Request fields: username, email, password
    - Used for Sign Up flow in current milestone
 
-Sign In UI is implemented and wired, while final login endpoint integration will be completed when backend introduces token-based auth routes.
+Sign In is now wired to real backend token endpoints with local session persistence and refresh on app start.
 
 ## Test
 
