@@ -64,7 +64,8 @@ Milestone 6 starts with an initial Flutter module under `mobile/flutter-app`.
 Current capabilities:
 
 - Flutter app scaffold with Material 3 baseline theme
-- Initial home screen shell for platform workflows
+- Auth flow screens for Sign In and Sign Up
+- API client integration with backend auth health and user registration contracts
 - Baseline widget test for app rendering
 
 ## Milestone 5: AI Module Foundation
