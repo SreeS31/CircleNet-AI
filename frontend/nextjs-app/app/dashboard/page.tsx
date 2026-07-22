@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { bulkUpdateMilestoneStatus, createCircle, createMilestone, createPerson, createProject, createTask, createUser, deleteMilestone, fetchCircles, fetchDashboardSummary, fetchMilestones, fetchPeople, fetchPermissions, fetchProjects, fetchRelationships, fetchTasks, fetchUsers, hasAuthSession, isUnauthorizedError, logout, updateMilestone } from '../lib/api';
+import { bulkUpdateMilestoneStatus, createCircle, createMilestone, createPerson, createProject, createTask, createUser, deleteMilestone, fetchCircles, fetchDashboardSummary, fetchMilestones, fetchPeople, fetchPermissions, fetchProjects, fetchRelationships, fetchSessionProfile, fetchTasks, fetchUsers, hasAuthSession, isUnauthorizedError, logout, updateMilestone } from '../lib/api';
 
 type ResourceType = 'user' | 'person' | 'circle' | 'project' | 'task' | 'milestone';
 type ToastTone = 'success' | 'error';
@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [milestones, setMilestones] = useState<any[]>([]);
+  const [sessionUser, setSessionUser] = useState<{ username: string; email: string } | null>(null);
   const [resourceType, setResourceType] = useState<ResourceType>('user');
   const [summary, setSummary] = useState({ userCount: 0, personCount: 0, circleCount: 0, relationshipCount: 0, permissionCount: 0 });
   const [status, setStatus] = useState('Ready to add a new record.');
@@ -63,7 +64,8 @@ export default function DashboardPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [usersData, peopleData, circlesData, relationshipsData, permissionsData, projectsData, tasksData, milestonesData, summaryData] = await Promise.all([fetchUsers(), fetchPeople(), fetchCircles(), fetchRelationships(), fetchPermissions(), fetchProjects(), fetchTasks(), fetchMilestones(), fetchDashboardSummary()]);
+      const [profileData, usersData, peopleData, circlesData, relationshipsData, permissionsData, projectsData, tasksData, milestonesData, summaryData] = await Promise.all([fetchSessionProfile(), fetchUsers(), fetchPeople(), fetchCircles(), fetchRelationships(), fetchPermissions(), fetchProjects(), fetchTasks(), fetchMilestones(), fetchDashboardSummary()]);
+        setSessionUser({ username: profileData.username, email: profileData.email });
         setUsers(usersData);
         setPeople(peopleData);
         setCircles(circlesData);
@@ -87,6 +89,7 @@ export default function DashboardPage() {
       setProjects([]);
       setTasks([]);
       setMilestones([]);
+      setSessionUser(null);
       setSummary({ userCount: 0, personCount: 0, circleCount: 0, relationshipCount: 0, permissionCount: 0 });
     }
   }, [router]);
@@ -564,6 +567,7 @@ export default function DashboardPage() {
       <div className="nav">
         <div style={{ fontWeight: 800 }}>Dashboard</div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          {sessionUser && <span style={{ color: '#334155', fontSize: '0.9rem' }}>Signed in as {sessionUser.username}</span>}
           <Link href="/">Back home</Link>
           <button type="button" className="btn" onClick={handleLogout}>Sign out</button>
         </div>

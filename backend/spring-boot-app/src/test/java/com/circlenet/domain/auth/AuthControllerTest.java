@@ -96,6 +96,29 @@ class AuthControllerTest {
   }
 
   @Test
+  void shouldRequireAccessTokenForSessionProfile() throws Exception {
+    createUser("auth-me-user", "auth-me@circlenet.ai", "secret123");
+
+    mockMvc.perform(get("/api/auth/me"))
+      .andExpect(status().isUnauthorized());
+
+    MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new LoginPayload("auth-me@circlenet.ai", "secret123"))))
+      .andExpect(status().isOk())
+      .andReturn();
+
+    TokenPayload loginPayload = objectMapper.readValue(loginResult.getResponse().getContentAsString(), TokenPayload.class);
+
+    mockMvc.perform(get("/api/auth/me")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + loginPayload.accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.id", not(nullValue())))
+      .andExpect(jsonPath("$.username").value("auth-me-user"))
+      .andExpect(jsonPath("$.email").value("auth-me@circlenet.ai"));
+  }
+
+  @Test
   void shouldLogoutAndRevokeRefreshToken() throws Exception {
     createUser("auth-logout-user", "auth-logout@circlenet.ai", "secret123");
 

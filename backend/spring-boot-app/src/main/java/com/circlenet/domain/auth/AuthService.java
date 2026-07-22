@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.circlenet.domain.auth.dto.AuthLoginRequest;
+import com.circlenet.domain.auth.dto.AuthSessionProfileResponse;
 import com.circlenet.domain.auth.dto.AuthRefreshRequest;
 import com.circlenet.domain.auth.dto.AuthTokenResponse;
 import com.circlenet.domain.auth.model.AuthTokenEntity;
@@ -93,6 +94,20 @@ public class AuthService {
     }
 
     authTokenRepository.deleteByToken(request.getRefreshToken());
+  }
+
+  public AuthSessionProfileResponse getSessionProfile(String accessToken) {
+    Claims claims = jwtTokenService.parseAndValidate(accessToken, "access");
+    Long userId = Long.parseLong(claims.getSubject());
+
+    UserEntity user = userRepository.findById(userId)
+      .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+    AuthSessionProfileResponse response = new AuthSessionProfileResponse();
+    response.setId(user.getId());
+    response.setUsername(user.getUsername());
+    response.setEmail(user.getEmail());
+    return response;
   }
 
   private AuthTokenResponse issueNewSession(UserEntity user, String oldRefreshToken) {

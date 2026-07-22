@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchAuthHealth, fetchCircles, fetchMilestones, fetchPeople, fetchPermissions, fetchProjects, fetchRelationships, fetchTasks, fetchUsers, hasAuthSession, logout } from './lib/api';
+import { fetchAuthHealth, fetchCircles, fetchMilestones, fetchPeople, fetchPermissions, fetchProjects, fetchRelationships, fetchSessionProfile, fetchTasks, fetchUsers, hasAuthSession, logout } from './lib/api';
 
 export default function HomePage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -13,6 +13,7 @@ export default function HomePage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [milestones, setMilestones] = useState<any[]>([]);
+  const [sessionUser, setSessionUser] = useState<{ username: string; email: string } | null>(null);
   const [authHealth, setAuthHealth] = useState('checking...');
   const [sessionReady, setSessionReady] = useState(false);
 
@@ -44,12 +45,14 @@ export default function HomePage() {
       }
 
       try {
+        const profile = await fetchSessionProfile();
         const [usersData, peopleData, circlesData, relationshipsData, permissionsData, projectsData, tasksData, milestonesData] = await Promise.all([fetchUsers(), fetchPeople(), fetchCircles(), fetchRelationships(), fetchPermissions(), fetchProjects(), fetchTasks(), fetchMilestones()]);
 
         if (!isMounted) {
           return;
         }
 
+        setSessionUser({ username: profile.username, email: profile.email });
         setUsers(usersData);
         setPeople(peopleData);
         setCircles(circlesData);
@@ -65,6 +68,7 @@ export default function HomePage() {
         }
 
         setSessionReady(false);
+        setSessionUser(null);
         setUsers([]);
         setPeople([]);
         setCircles([]);
@@ -86,6 +90,7 @@ export default function HomePage() {
   const handleSignOut = async () => {
     await logout();
     setSessionReady(false);
+    setSessionUser(null);
     setUsers([]);
     setPeople([]);
     setCircles([]);
@@ -100,7 +105,12 @@ export default function HomePage() {
     <main className="container">
       <nav className="nav">
         <div style={{ fontWeight: 800 }}>CircleNet-AI</div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {sessionUser && (
+            <span style={{ color: '#334155', fontSize: '0.9rem' }}>
+              Signed in as {sessionUser.username}
+            </span>
+          )}
           {sessionReady ? (
             <button type="button" className="btn btn-secondary" onClick={handleSignOut}>Sign Out</button>
           ) : (

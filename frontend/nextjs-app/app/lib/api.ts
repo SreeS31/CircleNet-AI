@@ -8,6 +8,12 @@ type AuthSession = {
   expiresIn: number;
 };
 
+export type SessionProfile = {
+  id: number;
+  username: string;
+  email: string;
+};
+
 type RequestOptions = RequestInit & {
   skipAuth?: boolean;
 };
@@ -144,6 +150,10 @@ export async function fetchAuthHealth() {
     method: 'GET',
     skipAuth: true,
   });
+}
+
+export async function fetchSessionProfile() {
+  return authenticatedRequest<SessionProfile>('/api/auth/me');
 }
 
 export async function logout() {

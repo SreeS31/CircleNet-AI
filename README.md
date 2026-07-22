@@ -95,6 +95,17 @@ Current capabilities:
 - Sign-out action available directly from the landing navigation
 - Consistent authenticated handoff to dashboard workflows
 
+## Milestone 9: Session Identity Introspection
+
+Milestone 9 adds authenticated user identity introspection for web clients.
+
+Current capabilities:
+
+- Backend `GET /api/auth/me` endpoint for access-token session profile retrieval
+- Bearer-protected auth-me path via JWT security filter and security chain rules
+- Frontend session profile client integration for landing and dashboard experiences
+- Signed-in identity context displayed in web navigation surfaces
+
 ## Milestone 5: AI Module Foundation
 
 Milestone 5 starts with an initial AI service module under `ai/agent-service`.
