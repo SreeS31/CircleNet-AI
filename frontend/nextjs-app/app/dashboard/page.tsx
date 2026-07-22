@@ -1,13 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { bulkUpdateMilestoneStatus, createCircle, createMilestone, createPerson, createProject, createTask, createUser, deleteMilestone, fetchCircles, fetchDashboardSummary, fetchMilestones, fetchPeople, fetchPermissions, fetchProjects, fetchRelationships, fetchTasks, fetchUsers, updateMilestone } from '../lib/api';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { bulkUpdateMilestoneStatus, createCircle, createMilestone, createPerson, createProject, createTask, createUser, deleteMilestone, fetchCircles, fetchDashboardSummary, fetchMilestones, fetchPeople, fetchPermissions, fetchProjects, fetchRelationships, fetchTasks, fetchUsers, hasAuthSession, isUnauthorizedError, logout, updateMilestone } from '../lib/api';
 
 type ResourceType = 'user' | 'person' | 'circle' | 'project' | 'task' | 'milestone';
 type ToastTone = 'success' | 'error';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<any[]>([]);
   const [people, setPeople] = useState<any[]>([]);
   const [circles, setCircles] = useState<any[]>([]);
@@ -59,9 +61,9 @@ export default function DashboardPage() {
     milestoneBlockedReason: '',
   });
 
-  const loadData = () => {
-    Promise.all([fetchUsers(), fetchPeople(), fetchCircles(), fetchRelationships(), fetchPermissions(), fetchProjects(), fetchTasks(), fetchMilestones(), fetchDashboardSummary()])
-      .then(([usersData, peopleData, circlesData, relationshipsData, permissionsData, projectsData, tasksData, milestonesData, summaryData]) => {
+  const loadData = useCallback(async () => {
+    try {
+      const [usersData, peopleData, circlesData, relationshipsData, permissionsData, projectsData, tasksData, milestonesData, summaryData] = await Promise.all([fetchUsers(), fetchPeople(), fetchCircles(), fetchRelationships(), fetchPermissions(), fetchProjects(), fetchTasks(), fetchMilestones(), fetchDashboardSummary()]);
         setUsers(usersData);
         setPeople(peopleData);
         setCircles(circlesData);
@@ -71,23 +73,32 @@ export default function DashboardPage() {
         setTasks(tasksData);
         setMilestones(milestonesData);
         setSummary(summaryData);
-      })
-      .catch(() => {
-        setUsers([]);
-        setPeople([]);
-        setCircles([]);
-        setRelationships([]);
-        setPermissions([]);
-        setProjects([]);
-        setTasks([]);
-        setMilestones([]);
-        setSummary({ userCount: 0, personCount: 0, circleCount: 0, relationshipCount: 0, permissionCount: 0 });
-      });
-  };
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        router.replace('/auth?reason=session-expired');
+        return;
+      }
+
+      setUsers([]);
+      setPeople([]);
+      setCircles([]);
+      setRelationships([]);
+      setPermissions([]);
+      setProjects([]);
+      setTasks([]);
+      setMilestones([]);
+      setSummary({ userCount: 0, personCount: 0, circleCount: 0, relationshipCount: 0, permissionCount: 0 });
+    }
+  }, [router]);
 
   useEffect(() => {
+    if (!hasAuthSession()) {
+      router.replace('/auth');
+      return;
+    }
+
     loadData();
-  }, []);
+  }, [loadData, router]);
 
   useEffect(() => {
     if (!toast) {
@@ -529,6 +540,11 @@ export default function DashboardPage() {
     }
   };
 
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/auth');
+  };
+
   return (
     <main className="container" style={{ paddingTop: '3rem' }}>
       {toast && (
@@ -547,7 +563,10 @@ export default function DashboardPage() {
 
       <div className="nav">
         <div style={{ fontWeight: 800 }}>Dashboard</div>
-        <Link href="/">Back home</Link>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <Link href="/">Back home</Link>
+          <button type="button" className="btn" onClick={handleLogout}>Sign out</button>
+        </div>
       </div>
 
       <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: '1rem' }}>

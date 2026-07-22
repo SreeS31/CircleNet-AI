@@ -71,6 +71,18 @@ Current capabilities:
 - Authenticated mobile dashboard summary call using bearer access token
 - Baseline widget test for app rendering
 
+## Milestone 7: Web Authenticated Dashboard
+
+Milestone 7 secures the Next.js dashboard with backend JWT session flows.
+
+Current capabilities:
+
+- Web sign-in page integrated with `POST /api/auth/login`
+- Browser session persistence for access and refresh tokens
+- Automatic token refresh fallback via `POST /api/auth/refresh`
+- Authenticated dashboard API calls using bearer access tokens
+- Web logout flow integrated with `POST /api/auth/logout`
+
 ## Milestone 5: AI Module Foundation
 
 Milestone 5 starts with an initial AI service module under `ai/agent-service`.

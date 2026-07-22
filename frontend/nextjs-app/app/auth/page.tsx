@@ -1,14 +1,45 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+import { hasAuthSession, login } from '../lib/api';
 
 export default function AuthPage() {
-  const [status, setStatus] = useState('Ready to connect');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState('admin@circlenet.ai');
+  const [password, setPassword] = useState('admin123');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [status, setStatus] = useState('Sign in with your CircleNet account.');
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (hasAuthSession()) {
+      router.replace('/dashboard');
+      return;
+    }
+
+    const reason = searchParams.get('reason');
+    if (reason === 'session-expired') {
+      setStatus('Your session expired. Please sign in again.');
+    }
+  }, [router, searchParams]);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setStatus('Authentication is ready. Use the seeded admin account to access the backend.');
+    setIsSubmitting(true);
+    setStatus('Signing you in...');
+
+    try {
+      await login(email.trim(), password);
+      setStatus('Signed in. Redirecting to dashboard...');
+      router.replace('/dashboard');
+    } catch {
+      setStatus('Sign-in failed. Check your credentials and backend availability.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -20,13 +51,29 @@ export default function AuthPage() {
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1rem' }}>
           <label style={{ display: 'grid', gap: '0.4rem' }}>
             <span>Email</span>
-            <input type="email" placeholder="admin@circlenet.ai" style={{ padding: '0.8rem', borderRadius: '0.75rem', border: '1px solid #dbe3ee' }} />
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="admin@circlenet.ai"
+              style={{ padding: '0.8rem', borderRadius: '0.75rem', border: '1px solid #dbe3ee' }}
+            />
           </label>
           <label style={{ display: 'grid', gap: '0.4rem' }}>
             <span>Password</span>
-            <input type="password" placeholder="demo-password" style={{ padding: '0.8rem', borderRadius: '0.75rem', border: '1px solid #dbe3ee' }} />
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="demo-password"
+              style={{ padding: '0.8rem', borderRadius: '0.75rem', border: '1px solid #dbe3ee' }}
+            />
           </label>
-          <button className="btn btn-primary" type="submit">Continue</button>
+          <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Signing in...' : 'Continue'}
+          </button>
         </form>
 
         <p style={{ marginTop: '1rem', color: '#2563eb' }}>{status}</p>
