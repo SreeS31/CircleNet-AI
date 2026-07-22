@@ -116,6 +116,7 @@ export default function HomePage() {
           ) : (
             <Link href="/auth">Sign In</Link>
           )}
+          <Link href="/session">Session</Link>
           <Link href="/dashboard">Dashboard</Link>
         </div>
       </nav>

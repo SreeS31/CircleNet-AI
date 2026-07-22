@@ -569,6 +569,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           {sessionUser && <span style={{ color: '#334155', fontSize: '0.9rem' }}>Signed in as {sessionUser.username}</span>}
           <Link href="/">Back home</Link>
+          <Link href="/session">Session</Link>
           <button type="button" className="btn" onClick={handleLogout}>Sign out</button>
         </div>
       </div>

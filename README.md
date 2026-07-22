@@ -106,6 +106,18 @@ Current capabilities:
 - Frontend session profile client integration for landing and dashboard experiences
 - Signed-in identity context displayed in web navigation surfaces
 
+## Milestone 10: Web Session Control Center
+
+Milestone 10 adds first-class web session lifecycle controls and observability.
+
+Current capabilities:
+
+- Dedicated session control page at `/session`
+- Live session identity and token lifetime visibility for signed-in users
+- Manual access token refresh workflow using `POST /api/auth/refresh`
+- Explicit session revocation workflow using `POST /api/auth/revoke`
+- Unified navigation entry points to session controls from landing and dashboard pages
+
 ## Milestone 5: AI Module Foundation
 
 Milestone 5 starts with an initial AI service module under `ai/agent-service`.
