@@ -88,7 +88,12 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json() as Promise<T>;
+  }
+
+  return response.text() as Promise<T>;
 }
 
 async function refreshSessionOrThrow() {
@@ -132,6 +137,13 @@ export async function login(email: string, password: string) {
   });
   setStoredAuthSession(session);
   return session;
+}
+
+export async function fetchAuthHealth() {
+  return request<string>('/api/auth/health', {
+    method: 'GET',
+    skipAuth: true,
+  });
 }
 
 export async function logout() {

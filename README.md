@@ -83,6 +83,18 @@ Current capabilities:
 - Authenticated dashboard API calls using bearer access tokens
 - Web logout flow integrated with `POST /api/auth/logout`
 
+## Milestone 8: Web Session Bootstrap Experience
+
+Milestone 8 improves public-to-authenticated flow on the Next.js web app.
+
+Current capabilities:
+
+- Landing page always remains available without login
+- Public auth service health check integration via `GET /api/auth/health`
+- Session-aware landing behavior that enriches workspace data for signed-in users
+- Sign-out action available directly from the landing navigation
+- Consistent authenticated handoff to dashboard workflows
+
 ## Milestone 5: AI Module Foundation
 
 Milestone 5 starts with an initial AI service module under `ai/agent-service`.
