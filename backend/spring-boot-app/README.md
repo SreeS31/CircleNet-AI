@@ -17,9 +17,12 @@ This module contains the initial Spring Boot backend foundation for the CircleNe
 - `POST /api/auth/refresh`
 - `POST /api/auth/logout`
 - `POST /api/auth/revoke`
+- `GET /api/auth/me`
 - `GET /api/auth/health`
 
-`/api/dashboard/**` endpoints now require `Authorization: Bearer <accessToken>`.
+`/api/auth/me` and `/api/dashboard/**` endpoints require `Authorization: Bearer <accessToken>`.
+
+User registration requires a unique mobile number. Email is optional and, when supplied, must also be unique. Sign in accepts either an email address or mobile number through the `identifier` request field.
 
 ## Run locally
 

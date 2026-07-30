@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -35,12 +36,15 @@ class MilestoneControllerTest {
 
   @Test
   void shouldCreateListUpdateDeleteAndFilterMilestones() throws Exception {
+    String accessToken = issueAccessToken();
+
     CreateProjectRequest projectRequest = new CreateProjectRequest();
     projectRequest.setName("Milestone Test Project");
     projectRequest.setDescription("Project used to validate milestone project linkage");
     projectRequest.setStatus("Active");
 
     MvcResult projectResult = mockMvc.perform(post("/api/projects")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(projectRequest)))
       .andExpect(status().isOk())
@@ -57,6 +61,7 @@ class MilestoneControllerTest {
     request.setDueDate(java.time.LocalDate.parse("2026-10-15"));
 
     MvcResult createResult = mockMvc.perform(post("/api/milestones")
+      .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(request)))
       .andExpect(status().isOk())
@@ -68,11 +73,14 @@ class MilestoneControllerTest {
 
     Long milestoneId = objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asLong();
 
-    mockMvc.perform(get("/api/milestones"))
+    mockMvc.perform(get("/api/milestones")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.length()").value(greaterThanOrEqualTo(1)));
 
-    mockMvc.perform(get("/api/milestones").param("projectId", projectId.toString()))
+    mockMvc.perform(get("/api/milestones")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+        .param("projectId", projectId.toString()))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.length()").value(greaterThanOrEqualTo(1)));
 
@@ -85,6 +93,7 @@ class MilestoneControllerTest {
     updateRequest.setBlockedReason("Waiting for security approval");
 
     mockMvc.perform(put("/api/milestones/{id}", milestoneId)
+      .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(updateRequest)))
       .andExpect(status().isOk())
@@ -93,18 +102,21 @@ class MilestoneControllerTest {
       .andExpect(jsonPath("$.dueDate").value("2026-11-01"))
       .andExpect(jsonPath("$.blockedReason").value("Waiting for security approval"));
 
-    mockMvc.perform(get("/api/milestones/{id}", milestoneId))
+    mockMvc.perform(get("/api/milestones/{id}", milestoneId)
+      .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.id").value(milestoneId))
       .andExpect(jsonPath("$.dueDate").value("2026-11-01"))
       .andExpect(jsonPath("$.blockedReason").value("Waiting for security approval"));
 
     mockMvc.perform(post("/api/milestones/bulk-status")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content("{\"milestoneIds\":[" + milestoneId + "],\"status\":\"Blocked\"}"))
       .andExpect(status().isBadRequest());
 
     mockMvc.perform(post("/api/milestones/bulk-status")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content("{\"milestoneIds\":[" + milestoneId + "],\"status\":\"Blocked\",\"blockedReason\":\"Dependency from vendor API\"}"))
       .andExpect(status().isOk())
@@ -113,6 +125,7 @@ class MilestoneControllerTest {
       .andExpect(jsonPath("$[0].blockedReason").value("Dependency from vendor API"));
 
     mockMvc.perform(post("/api/milestones/bulk-status")
+      .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content("{\"milestoneIds\":[" + milestoneId + "],\"status\":\"Completed\"}"))
       .andExpect(status().isOk())
@@ -120,10 +133,29 @@ class MilestoneControllerTest {
       .andExpect(jsonPath("$[0].status").value("Completed"))
       .andExpect(jsonPath("$[0].blockedReason", nullValue()));
 
-    mockMvc.perform(delete("/api/milestones/{id}", milestoneId))
+    mockMvc.perform(delete("/api/milestones/{id}", milestoneId)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
       .andExpect(status().isNoContent());
 
-    mockMvc.perform(get("/api/milestones/{id}", milestoneId))
+    mockMvc.perform(get("/api/milestones/{id}", milestoneId)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
       .andExpect(status().isNotFound());
+  }
+
+  private String issueAccessToken() throws Exception {
+    MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"email\":\"admin@circlenet.ai\",\"password\":\"admin123\"}"))
+      .andExpect(status().isOk())
+      .andReturn();
+
+    return objectMapper.readTree(loginResult.getResponse().getContentAsString()).get("accessToken").asText();
+  }
+
+  private void createUser(String username, String email, String password) throws Exception {
+    mockMvc.perform(post("/api/users")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"username\":\"" + username + "\",\"email\":\"" + email + "\",\"phoneNumber\":\"+1555" + Math.abs(username.hashCode()) + "\",\"password\":\"" + password + "\"}"))
+      .andExpect(status().isOk());
   }
 }

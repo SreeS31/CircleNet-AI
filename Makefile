@@ -18,8 +18,10 @@ docker-down:
 	docker compose down
 
 ci:
-	@echo "Repository validation placeholder"
-	@echo "Add lint, test, and build commands here as modules are introduced"
+	$(MAKE) ai-test
+	cd frontend/nextjs-app && npm ci && npm run build
+	cd backend/spring-boot-app && mvn --batch-mode test
+	cd mobile/flutter-app && flutter test
 
 ai-install:
 	python -m pip install -r ai/agent-service/requirements.txt

@@ -27,3 +27,7 @@ spring:
 
 server:
   port: 8080
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:circlenet-local-dev-jwt-secret-please-change-2026-strong}

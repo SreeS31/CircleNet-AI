@@ -29,6 +29,15 @@ public class ProjectService {
     return toDto(projectRepository.save(entity));
   }
 
+  public ProjectDto updateProject(Long id, CreateProjectRequest request) {
+    ProjectEntity entity = projectRepository.findById(id)
+      .orElseThrow(() -> new IllegalArgumentException("Project not found"));
+    entity.setName(request.getName());
+    entity.setDescription(request.getDescription());
+    entity.setStatus(request.getStatus());
+    return toDto(projectRepository.save(entity));
+  }
+
   private ProjectDto toDto(ProjectEntity entity) {
     ProjectDto dto = new ProjectDto();
     dto.setId(entity.getId());

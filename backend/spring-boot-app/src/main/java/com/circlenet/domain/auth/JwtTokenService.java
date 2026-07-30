@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -18,14 +19,28 @@ import javax.crypto.SecretKey;
 
 @Service
 public class JwtTokenService {
+  private static final String INSECURE_DEFAULT_SECRET = "circlenet-dev-secret-key-change-me-32bytes";
+
   private final String jwtSecret;
   private final long accessTokenMinutes;
   private final long refreshTokenDays;
 
   public JwtTokenService(
-      @Value("${security.jwt.secret:circlenet-dev-secret-key-change-me-32bytes}") String jwtSecret,
+      @Value("${security.jwt.secret}") String jwtSecret,
       @Value("${security.jwt.access-token-minutes:15}") long accessTokenMinutes,
       @Value("${security.jwt.refresh-token-days:7}") long refreshTokenDays) {
+    if (jwtSecret == null || jwtSecret.isBlank()) {
+      throw new IllegalStateException("security.jwt.secret must be configured");
+    }
+
+    if (INSECURE_DEFAULT_SECRET.equals(jwtSecret)) {
+      throw new IllegalStateException("security.jwt.secret must not use the insecure default value");
+    }
+
+    if (jwtSecret.length() < 32) {
+      throw new IllegalStateException("security.jwt.secret must be at least 32 characters");
+    }
+
     this.jwtSecret = jwtSecret;
     this.accessTokenMinutes = accessTokenMinutes;
     this.refreshTokenDays = refreshTokenDays;
@@ -72,7 +87,9 @@ public class JwtTokenService {
 
     return Jwts.builder()
       .subject(String.valueOf(user.getId()))
+      .id(UUID.randomUUID().toString())
       .claim("username", user.getUsername())
+      .claim("role", user.getRole())
       .claim("type", tokenType)
       .issuedAt(Date.from(now))
       .expiration(Date.from(expiresAt))

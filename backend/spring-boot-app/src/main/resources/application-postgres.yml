@@ -17,3 +17,7 @@ spring:
   h2:
     console:
       enabled: false
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:circlenet-local-dev-jwt-secret-please-change-2026-strong}

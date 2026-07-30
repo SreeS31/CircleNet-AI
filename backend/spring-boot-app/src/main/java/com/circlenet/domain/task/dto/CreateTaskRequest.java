@@ -6,6 +6,7 @@ public class CreateTaskRequest {
   private String status;
   private Long projectId;
   private Long milestoneId;
+  private Long taskGroupId;
 
   public String getTitle() {
     return title;
@@ -46,4 +47,6 @@ public class CreateTaskRequest {
   public void setMilestoneId(Long milestoneId) {
     this.milestoneId = milestoneId;
   }
+  public Long getTaskGroupId() { return taskGroupId; }
+  public void setTaskGroupId(Long taskGroupId) { this.taskGroupId = taskGroupId; }
 }

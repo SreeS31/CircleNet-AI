@@ -2,6 +2,7 @@ package com.circlenet.config;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.circlenet.domain.circle.CircleRepository;
 import com.circlenet.domain.circle.model.CircleEntity;
@@ -21,27 +22,34 @@ public class DataSeeder implements CommandLineRunner {
   private final CircleRepository circleRepository;
   private final RelationshipRepository relationshipRepository;
   private final PermissionRepository permissionRepository;
+  private final PasswordEncoder passwordEncoder;
 
   public DataSeeder(
       UserRepository userRepository,
       PersonRepository personRepository,
       CircleRepository circleRepository,
       RelationshipRepository relationshipRepository,
-      PermissionRepository permissionRepository) {
+      PermissionRepository permissionRepository,
+      PasswordEncoder passwordEncoder) {
     this.userRepository = userRepository;
     this.personRepository = personRepository;
     this.circleRepository = circleRepository;
     this.relationshipRepository = relationshipRepository;
     this.permissionRepository = permissionRepository;
+    this.passwordEncoder = passwordEncoder;
   }
 
   @Override
   public void run(String... args) {
+    migrateLegacyPasswords();
+
     if (userRepository.count() == 0) {
       UserEntity user = new UserEntity();
       user.setUsername("admin");
       user.setEmail("admin@circlenet.ai");
-      user.setPasswordHash("demo-password");
+      user.setPhoneNumber("+10000000000");
+      user.setRole("ADMIN");
+      user.setPasswordHash(passwordEncoder.encode("admin123"));
       userRepository.save(user);
     }
 
@@ -71,5 +79,19 @@ public class DataSeeder implements CommandLineRunner {
       permission.setDescription("Full platform access");
       permissionRepository.save(permission);
     }
+  }
+
+  private void migrateLegacyPasswords() {
+    userRepository.findAll().forEach((user) -> {
+      if (!isBcryptHash(user.getPasswordHash())) {
+        user.setPasswordHash(passwordEncoder.encode(user.getPasswordHash()));
+        userRepository.save(user);
+      }
+    });
+  }
+
+  private boolean isBcryptHash(String passwordHash) {
+    return passwordHash != null
+      && (passwordHash.startsWith("$2a$") || passwordHash.startsWith("$2b$") || passwordHash.startsWith("$2y$"));
   }
 }

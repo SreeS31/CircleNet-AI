@@ -10,8 +10,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import com.circlenet.domain.milestone.dto.CreateMilestoneRequest;
 import com.circlenet.domain.project.dto.CreateProjectRequest;
@@ -27,6 +29,8 @@ class DataQualityConstraintIntegrationTest {
 
   @Autowired
   private ObjectMapper objectMapper;
+
+  private String cachedAccessToken;
 
   @Test
   void shouldRejectProjectWithInvalidStatusViaDbConstraint() {
@@ -60,6 +64,7 @@ class DataQualityConstraintIntegrationTest {
 
   private void assertConstraintViolationOnCreate(String endpoint, Object payload, String constraintName) {
     Exception exception = assertThrows(Exception.class, () -> mockMvc.perform(post(endpoint)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueAccessToken())
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(payload)))
       .andReturn());
@@ -81,5 +86,20 @@ class DataQualityConstraintIntegrationTest {
       current = current.getCause();
     }
     return builder.toString();
+  }
+
+  private String issueAccessToken() throws Exception {
+    if (cachedAccessToken != null) {
+      return cachedAccessToken;
+    }
+
+    MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"email\":\"admin@circlenet.ai\",\"password\":\"admin123\"}"))
+      .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+      .andReturn();
+
+    cachedAccessToken = objectMapper.readTree(loginResult.getResponse().getContentAsString()).get("accessToken").asText();
+    return cachedAccessToken;
   }
 }

@@ -30,6 +30,9 @@ public class TaskEntity {
   @Column
   private Long milestoneId;
 
+  @Column
+  private Long taskGroupId;
+
   public Long getId() {
     return id;
   }
@@ -73,4 +76,7 @@ public class TaskEntity {
   public void setMilestoneId(Long milestoneId) {
     this.milestoneId = milestoneId;
   }
+
+  public Long getTaskGroupId() { return taskGroupId; }
+  public void setTaskGroupId(Long taskGroupId) { this.taskGroupId = taskGroupId; }
 }

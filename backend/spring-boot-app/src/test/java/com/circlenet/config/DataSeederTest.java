@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.circlenet.domain.circle.CircleRepository;
 import com.circlenet.domain.permission.PermissionRepository;
@@ -33,6 +34,9 @@ class DataSeederTest {
   @Mock
   private PermissionRepository permissionRepository;
 
+  @Mock
+  private PasswordEncoder passwordEncoder;
+
   @InjectMocks
   private DataSeeder dataSeeder;
 
@@ -43,6 +47,7 @@ class DataSeederTest {
     when(circleRepository.count()).thenReturn(0L);
     when(relationshipRepository.count()).thenReturn(0L);
     when(permissionRepository.count()).thenReturn(0L);
+    when(passwordEncoder.encode(any())).thenReturn("hashed-password");
 
     dataSeeder.run();
 

@@ -24,6 +24,8 @@ export type SessionProfile = {
   id: number;
   username: string;
   email: string;
+  phoneNumber: string;
+  role: string;
 };
 
 type RequestOptions = RequestInit & {
@@ -139,7 +141,19 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status);
+    const errorBody = await response.text();
+    let message = `Request failed: ${response.status}`;
+
+    if (errorBody) {
+      try {
+        const parsed = JSON.parse(errorBody) as { message?: string; error?: string };
+        message = parsed.message || parsed.error || message;
+      } catch {
+        message = errorBody;
+      }
+    }
+
+    throw new ApiError(response.status, message);
   }
 
   if (response.status === 204) {
@@ -191,10 +205,10 @@ async function authenticatedRequest<T>(path: string, init?: RequestInit): Promis
   }
 }
 
-export async function login(email: string, password: string) {
+export async function login(identifier: string, password: string) {
   const session = await request<AuthSession>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ identifier, password }),
     skipAuth: true,
   });
   setStoredAuthSession(session);
@@ -252,11 +266,16 @@ export async function fetchUsers() {
   return authenticatedRequest<any[]>('/api/users');
 }
 
-export async function createUser(payload: { username: string; email: string; password: string }) {
-  return authenticatedRequest<any>('/api/users', {
+export async function createUser(payload: { username: string; email?: string; phoneNumber: string; password: string }) {
+  return request<any>('/api/users', {
     method: 'POST',
     body: JSON.stringify(payload),
+    skipAuth: true,
   });
+}
+
+export async function updateUser(id: number, payload: { username: string; email?: string; phoneNumber: string; password?: string }) {
+  return authenticatedRequest<any>(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
 export async function fetchPeople() {
@@ -270,6 +289,10 @@ export async function createPerson(payload: { fullName: string; email: string })
   });
 }
 
+export async function updatePerson(id: number, payload: { fullName: string; email: string }) {
+  return authenticatedRequest<any>(`/api/people/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
 export async function fetchCircles() {
   return authenticatedRequest<any[]>('/api/circles');
 }
@@ -281,12 +304,32 @@ export async function createCircle(payload: { name: string; description: string 
   });
 }
 
+export async function updateCircle(id: number, payload: { name: string; description: string }) {
+  return authenticatedRequest<any>(`/api/circles/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
 export async function fetchRelationships() {
   return authenticatedRequest<any[]>('/api/relationships');
 }
 
+export async function createRelationship(payload: { type: string }) {
+  return authenticatedRequest<any>('/api/relationships', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function createTaskGroup(payload: { name: string; description: string }) {
+  return authenticatedRequest<any>('/api/task-groups', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function updateRelationship(id: number, payload: { type: string }) {
+  return authenticatedRequest<any>(`/api/relationships/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
 export async function fetchPermissions() {
   return authenticatedRequest<any[]>('/api/permissions');
+}
+
+export async function updatePermission(id: number, payload: { name: string; description: string }) {
+  return authenticatedRequest<any>(`/api/permissions/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
 export async function fetchProjects() {
@@ -298,6 +341,10 @@ export async function createProject(payload: { name: string; description: string
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export async function updateProject(id: number, payload: { name: string; description: string; status: string }) {
+  return authenticatedRequest<any>(`/api/projects/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
 export async function fetchTasks() {
@@ -313,6 +360,10 @@ export async function createTask(payload: { title: string; details: string; stat
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export async function updateTask(id: number, payload: { title: string; details: string; status: string; projectId?: number; milestoneId?: number }) {
+  return authenticatedRequest<any>(`/api/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
 export async function fetchMilestones() {

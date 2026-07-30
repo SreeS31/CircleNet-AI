@@ -8,6 +8,6 @@ void main() {
 
     expect(find.text('CircleNet-AI Auth'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Sign In'), findsOneWidget);
-    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Email or mobile number'), findsOneWidget);
   });
 }

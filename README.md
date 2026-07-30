@@ -9,8 +9,37 @@ This milestone delivers the core repository scaffolding for a production-ready e
 - Repository metadata and licensing
 - Standardized editor and Git configuration
 - Container-based local development environment
-- CI workflow for validation and consistency
+- CI workflow that validates repository structure and runs backend, frontend, AI, and mobile checks
 - Initial module directories for future implementation
+
+## Milestone 2: Relationship Domain Foundation
+
+This milestone delivers the secured backend domain APIs for the collaboration graph:
+
+- User and person management
+- Circles and relationship management
+- Permission management
+- Authenticated CRUD endpoints with missing-resource handling
+- Integration coverage for each relationship-domain API lifecycle
+
+## Milestone 3: Project Delivery Foundation
+
+This milestone provides the delivery-planning backend capabilities:
+
+- Projects, milestones, and tasks
+- Milestone status updates, blocking reasons, and bulk status changes
+- Task filtering by milestone and milestone filtering by project
+- Authenticated dashboard summary data
+- Flyway migrations, data-quality constraints, and development seed data
+
+## Milestone 4: Web Design System Foundation
+
+This milestone establishes the shared web presentation baseline:
+
+- Design tokens for color, typography, spacing, radii, and elevation
+- Reusable layout, component, and utility styles
+- Responsive design-system demonstration page
+- A documented foundation for the Next.js application
 
 ## Repository Structure
 
@@ -56,6 +85,18 @@ This milestone delivers the core repository scaffolding for a production-ready e
 - `make ai-test` - Run AI service test suite
 - `make mobile-get` - Install Flutter mobile dependencies
 - `make mobile-test` - Run Flutter mobile tests
+
+## Milestone 5: AI Module Foundation
+
+Milestone 5 starts with an initial AI service module under `ai/agent-service`.
+
+Current capabilities:
+
+- FastAPI service scaffold with health endpoints
+- Versioned API namespace (`/api/v1`)
+- Strongly typed request/response models
+- Config-driven behavior via environment variables
+- Test baseline for service health checks
 
 ## Milestone 6: Mobile Foundation
 
@@ -117,18 +158,6 @@ Current capabilities:
 - Manual access token refresh workflow using `POST /api/auth/refresh`
 - Explicit session revocation workflow using `POST /api/auth/revoke`
 - Unified navigation entry points to session controls from landing and dashboard pages
-
-## Milestone 5: AI Module Foundation
-
-Milestone 5 starts with an initial AI service module under `ai/agent-service`.
-
-Current capabilities:
-
-- FastAPI service scaffold with health endpoints
-- Versioned API namespace (`/api/v1`)
-- Strongly typed request/response models
-- Config-driven behavior via environment variables
-- Test baseline for service health checks
 
 ## Quality Standards
 

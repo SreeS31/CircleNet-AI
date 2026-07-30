@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 import { hasAuthSession, login } from '../lib/api';
 
-export default function AuthPage() {
+function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState('admin@circlenet.ai');
+  const [identifier, setIdentifier] = useState('admin@circlenet.ai');
   const [password, setPassword] = useState('admin123');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState('Sign in with your CircleNet account.');
@@ -32,7 +32,7 @@ export default function AuthPage() {
     setStatus('Signing you in...');
 
     try {
-      await login(email.trim(), password);
+      await login(identifier.trim(), password);
       setStatus('Signed in. Redirecting to dashboard...');
       router.replace('/dashboard');
     } catch {
@@ -50,13 +50,13 @@ export default function AuthPage() {
 
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1rem' }}>
           <label style={{ display: 'grid', gap: '0.4rem' }}>
-            <span>Email</span>
+            <span>Email or mobile number</span>
             <input
-              type="email"
+              type="text"
               required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="admin@circlenet.ai"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder="admin@circlenet.ai or +15551234567"
               style={{ padding: '0.8rem', borderRadius: '0.75rem', border: '1px solid #dbe3ee' }}
             />
           </label>
@@ -82,5 +82,13 @@ export default function AuthPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<main className="container" style={{ paddingTop: '3rem' }}>Loading sign-in…</main>}>
+      <AuthForm />
+    </Suspense>
   );
 }

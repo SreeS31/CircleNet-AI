@@ -4,6 +4,8 @@ public class AuthSessionProfileResponse {
   private Long id;
   private String username;
   private String email;
+  private String role;
+  private String phoneNumber;
 
   public Long getId() {
     return id;
@@ -27,5 +29,21 @@ public class AuthSessionProfileResponse {
 
   public void setEmail(String email) {
     this.email = email;
+  }
+
+  public String getRole() {
+    return role;
+  }
+
+  public void setRole(String role) {
+    this.role = role;
+  }
+
+  public String getPhoneNumber() {
+    return phoneNumber;
+  }
+
+  public void setPhoneNumber(String phoneNumber) {
+    this.phoneNumber = phoneNumber;
   }
 }

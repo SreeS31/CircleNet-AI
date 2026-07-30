@@ -167,11 +167,11 @@ class AuthControllerTest {
   private void createUser(String username, String email, String password) throws Exception {
     mockMvc.perform(post("/api/users")
         .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(new CreateUserPayload(username, email, password))))
+        .content(objectMapper.writeValueAsString(new CreateUserPayload(username, email, "+1555" + Math.abs(username.hashCode()), password))))
       .andExpect(status().isOk());
   }
 
-  private record CreateUserPayload(String username, String email, String password) {
+  private record CreateUserPayload(String username, String email, String phoneNumber, String password) {
   }
 
   private record LoginPayload(String email, String password) {

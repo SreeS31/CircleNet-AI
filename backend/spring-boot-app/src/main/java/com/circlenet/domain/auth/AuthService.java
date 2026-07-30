@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.circlenet.domain.auth.dto.AuthLoginRequest;
 import com.circlenet.domain.auth.dto.AuthSessionProfileResponse;
@@ -23,14 +24,17 @@ public class AuthService {
   private final AuthTokenRepository authTokenRepository;
   private final UserRepository userRepository;
   private final JwtTokenService jwtTokenService;
+  private final PasswordEncoder passwordEncoder;
 
   public AuthService(
       AuthTokenRepository authTokenRepository,
       UserRepository userRepository,
-      JwtTokenService jwtTokenService) {
+      JwtTokenService jwtTokenService,
+      PasswordEncoder passwordEncoder) {
     this.authTokenRepository = authTokenRepository;
     this.userRepository = userRepository;
     this.jwtTokenService = jwtTokenService;
+    this.passwordEncoder = passwordEncoder;
   }
 
   public List<AuthTokenEntity> listTokens() {
@@ -46,10 +50,20 @@ public class AuthService {
   }
 
   public AuthTokenResponse login(AuthLoginRequest request) {
-    UserEntity user = userRepository.findByEmail(request.getEmail())
+    String identifier = request.getIdentifier();
+    if (identifier == null || identifier.isBlank()) {
+      identifier = request.getEmail();
+    }
+    if (identifier == null || identifier.isBlank() || request.getPassword() == null || request.getPassword().isBlank()) {
+      throw new IllegalArgumentException("Invalid email, phone number, or password");
+    }
+
+    String normalizedIdentifier = identifier.trim();
+    UserEntity user = userRepository.findByEmail(normalizedIdentifier.toLowerCase())
+      .or(() -> userRepository.findByPhoneNumber(normalizePhoneNumber(normalizedIdentifier)))
       .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
 
-    if (!user.getPasswordHash().equals(request.getPassword())) {
+    if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
       throw new IllegalArgumentException("Invalid email or password");
     }
 
@@ -107,6 +121,8 @@ public class AuthService {
     response.setId(user.getId());
     response.setUsername(user.getUsername());
     response.setEmail(user.getEmail());
+    response.setRole(user.getRole());
+    response.setPhoneNumber(user.getPhoneNumber());
     return response;
   }
 
@@ -132,5 +148,9 @@ public class AuthService {
     response.setRefreshToken(refreshToken);
     response.setExpiresIn(jwtTokenService.getAccessTokenExpirySeconds());
     return response;
+  }
+
+  private String normalizePhoneNumber(String value) {
+    return value.replaceAll("[\\s()-]", "");
   }
 }

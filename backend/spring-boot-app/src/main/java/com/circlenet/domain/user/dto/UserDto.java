@@ -4,7 +4,8 @@ public class UserDto {
   private Long id;
   private String username;
   private String email;
-  private String passwordHash;
+  private String phoneNumber;
+  private String role;
 
   public Long getId() {
     return id;
@@ -30,11 +31,19 @@ public class UserDto {
     this.email = email;
   }
 
-  public String getPasswordHash() {
-    return passwordHash;
+  public String getPhoneNumber() {
+    return phoneNumber;
   }
 
-  public void setPasswordHash(String passwordHash) {
-    this.passwordHash = passwordHash;
+  public void setPhoneNumber(String phoneNumber) {
+    this.phoneNumber = phoneNumber;
+  }
+
+  public String getRole() {
+    return role;
+  }
+
+  public void setRole(String role) {
+    this.role = role;
   }
 }

@@ -6,16 +6,16 @@ class AuthHealth {
 
 class LoginRequest {
   LoginRequest({
-    required this.email,
+    required this.identifier,
     required this.password,
   });
 
-  final String email;
+  final String identifier;
   final String password;
 
   Map<String, dynamic> toJson() {
     return {
-      'email': email,
+      'identifier': identifier,
       'password': password,
     };
   }
@@ -83,18 +83,21 @@ class DashboardSummary {
 class RegisterUserRequest {
   RegisterUserRequest({
     required this.username,
-    required this.email,
+    required this.phoneNumber,
+    this.email,
     required this.password,
   });
 
   final String username;
-  final String email;
+  final String phoneNumber;
+  final String? email;
   final String password;
 
   Map<String, dynamic> toJson() {
     return {
       'username': username,
-      'email': email,
+      'phoneNumber': phoneNumber,
+      if (email != null && email!.isNotEmpty) 'email': email,
       'password': password,
     };
   }
@@ -104,18 +107,21 @@ class RegisterUserResult {
   RegisterUserResult({
     required this.id,
     required this.username,
-    required this.email,
+    required this.phoneNumber,
+    this.email,
   });
 
   final int id;
   final String username;
-  final String email;
+  final String? email;
+  final String phoneNumber;
 
   factory RegisterUserResult.fromJson(Map<String, dynamic> json) {
     return RegisterUserResult(
       id: (json['id'] as num).toInt(),
       username: json['username'] as String? ?? '',
-      email: json['email'] as String? ?? '',
+      email: json['email'] as String?,
+      phoneNumber: json['phoneNumber'] as String? ?? '',
     );
   }
 }

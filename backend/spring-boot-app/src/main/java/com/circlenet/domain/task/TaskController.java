@@ -4,6 +4,9 @@ import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,5 +32,14 @@ public class TaskController {
   @PostMapping
   public TaskDto createTask(@RequestBody CreateTaskRequest request) {
     return taskService.createTask(request);
+  }
+
+  @PutMapping("/{id}")
+  public ResponseEntity<TaskDto> updateTask(@PathVariable Long id, @RequestBody CreateTaskRequest request) {
+    try {
+      return ResponseEntity.ok(taskService.updateTask(id, request));
+    } catch (IllegalArgumentException ex) {
+      return ResponseEntity.notFound().build();
+    }
   }
 }

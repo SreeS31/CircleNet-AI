@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { bulkUpdateMilestoneStatus, createCircle, createMilestone, createPerson, createProject, createTask, createUser, deleteMilestone, fetchCircles, fetchDashboardSummary, fetchMilestones, fetchPeople, fetchPermissions, fetchProjects, fetchRelationships, fetchSessionProfile, fetchTasks, fetchUsers, hasAuthSession, isUnauthorizedError, logout, updateMilestone } from '../lib/api';
+import { bulkUpdateMilestoneStatus, createCircle, createMilestone, createPerson, createProject, createRelationship, createTask, createTaskGroup, createUser, deleteMilestone, fetchCircles, fetchDashboardSummary, fetchMilestones, fetchPeople, fetchPermissions, fetchProjects, fetchRelationships, fetchSessionProfile, fetchTasks, fetchUsers, hasAuthSession, isUnauthorizedError, logout, updateCircle, updateMilestone, updatePermission, updatePerson, updateProject, updateRelationship, updateTask, updateUser } from '../lib/api';
 
 type ResourceType = 'user' | 'person' | 'circle' | 'project' | 'task' | 'milestone';
 type ToastTone = 'success' | 'error';
@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [milestones, setMilestones] = useState<any[]>([]);
-  const [sessionUser, setSessionUser] = useState<{ username: string; email: string } | null>(null);
+  const [sessionUser, setSessionUser] = useState<{ username: string; email: string; role: string } | null>(null);
   const [resourceType, setResourceType] = useState<ResourceType>('user');
   const [summary, setSummary] = useState({ userCount: 0, personCount: 0, circleCount: 0, relationshipCount: 0, permissionCount: 0 });
   const [status, setStatus] = useState('Ready to add a new record.');
@@ -43,6 +43,7 @@ export default function DashboardPage() {
   const [formState, setFormState] = useState({
     username: '',
     email: '',
+    phoneNumber: '',
     password: '',
     fullName: '',
     circleName: '',
@@ -65,7 +66,7 @@ export default function DashboardPage() {
   const loadData = useCallback(async () => {
     try {
       const [profileData, usersData, peopleData, circlesData, relationshipsData, permissionsData, projectsData, tasksData, milestonesData, summaryData] = await Promise.all([fetchSessionProfile(), fetchUsers(), fetchPeople(), fetchCircles(), fetchRelationships(), fetchPermissions(), fetchProjects(), fetchTasks(), fetchMilestones(), fetchDashboardSummary()]);
-        setSessionUser({ username: profileData.username, email: profileData.email });
+        setSessionUser({ username: profileData.username, email: profileData.email, role: profileData.role });
         setUsers(usersData);
         setPeople(peopleData);
         setCircles(circlesData);
@@ -461,6 +462,7 @@ export default function DashboardPage() {
         await createUser({
           username: formState.username,
           email: formState.email,
+          phoneNumber: formState.phoneNumber,
           password: formState.password,
         });
       } else if (resourceType === 'person') {
@@ -513,6 +515,7 @@ export default function DashboardPage() {
       setFormState({
         username: '',
         email: '',
+        phoneNumber: '',
         password: '',
         fullName: '',
         circleName: '',
@@ -535,7 +538,11 @@ export default function DashboardPage() {
     } catch (error) {
       const errorMessage = error instanceof Error && error.message === 'blocked-reason-required'
         ? 'Blocked milestones require a reason.'
-        : 'Failed to create the record. Check the API and try again.';
+        : isUnauthorizedError(error)
+          ? 'Your session expired. Please sign in again.'
+          : error instanceof Error
+            ? `Could not create ${resourceType}: ${error.message}`
+            : 'Failed to create the record. Check the API and try again.';
       setStatus(errorMessage);
       showToast(errorMessage, 'error');
     } finally {
@@ -546,6 +553,83 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     await logout();
     router.replace('/auth');
+  };
+
+  const promptValue = (label: string, currentValue = '') => window.prompt(label, currentValue);
+
+  const handleAdminCreate = async (kind: 'relationship' | 'task group') => {
+    if (sessionUser?.role !== 'ADMIN') return;
+    const name = window.prompt(kind === 'relationship' ? 'Relationship type' : 'Task group name');
+    if (!name) return;
+    try {
+      if (kind === 'relationship') await createRelationship({ type: name });
+      else {
+        const description = window.prompt('Task group description') || '';
+        await createTaskGroup({ name, description });
+      }
+      await loadData();
+      showToast(`${kind} created successfully.`, 'success');
+    } catch (error) { showToast(error instanceof Error ? error.message : `Could not create ${kind}.`, 'error'); }
+  };
+
+  const handleAdminEdit = async (recordType: 'user' | 'person' | 'circle' | 'relationship' | 'permission' | 'project' | 'task', record: any) => {
+    try {
+      if (sessionUser?.role !== 'ADMIN') {
+        throw new Error('Administrator access is required to edit records.');
+      }
+      if (!record.id) {
+        throw new Error('This record cannot be edited because it has no identifier.');
+      }
+
+      if (recordType === 'user') {
+        const username = promptValue('Username', record.username);
+        const phoneNumber = promptValue('Mobile number', record.phoneNumber);
+        const email = promptValue('Email (optional)', record.email || '');
+        const password = promptValue('New password (leave blank to keep current password)', '');
+        if (username === null || phoneNumber === null || email === null || password === null) return;
+        await updateUser(record.id, { username, phoneNumber, email: email || undefined, password: password || undefined });
+      } else if (recordType === 'person') {
+        const fullName = promptValue('Full name', record.fullName);
+        const email = promptValue('Email', record.email);
+        if (fullName === null || email === null) return;
+        await updatePerson(record.id, { fullName, email });
+      } else if (recordType === 'circle') {
+        const name = promptValue('Circle name', record.name);
+        const description = promptValue('Description', record.description);
+        if (name === null || description === null) return;
+        await updateCircle(record.id, { name, description });
+      } else if (recordType === 'relationship') {
+        const type = promptValue('Relationship type', record.type);
+        if (type === null) return;
+        await updateRelationship(record.id, { type });
+      } else if (recordType === 'permission') {
+        const name = promptValue('Permission name', record.name);
+        const description = promptValue('Description', record.description);
+        if (name === null || description === null) return;
+        await updatePermission(record.id, { name, description });
+      } else if (recordType === 'project') {
+        const name = promptValue('Project name', record.name);
+        const description = promptValue('Description', record.description);
+        const status = promptValue('Status: Active, Planning, or Completed', record.status);
+        if (name === null || description === null || status === null) return;
+        await updateProject(record.id, { name, description, status });
+      } else {
+        const title = promptValue('Task title', record.title);
+        const details = promptValue('Task details', record.details);
+        const status = promptValue('Status: Todo, In Progress, or Done', record.status);
+        if (title === null || details === null || status === null) return;
+        await updateTask(record.id, { title, details, status, projectId: record.projectId || undefined, milestoneId: record.milestoneId || undefined });
+      }
+
+      const message = `${recordType} updated successfully.`;
+      setStatus(message);
+      showToast(message, 'success');
+      await loadData();
+    } catch (error) {
+      const message = error instanceof Error ? `Could not update ${recordType}: ${error.message}` : `Could not update ${recordType}.`;
+      setStatus(message);
+      showToast(message, 'error');
+    }
   };
 
   return (
@@ -651,9 +735,19 @@ export default function DashboardPage() {
                 />
               </label>
               <label style={{ display: 'grid', gap: '0.35rem' }}>
-                <span>Email</span>
+                <span>Mobile number</span>
                 <input
                   required
+                  type="tel"
+                  value={formState.phoneNumber}
+                  onChange={(event) => setFormState({ ...formState, phoneNumber: event.target.value })}
+                  placeholder="+15551234567"
+                  style={{ padding: '0.7rem', borderRadius: '0.75rem', border: '1px solid #dbe3ee' }}
+                />
+              </label>
+              <label style={{ display: 'grid', gap: '0.35rem' }}>
+                <span>Email (optional)</span>
+                <input
                   type="email"
                   value={formState.email}
                   onChange={(event) => setFormState({ ...formState, email: event.target.value })}
@@ -900,18 +994,38 @@ export default function DashboardPage() {
       <section className="grid" style={{ marginTop: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
         <div className="card">
           <h3>Users</h3>
-          <ul>{users.map((user) => <li key={user.id || user.username}>{user.username || user.email}</li>)}</ul>
+          <ul>{users.map((user) => <li key={user.id || user.username}>{user.username || user.phoneNumber} {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => handleAdminEdit('user', user)}>Edit</button>}</li>)}</ul>
+        </div>
+        <div className="card">
+          <h3>People</h3>
+          <ul>{people.map((person) => <li key={person.id || person.email}>{person.fullName} {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => handleAdminEdit('person', person)}>Edit</button>}</li>)}</ul>
+        </div>
+        <div className="card">
+          <h3>Circles</h3>
+          <ul>{circles.map((circle) => <li key={circle.id || circle.name}>{circle.name} {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => handleAdminEdit('circle', circle)}>Edit</button>}</li>)}</ul>
         </div>
         <div className="card">
           <h3>Relationships</h3>
-          <ul>{relationships.map((relationship) => <li key={relationship.id || relationship.type}>{relationship.type}</li>)}</ul>
+          {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem' }} onClick={() => handleAdminCreate('relationship')}>Add relationship</button>}
+          <ul>{relationships.map((relationship) => <li key={relationship.id || relationship.type}>{relationship.type} {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => handleAdminEdit('relationship', relationship)}>Edit</button>}</li>)}</ul>
+        </div>
+        <div className="card">
+          <h3>Permissions</h3>
+          <ul>{permissions.map((permission) => <li key={permission.id || permission.name}>{permission.name} {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => handleAdminEdit('permission', permission)}>Edit</button>}</li>)}</ul>
         </div>
         <div className="card">
           <h3>Projects</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.5rem' }}>
+            {sessionUser?.role === 'ADMIN' && projects.map((project) => <button key={`edit-project-${project.id}`} type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem' }} onClick={() => handleAdminEdit('project', project)}>Edit {project.name}</button>)}
+          </div>
           <ul>{projects.map((project) => <li key={project.id || project.name}>{project.name} • {project.status}</li>)}</ul>
         </div>
         <div className="card">
           <h3>Tasks</h3>
+          {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem' }} onClick={() => handleAdminCreate('task group')}>Add task group</button>}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.5rem' }}>
+            {sessionUser?.role === 'ADMIN' && tasks.map((task) => <button key={`edit-task-${task.id}`} type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem' }} onClick={() => handleAdminEdit('task', task)}>Edit {task.title}</button>)}
+          </div>
           <ul>{tasks.map((task) => <li key={task.id || task.title}>{task.title} • {task.status}{task.milestoneId ? ` • Milestone ${task.milestoneId}` : ''}</li>)}</ul>
         </div>
         <div className="card">

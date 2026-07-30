@@ -1,6 +1,7 @@
 package com.circlenet.config;
 
 import java.io.IOException;
+import java.util.Set;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,6 +20,13 @@ import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+  private static final Set<String> PUBLIC_AUTH_PATHS = Set.of(
+      "/api/auth/health",
+      "/api/auth/login",
+      "/api/auth/refresh",
+      "/api/auth/logout",
+      "/api/auth/revoke");
+
   private final JwtTokenService jwtTokenService;
 
   public JwtAuthenticationFilter(JwtTokenService jwtTokenService) {
@@ -31,10 +39,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       HttpServletResponse response,
       FilterChain filterChain) throws ServletException, IOException {
 
+    if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+      filterChain.doFilter(request, response);
+      return;
+    }
+
     String path = request.getRequestURI();
-    boolean isDashboardPath = path.startsWith("/api/dashboard/");
-    boolean isAuthMePath = "/api/auth/me".equals(path);
-    if (!isDashboardPath && !isAuthMePath) {
+    if (!path.startsWith("/api/")) {
+      filterChain.doFilter(request, response);
+      return;
+    }
+
+    if (isPublicEndpoint(request, path)) {
       filterChain.doFilter(request, response);
       return;
     }
@@ -48,10 +64,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     String token = authorizationHeader.substring("Bearer ".length()).trim();
     try {
       Claims claims = jwtTokenService.parseAndValidate(token, "access");
+      String role = claims.get("role", String.class);
       UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
           claims.getSubject(),
           null,
-          AuthorityUtils.NO_AUTHORITIES);
+          role == null ? AuthorityUtils.NO_AUTHORITIES : AuthorityUtils.createAuthorityList("ROLE_" + role));
       SecurityContextHolder.getContext().setAuthentication(authentication);
       filterChain.doFilter(request, response);
     } catch (IllegalArgumentException ex) {
@@ -59,5 +76,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     } finally {
       SecurityContextHolder.clearContext();
     }
+  }
+
+  private boolean isPublicEndpoint(HttpServletRequest request, String path) {
+    if ("/actuator/health".equals(path)) {
+      return true;
+    }
+
+    if (PUBLIC_AUTH_PATHS.contains(path)) {
+      return true;
+    }
+
+    return "POST".equalsIgnoreCase(request.getMethod()) && "/api/users".equals(path);
   }
 }

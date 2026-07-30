@@ -3,6 +3,7 @@ package com.circlenet.domain.user.dto;
 public class CreateUserRequest {
   private String username;
   private String email;
+  private String phoneNumber;
   private String password;
 
   public String getUsername() {
@@ -19,6 +20,14 @@ public class CreateUserRequest {
 
   public void setEmail(String email) {
     this.email = email;
+  }
+
+  public String getPhoneNumber() {
+    return phoneNumber;
+  }
+
+  public void setPhoneNumber(String phoneNumber) {
+    this.phoneNumber = phoneNumber;
   }
 
   public String getPassword() {

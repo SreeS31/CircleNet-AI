@@ -1,15 +1,19 @@
 package com.circlenet.domain.auth.dto;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-
 public class AuthLoginRequest {
-  @NotBlank
-  @Email
-  private String email;
+  private String identifier;
 
-  @NotBlank
+  // Retained for compatibility with existing email-based clients.
+  private String email;
   private String password;
+
+  public String getIdentifier() {
+    return identifier;
+  }
+
+  public void setIdentifier(String identifier) {
+    this.identifier = identifier;
+  }
 
   public String getEmail() {
     return email;

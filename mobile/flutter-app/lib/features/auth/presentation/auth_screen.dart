@@ -19,6 +19,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   AuthMode _authMode = AuthMode.signIn;
@@ -37,6 +38,7 @@ class _AuthScreenState extends State<AuthScreen> {
   void dispose() {
     _usernameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -161,7 +163,8 @@ class _AuthScreenState extends State<AuthScreen> {
         final result = await _authApi.registerUser(
           RegisterUserRequest(
             username: _usernameController.text.trim(),
-            email: _emailController.text.trim(),
+            phoneNumber: _phoneController.text.trim(),
+            email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
             password: _passwordController.text,
           ),
         );
@@ -176,7 +179,7 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         final tokenBundle = await _authApi.login(
           LoginRequest(
-            email: _emailController.text.trim(),
+            identifier: _emailController.text.trim(),
             password: _passwordController.text,
           ),
         );
@@ -276,20 +279,36 @@ class _AuthScreenState extends State<AuthScreen> {
               if (isSignUp) const SizedBox(height: 12),
               TextFormField(
                 controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
+                decoration: InputDecoration(
+                  labelText: isSignUp ? 'Email (optional)' : 'Email or mobile number',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Email is required';
+                  if (!isSignUp && (value == null || value.trim().isEmpty)) {
+                    return 'Email or mobile number is required';
                   }
-                  if (!value.contains('@')) {
+                  if (isSignUp && value != null && value.trim().isNotEmpty && !value.contains('@')) {
                     return 'Enter a valid email';
                   }
                   return null;
                 },
               ),
+              if (isSignUp) const SizedBox(height: 12),
+              if (isSignUp)
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Mobile number',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Mobile number is required';
+                    }
+                    return null;
+                  },
+                ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _passwordController,

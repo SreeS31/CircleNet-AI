@@ -1,7 +1,3 @@
-INSERT INTO users (username, email, password_hash)
-SELECT 'admin', 'admin@circlenet.ai', 'demo-password'
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin');
-
 INSERT INTO people (full_name, email)
 SELECT 'Ava Patel', 'ava@circlenet.ai'
 WHERE NOT EXISTS (SELECT 1 FROM people WHERE email = 'ava@circlenet.ai');
