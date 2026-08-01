@@ -278,7 +278,7 @@ export async function updateUser(id: number, payload: { username: string; email?
   return authenticatedRequest<any>(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
-export type NetworkPerson = { id: number; username: string; firstName?: string; surname?: string; displayName: string; phoneNumber: string; location?: string; accountStatus: 'ACTIVE' | 'INVITED' };
+export type NetworkPerson = { id: number; firstName?: string; surname?: string; displayName: string; phoneNumber: string; location?: string; accountStatus: 'ACTIVE' | 'INVITED' };
 export type NetworkRelationship = { id: number; type: string; person: NetworkPerson };
 export type NetworkCircle = { id: number; name: string; description: string; members: NetworkPerson[] };
 

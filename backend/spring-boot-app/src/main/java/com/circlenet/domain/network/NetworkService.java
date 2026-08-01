@@ -49,18 +49,20 @@ public class NetworkService {
     String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
     LinkedHashMap<Long, UserEntity> matches = new LinkedHashMap<>();
     userRepository.searchPeople(currentUserId, normalizedQuery).forEach(user -> matches.put(user.getId(), user));
-    relationshipRepository.findByOwnerUserId(currentUserId).stream()
+    List<RelationshipEntity> ownedRelationships = relationshipRepository.findByOwnerUserId(currentUserId);
+    ownedRelationships.stream()
         .map(RelationshipEntity::getRelatedUserId).filter(id -> id != null)
-        .map(this::requireUser).filter(user -> matchesSearch(user, normalizedQuery))
+        .map(this::requireUser).filter(user -> matchesSearch(user, normalizedQuery, ownedRelationships))
         .forEach(user -> matches.putIfAbsent(user.getId(), user));
-    return matches.values().stream().limit(50).map(this::toPerson).toList();
+    return matches.values().stream().limit(50)
+        .map(user -> toPerson(user, relationshipName(ownedRelationships, user.getId()))).toList();
   }
 
   @Transactional(readOnly = true)
   public List<NetworkRelationshipDto> relationships(Long currentUserId) {
     return relationshipRepository.findByOwnerUserId(currentUserId).stream()
         .map(entity -> new NetworkRelationshipDto(entity.getId(), entity.getType(),
-            toPerson(requireUser(entity.getRelatedUserId()))))
+            toPerson(requireUser(entity.getRelatedUserId()), entity.getContactName())))
         .toList();
   }
 
@@ -88,8 +90,9 @@ public class NetworkService {
     relationship.setOwnerUserId(currentUserId);
     relationship.setRelatedUserId(related.getId());
     relationship.setType(type);
+    relationship.setContactName(profileDisplayName(related));
     relationship = relationshipRepository.save(relationship);
-    return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), toPerson(related));
+    return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), toPerson(related, relationship.getContactName()));
   }
 
   public NetworkRelationshipDto addPerson(Long currentUserId, AddPersonRequest request) {
@@ -115,8 +118,9 @@ public class NetworkService {
     relationship.setOwnerUserId(currentUserId);
     relationship.setRelatedUserId(person.getId());
     relationship.setType(type);
+    relationship.setContactName(fullName);
     relationship = relationshipRepository.save(relationship);
-    return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), toPerson(person));
+    return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), toPerson(person, fullName));
   }
 
   public void removeRelationship(Long currentUserId, Long relationshipId) {
@@ -176,17 +180,21 @@ public class NetworkService {
   }
 
   private NetworkCircleDto toCircle(CircleEntity circle) {
+    List<RelationshipEntity> relationships = relationshipRepository.findByOwnerUserId(circle.getOwnerUserId());
     List<NetworkPersonDto> members = circle.getMemberUserIds().stream()
-        .map(this::requireUser).map(this::toPerson).toList();
+        .map(this::requireUser).map(user -> toPerson(user, relationshipName(relationships, user.getId()))).toList();
     return new NetworkCircleDto(circle.getId(), circle.getName(), circle.getDescription(), members);
   }
 
-  private NetworkPersonDto toPerson(UserEntity user) {
+  private NetworkPersonDto toPerson(UserEntity user) { return toPerson(user, null); }
+
+  private NetworkPersonDto toPerson(UserEntity user, String contactName) {
     String displayName = String.join(" ",
         user.getFirstName() == null ? "" : user.getFirstName(),
         user.getSurname() == null ? "" : user.getSurname()).trim();
-    if (displayName.isBlank()) displayName = user.getUsername();
-    return new NetworkPersonDto(user.getId(), user.getUsername(), user.getFirstName(), user.getSurname(),
+    if (contactName != null && !contactName.isBlank()) displayName = contactName.trim();
+    if (displayName.isBlank()) displayName = profileDisplayName(user);
+    return new NetworkPersonDto(user.getId(), user.getFirstName(), user.getSurname(),
         displayName, user.getPhoneNumber(), user.getLocation(), user.getAccountStatus());
   }
 
@@ -209,9 +217,24 @@ public class NetworkService {
     return phone;
   }
 
-  private boolean matchesSearch(UserEntity user, String query) {
+  private boolean matchesSearch(UserEntity user, String query, List<RelationshipEntity> relationships) {
     if (query.isBlank()) return true;
-    return java.util.stream.Stream.of(user.getUsername(), user.getFirstName(), user.getSurname(), user.getLocation(), user.getPhoneNumber())
+    return java.util.stream.Stream.of(relationshipName(relationships, user.getId()), user.getFirstName(), user.getSurname(), user.getLocation(), user.getPhoneNumber())
         .filter(value -> value != null).anyMatch(value -> value.toLowerCase().contains(query));
+  }
+
+  private String relationshipName(List<RelationshipEntity> relationships, Long userId) {
+    return relationships.stream().filter(item -> userId.equals(item.getRelatedUserId()))
+        .map(RelationshipEntity::getContactName).filter(name -> name != null && !name.isBlank())
+        .findFirst().orElse(null);
+  }
+
+  private String profileDisplayName(UserEntity user) {
+    String name = String.join(" ", user.getFirstName() == null ? "" : user.getFirstName(),
+        user.getSurname() == null ? "" : user.getSurname()).trim();
+    if (!name.isBlank()) return name;
+    String username = user.getUsername();
+    return username == null || username.isBlank() ? "CircleNet member"
+        : username.substring(0, 1).toUpperCase() + username.substring(1);
   }
 }

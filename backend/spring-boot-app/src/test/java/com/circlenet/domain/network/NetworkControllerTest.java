@@ -67,6 +67,7 @@ class NetworkControllerTest {
         .content("{\"fullName\":\"Rambabu Test\",\"phoneNumber\":\"+15550110005\",\"email\":\"rambabu@test.example\",\"type\":\"Friend\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.person.displayName").value("Rambabu Test"))
+        .andExpect(jsonPath("$.person.username").doesNotExist())
         .andExpect(jsonPath("$.person.accountStatus").value("INVITED"));
 
     mockMvc.perform(get("/api/network/search").param("q", "Rambabu").header(auth(), "Bearer " + token))

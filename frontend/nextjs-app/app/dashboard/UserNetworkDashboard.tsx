@@ -26,7 +26,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const [directRelationshipType, setDirectRelationshipType] = useState('Friend');
   const [inviteMobile, setInviteMobile] = useState('');
   const [communication, setCommunication] = useState<{ name: string; mobile: string; email: string; relationship: string; existing: boolean } | null>(null);
-  const [message, setMessage] = useState('Search by name, surname, mobile number, username, or location.');
+  const [message, setMessage] = useState('Search by person name, surname, mobile number, or location.');
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -142,7 +142,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
       <article className="card network-search-card">
         <p className="eyebrow">PEOPLE DISCOVERY</p><h2>Find someone</h2>
         <form className="network-search" onSubmit={search}>
-          <input required value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name, surname, mobile, username, location…" />
+          <input required value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Person name, surname, mobile number, or location…" />
           <button className="btn btn-primary" disabled={busy}>Search</button>
         </form>
         <div className="search-results">
@@ -150,7 +150,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
             const relationship = relationships.find(item => item.person.id === person.id);
             return <div className="people-result" key={person.id}>
               <span className="person-avatar">{person.displayName.charAt(0).toUpperCase()}</span>
-              <div className="people-identity"><strong>{person.displayName}</strong><span>@{person.username} · {person.phoneNumber}</span><small>{person.location || 'Location not provided'}</small></div>
+              <div className="people-identity"><strong>{person.displayName}</strong><span>{person.phoneNumber}</span><small>{person.location || 'Location not provided'}</small></div>
               {!relationship ? <div className="people-controls">
                 <select value={relationshipType[person.id] || 'Friend'} onChange={e => setRelationshipType({...relationshipType, [person.id]: e.target.value})}>{relationshipTypes.map(type => <option key={type}>{type}</option>)}</select>
                 <button className="btn btn-primary" disabled={busy} onClick={() => connect(person)}>Add relationship</button>
