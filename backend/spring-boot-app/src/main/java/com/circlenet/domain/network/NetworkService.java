@@ -113,7 +113,8 @@ public class NetworkService {
     String fullName = requireText(request.fullName(), "Full name");
     String type = normalizeRelationshipType(request.type());
     String identityType = request.identityType() == null || request.identityType().isBlank()
-        ? "ACCOUNT" : request.identityType().trim().toUpperCase();
+        ? (request.managedCategory() == null || request.managedCategory().isBlank() ? "ACCOUNT" : "MANAGED")
+        : request.identityType().trim().toUpperCase();
     if (!Set.of("ACCOUNT", "MANAGED").contains(identityType)) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported person type");
     }

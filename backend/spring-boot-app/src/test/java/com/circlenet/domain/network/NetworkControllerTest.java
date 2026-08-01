@@ -80,7 +80,7 @@ class NetworkControllerTest {
 
     mockMvc.perform(post("/api/network/relationships/add-person").header(auth(), "Bearer " + token)
         .contentType(MediaType.APPLICATION_JSON)
-        .content("{\"fullName\":\"Little Tara\",\"type\":\"Child\",\"visibilityScope\":\"RELATIVES\",\"identityType\":\"MANAGED\",\"managedCategory\":\"CHILD\",\"dateOfBirth\":\"2020-03-14\"}"))
+        .content("{\"fullName\":\"Little Tara\",\"type\":\"Child\",\"visibilityScope\":\"RELATIVES\",\"managedCategory\":\"CHILD\",\"dateOfBirth\":\"2020-03-14\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.contactPhone").doesNotExist())
         .andExpect(jsonPath("$.person.accountStatus").value("MANAGED"))
