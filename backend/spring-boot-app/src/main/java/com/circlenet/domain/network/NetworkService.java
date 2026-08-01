@@ -26,12 +26,15 @@ import com.circlenet.domain.relationship.model.RelationshipEntity;
 import com.circlenet.domain.user.UserRepository;
 import com.circlenet.domain.user.model.UserEntity;
 import com.circlenet.domain.profile.UserProfileRepository;
+import com.circlenet.domain.profile.model.UserProfileEntity;
 
 @Service
 @Transactional
 public class NetworkService {
   private static final Set<String> RELATIONSHIP_TYPES = Set.of(
       "Friend", "Spouse", "Parent", "Child", "Sibling", "Colleague", "Relative", "Other");
+  private static final Set<String> VISIBILITY_SCOPES = Set.of("PUBLIC", "FRIENDS", "RELATIVES", "COLLEAGUES");
+  private static final Set<String> RELATIVE_TYPES = Set.of("spouse", "parent", "child", "sibling", "relative");
 
   private final UserRepository userRepository;
   private final RelationshipRepository relationshipRepository;
@@ -58,14 +61,14 @@ public class NetworkService {
         .map(RelationshipEntity::getRelatedUserId).filter(id -> id != null)
         .map(this::requireUser).filter(user -> matchesSearch(user, normalizedQuery, ownedRelationships))
         .forEach(user -> matches.putIfAbsent(user.getId(), user));
-    return matches.values().stream().limit(50)
+    return matches.values().stream().filter(user -> isVisibleTo(currentUserId, user.getId())).limit(50)
         .map(user -> toPerson(user, relationshipName(ownedRelationships, user.getId()))).toList();
   }
 
   @Transactional(readOnly = true)
   public List<NetworkRelationshipDto> relationships(Long currentUserId) {
     return relationshipRepository.findByOwnerUserId(currentUserId).stream()
-        .map(entity -> new NetworkRelationshipDto(entity.getId(), entity.getType(),
+        .map(entity -> new NetworkRelationshipDto(entity.getId(), entity.getType(), entity.getVisibilityScope(), entity.getVisibilityCompany(),
             toPerson(requireUser(entity.getRelatedUserId()), entity.getContactName())))
         .toList();
   }
@@ -95,8 +98,9 @@ public class NetworkService {
     relationship.setRelatedUserId(related.getId());
     relationship.setType(type);
     relationship.setContactName(profileDisplayName(related));
+    applyVisibility(currentUserId, relationship, request.visibilityScope(), request.visibilityCompany());
     relationship = relationshipRepository.save(relationship);
-    return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), toPerson(related, relationship.getContactName()));
+    return relationshipDto(relationship, related);
   }
 
   public NetworkRelationshipDto addPerson(Long currentUserId, AddPersonRequest request) {
@@ -123,8 +127,9 @@ public class NetworkService {
     relationship.setRelatedUserId(person.getId());
     relationship.setType(type);
     relationship.setContactName(fullName);
+    applyVisibility(currentUserId, relationship, request.visibilityScope(), request.visibilityCompany());
     relationship = relationshipRepository.save(relationship);
-    return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), toPerson(person, fullName));
+    return relationshipDto(relationship, person);
   }
 
   public void removeRelationship(Long currentUserId, Long relationshipId) {
@@ -228,8 +233,55 @@ public class NetworkService {
     if (contactName != null && !contactName.isBlank()) displayName = contactName.trim();
     if (displayName.isBlank()) displayName = profileDisplayName(user);
     return new NetworkPersonDto(user.getId(), user.getFirstName(), user.getSurname(),
-        displayName, user.getPhoneNumber(), user.getLocation(), user.getAccountStatus(),
+        displayName, null, user.getLocation(), user.getAccountStatus(),
         profileRepository.findById(user.getId()).map(profile -> profile.getProfilePhoto()).orElse(null));
+  }
+
+  private NetworkRelationshipDto relationshipDto(RelationshipEntity relationship, UserEntity person) {
+    return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), relationship.getVisibilityScope(),
+        relationship.getVisibilityCompany(), toPerson(person, relationship.getContactName()));
+  }
+
+  private void applyVisibility(Long ownerUserId, RelationshipEntity relationship, String requestedScope, String requestedCompany) {
+    String scope = requestedScope == null || requestedScope.isBlank() ? "FRIENDS" : requestedScope.trim().toUpperCase();
+    if (!VISIBILITY_SCOPES.contains(scope)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported view setting");
+    }
+    relationship.setVisibilityScope(scope);
+    if (!"COLLEAGUES".equals(scope)) {
+      relationship.setVisibilityCompany(null);
+      return;
+    }
+    String company = requireText(requestedCompany, "Company");
+    boolean belongsToOwner = employmentCompanies(ownerUserId).stream().anyMatch(item -> item.equalsIgnoreCase(company));
+    if (!belongsToOwner) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a company saved in your employment profile");
+    }
+    relationship.setVisibilityCompany(company);
+  }
+
+  private boolean isVisibleTo(Long viewerId, Long targetId) {
+    if (viewerId.equals(targetId) || relationshipRepository.findByOwnerUserIdAndRelatedUserId(viewerId, targetId).isPresent()) return true;
+    for (RelationshipEntity share : relationshipRepository.findByRelatedUserId(targetId)) {
+      String scope = share.getVisibilityScope() == null ? "FRIENDS" : share.getVisibilityScope();
+      if ("PUBLIC".equalsIgnoreCase(scope)) return true;
+      if (share.getOwnerUserId() == null) continue;
+      RelationshipEntity audience = relationshipRepository.findByOwnerUserIdAndRelatedUserId(share.getOwnerUserId(), viewerId).orElse(null);
+      if (audience == null) continue;
+      if ("FRIENDS".equalsIgnoreCase(scope) && "Friend".equalsIgnoreCase(audience.getType())) return true;
+      if ("RELATIVES".equalsIgnoreCase(scope) && audience.getType() != null
+          && RELATIVE_TYPES.contains(audience.getType().toLowerCase())) return true;
+      if ("COLLEAGUES".equalsIgnoreCase(scope) && share.getVisibilityCompany() != null
+          && employmentCompanies(viewerId).stream().anyMatch(company -> company.equalsIgnoreCase(share.getVisibilityCompany()))) return true;
+    }
+    return false;
+  }
+
+  private List<String> employmentCompanies(Long userId) {
+    return profileRepository.findById(userId).map(UserProfileEntity::getEmployer).stream()
+        .filter(value -> value != null && !value.isBlank())
+        .flatMap(value -> java.util.Arrays.stream(value.split("[,;|\\n]")))
+        .map(String::trim).filter(value -> !value.isBlank()).distinct().toList();
   }
 
   private String normalizeRelationshipType(String type) {

@@ -30,13 +30,17 @@ class NetworkControllerTest {
     String token = login(owner.get("phoneNumber").asText());
 
     mockMvc.perform(get("/api/network/search").param("q", "Mumbai").header(auth(), "Bearer " + token))
-        .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(friend.get("id").asLong()))
-        .andExpect(jsonPath("$[0].displayName").value("Meera Shah"));
+        .andExpect(status().isOk()).andExpect(jsonPath("$[0]").doesNotExist());
 
-    mockMvc.perform(post("/api/network/relationships").header(auth(), "Bearer " + token)
+    mockMvc.perform(post("/api/network/relationships/add-person").header(auth(), "Bearer " + token)
         .contentType(MediaType.APPLICATION_JSON)
-        .content("{\"relatedUserId\":" + friend.get("id").asLong() + ",\"type\":\"Friend\"}"))
-        .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("Friend"));
+        .content("{\"fullName\":\"Meera Shah\",\"phoneNumber\":\"+15550110002\",\"type\":\"Friend\",\"visibilityScope\":\"PUBLIC\"}"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("Friend"))
+        .andExpect(jsonPath("$.visibilityScope").value("PUBLIC"))
+        .andExpect(jsonPath("$.person.phoneNumber").doesNotExist());
+
+    mockMvc.perform(get("/api/network/search").param("q", "Mumbai").header(auth(), "Bearer " + token))
+        .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(friend.get("id").asLong()));
 
     MvcResult circleResult = mockMvc.perform(post("/api/network/circles").header(auth(), "Bearer " + token)
         .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Close friends\",\"description\":\"Trusted people\"}"))
@@ -87,7 +91,8 @@ class NetworkControllerTest {
 
     mockMvc.perform(get("/api/network/relationships").header(auth(), "Bearer " + token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].person.phoneNumber").value("+15550110005"));
+        .andExpect(jsonPath("$[0].person.phoneNumber").doesNotExist())
+        .andExpect(jsonPath("$[0].visibilityScope").value("FRIENDS"));
   }
 
   private JsonNode createUser(String username, String phone, String firstName, String surname, String location) throws Exception {

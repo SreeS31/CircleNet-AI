@@ -9,6 +9,7 @@ import java.util.Optional;
 @Repository
 public interface RelationshipRepository extends JpaRepository<RelationshipEntity, Long> {
   List<RelationshipEntity> findByOwnerUserId(Long ownerUserId);
+  List<RelationshipEntity> findByRelatedUserId(Long relatedUserId);
   Optional<RelationshipEntity> findByOwnerUserIdAndRelatedUserId(Long ownerUserId, Long relatedUserId);
   List<RelationshipEntity> findByOwnerUserIdIsNull();
 }

@@ -11,7 +11,7 @@ const fields: Record<string, Array<[string,string,string?]>> = {
   'Address': [['addressLine1','Address line 1'],['addressLine2','Address line 2'],['city','City'],['state','State'],['postalCode','Postal code'],['country','Country']],
   'Communication & social media': [['alternatePhone','Alternate phone','tel'],['website','Website','url'],['whatsapp','WhatsApp'],['linkedin','LinkedIn','url'],['facebook','Facebook','url'],['instagram','Instagram'],['xHandle','X / Twitter handle']],
   'Education': [['highestQualification','Highest qualification'],['institution','School / College / University'],['fieldOfStudy','Field of study'],['graduationYear','Graduation year']],
-  'Employment': [['employmentStatus','Employment status'],['employer','Employer / Organization'],['jobTitle','Job title'],['industry','Industry'],['workLocation','Work location']],
+  'Employment': [['employmentStatus','Employment status'],['employer','Employer / Organizations (separate multiple with commas)'],['jobTitle','Job title'],['industry','Industry'],['workLocation','Work location']],
 };
 
 export default function ProfilePage(){

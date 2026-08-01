@@ -27,6 +27,12 @@ public class RelationshipEntity {
   @Column(name = "contact_name")
   private String contactName;
 
+  @Column(name = "visibility_scope", nullable = false)
+  private String visibilityScope = "FRIENDS";
+
+  @Column(name = "visibility_company")
+  private String visibilityCompany;
+
   public Long getId() {
     return id;
   }
@@ -45,4 +51,8 @@ public class RelationshipEntity {
   public void setRelatedUserId(Long relatedUserId) { this.relatedUserId = relatedUserId; }
   public String getContactName() { return contactName; }
   public void setContactName(String contactName) { this.contactName = contactName; }
+  public String getVisibilityScope() { return visibilityScope; }
+  public void setVisibilityScope(String visibilityScope) { this.visibilityScope = visibilityScope; }
+  public String getVisibilityCompany() { return visibilityCompany; }
+  public void setVisibilityCompany(String visibilityCompany) { this.visibilityCompany = visibilityCompany; }
 }
