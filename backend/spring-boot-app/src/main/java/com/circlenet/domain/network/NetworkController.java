@@ -36,6 +36,9 @@ public class NetworkController {
     return networkService.relationships(userId(principal));
   }
 
+  @GetMapping("/relationship-types")
+  public List<String> relationshipTypes() { return networkService.relationshipTypes(); }
+
   @PostMapping("/relationships")
   public NetworkRelationshipDto addRelationship(Principal principal, @RequestBody AddRelationshipRequest request) {
     return networkService.addRelationship(userId(principal), request);

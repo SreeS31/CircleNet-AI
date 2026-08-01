@@ -4,16 +4,17 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { addMemberToMyCircle, addMyRelationship, ApiError, createMyCircle, fetchMyCircles,
-  fetchMyRelationships, logout, NetworkCircle, NetworkPerson, NetworkRelationship,
+  fetchMyRelationships, fetchRelationshipTypes, logout, NetworkCircle, NetworkPerson, NetworkRelationship,
   removeMemberFromMyCircle, removeMyRelationship, searchNetworkPeople } from '../lib/api';
 
-const relationshipTypes = ['Friend', 'Spouse', 'Parent', 'Child', 'Sibling', 'Colleague', 'Relative', 'Other'];
+const defaultRelationshipTypes = ['Friend', 'Spouse', 'Parent', 'Child', 'Sibling', 'Colleague', 'Relative', 'Other'];
 
 export default function UserNetworkDashboard({ username }: { username: string }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<NetworkPerson[]>([]);
   const [relationships, setRelationships] = useState<NetworkRelationship[]>([]);
+  const [relationshipTypes, setRelationshipTypes] = useState(defaultRelationshipTypes);
   const [circles, setCircles] = useState<NetworkCircle[]>([]);
   const [relationshipType, setRelationshipType] = useState<Record<number, string>>({});
   const [circleChoice, setCircleChoice] = useState<Record<number, string>>({});
@@ -29,9 +30,10 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [relationshipData, circleData] = await Promise.all([fetchMyRelationships(), fetchMyCircles()]);
+    const [relationshipData, circleData, typeData] = await Promise.all([fetchMyRelationships(), fetchMyCircles(), fetchRelationshipTypes()]);
     setRelationships(relationshipData);
     setCircles(circleData);
+    setRelationshipTypes(typeData.length ? typeData : defaultRelationshipTypes);
   }, []);
 
   useEffect(() => { refresh().catch(() => setMessage('Could not load your network.')); }, [refresh]);
@@ -132,10 +134,10 @@ export default function UserNetworkDashboard({ username }: { username: string })
     <section className="card quick-add-card">
       <div><p className="eyebrow">ADD TO MY NETWORK</p><h2>Add a friend, relative, or family member</h2><p>Full name, mobile number, and relationship are required. Email is optional. Mobile is checked first to prevent duplicate users.</p></div>
       <form onSubmit={addByMobile} className="quick-add-form">
-        <input type="text" required value={fullNameToAdd} onChange={e => setFullNameToAdd(e.target.value)} placeholder="Full name" />
-        <input type="tel" required value={mobileToAdd} onChange={e => setMobileToAdd(e.target.value)} placeholder="Mobile number, e.g. +919876543210" />
-        <input type="email" value={emailToAdd} onChange={e => setEmailToAdd(e.target.value)} placeholder="Email (optional)" />
-        <select value={directRelationshipType} onChange={e => setDirectRelationshipType(e.target.value)}>{relationshipTypes.map(type => <option key={type}>{type}</option>)}</select>
+        <input className="quick-add-name" type="text" required value={fullNameToAdd} onChange={e => setFullNameToAdd(e.target.value)} placeholder="Full name" />
+        <input className="quick-add-mobile" type="tel" required value={mobileToAdd} onChange={e => setMobileToAdd(e.target.value)} placeholder="Mobile number, e.g. +919876543210" />
+        <input className="quick-add-email" type="email" value={emailToAdd} onChange={e => setEmailToAdd(e.target.value)} placeholder="Email address (optional)" />
+        <select className="quick-add-relationship" value={directRelationshipType} onChange={e => setDirectRelationshipType(e.target.value)}>{relationshipTypes.map(type => <option key={type}>{type}</option>)}</select>
         <button className="btn btn-primary" disabled={busy}>{busy ? 'Checking…' : 'Add person'}</button>
       </form>
       {communication && <div className="invite-callout"><span>{communication.existing ? `${communication.name} was added. Send them a notification:` : `No user found for ${inviteMobile}. Send a registration invitation:`}</span><div className="communication-actions"><a className="btn btn-secondary" href={`sms:${communication.mobile}?body=${encodeURIComponent(communicationMessage(communication))}`}>Send SMS</a>{communication.email && <a className="btn btn-secondary" href={`mailto:${communication.email}?subject=${encodeURIComponent('CircleNet-AI relationship notification')}&body=${encodeURIComponent(communicationMessage(communication))}`}>Send email</a>}<button type="button" className="btn btn-secondary" onClick={copyInvitation}>Copy message</button></div></div>}

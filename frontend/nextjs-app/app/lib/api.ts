@@ -290,6 +290,10 @@ export async function fetchMyRelationships() {
   return authenticatedRequest<NetworkRelationship[]>('/api/network/relationships');
 }
 
+export async function fetchRelationshipTypes() {
+  return authenticatedRequest<string[]>('/api/network/relationship-types');
+}
+
 export async function addMyRelationship(relatedUserId: number, type: string) {
   return authenticatedRequest<NetworkRelationship>('/api/network/relationships', {
     method: 'POST', body: JSON.stringify({ relatedUserId, type }),

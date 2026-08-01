@@ -2,6 +2,7 @@ package com.circlenet.domain.network;
 
 import java.util.List;
 import java.util.Set;
+import java.util.LinkedHashSet;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,18 @@ public class NetworkService {
         .map(entity -> new NetworkRelationshipDto(entity.getId(), entity.getType(),
             toPerson(requireUser(entity.getRelatedUserId()))))
         .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<String> relationshipTypes() {
+    LinkedHashSet<String> types = new LinkedHashSet<>(RELATIONSHIP_TYPES);
+    relationshipRepository.findByOwnerUserIdIsNull().stream()
+        .map(RelationshipEntity::getType)
+        .filter(type -> type != null && !type.isBlank())
+        .forEach(type -> {
+          if (types.stream().noneMatch(existing -> existing.equalsIgnoreCase(type.trim()))) types.add(type.trim());
+        });
+    return types.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
   }
 
   public NetworkRelationshipDto addRelationship(Long currentUserId, AddRelationshipRequest request) {
@@ -140,7 +153,7 @@ public class NetworkService {
 
   private String normalizeRelationshipType(String type) {
     String value = requireText(type, "Relationship type");
-    return RELATIONSHIP_TYPES.stream().filter(item -> item.equalsIgnoreCase(value)).findFirst()
+    return relationshipTypes().stream().filter(item -> item.equalsIgnoreCase(value)).findFirst()
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported relationship type"));
   }
 
