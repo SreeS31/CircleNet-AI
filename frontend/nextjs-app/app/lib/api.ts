@@ -280,7 +280,7 @@ export async function updateUser(id: number, payload: { username: string; email?
 
 export type NetworkPerson = { id: number; firstName?: string; surname?: string; displayName: string; phoneNumber: string; location?: string; accountStatus: 'ACTIVE' | 'INVITED' };
 export type NetworkRelationship = { id: number; type: string; person: NetworkPerson };
-export type NetworkCircle = { id: number; name: string; description: string; members: NetworkPerson[] };
+export type NetworkCircle = { id: number; name: string; description: string; members: NetworkPerson[]; ownerName: string; ownedByCurrentUser: boolean };
 
 export async function searchNetworkPeople(query: string) {
   return authenticatedRequest<NetworkPerson[]>(`/api/network/search?q=${encodeURIComponent(query)}`);

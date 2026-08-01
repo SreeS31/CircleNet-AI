@@ -46,6 +46,13 @@ class NetworkControllerTest {
     mockMvc.perform(post("/api/network/circles/" + circleId + "/members").header(auth(), "Bearer " + token)
         .contentType(MediaType.APPLICATION_JSON).content("{\"userId\":" + friend.get("id").asLong() + "}"))
         .andExpect(status().isOk()).andExpect(jsonPath("$.members[0].id").value(friend.get("id").asLong()));
+
+    String friendToken = login(friend.get("phoneNumber").asText());
+    mockMvc.perform(get("/api/network/circles").header(auth(), "Bearer " + friendToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(circleId))
+        .andExpect(jsonPath("$[0].ownerName").value("Asha Rao"))
+        .andExpect(jsonPath("$[0].ownedByCurrentUser").value(false));
   }
 
   @Test

@@ -137,7 +137,8 @@ public class NetworkService {
 
   @Transactional(readOnly = true)
   public List<NetworkCircleDto> circles(Long currentUserId) {
-    return circleRepository.findByOwnerUserId(currentUserId).stream().map(this::toCircle).toList();
+    return circleRepository.findVisibleToUser(currentUserId).stream()
+        .map(circle -> toCircle(circle, currentUserId)).toList();
   }
 
   public NetworkCircleDto createCircle(Long currentUserId, CreateNetworkCircleRequest request) {
@@ -146,7 +147,7 @@ public class NetworkService {
     entity.setName(name);
     entity.setDescription(request.description() == null ? "" : request.description().trim());
     entity.setOwnerUserId(currentUserId);
-    return toCircle(circleRepository.save(entity));
+    return toCircle(circleRepository.save(entity), currentUserId);
   }
 
   public NetworkCircleDto addCircleMember(Long currentUserId, Long circleId, Long userId) {
@@ -156,13 +157,13 @@ public class NetworkService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Add this person as a relationship before adding them to a circle");
     }
     circle.getMemberUserIds().add(userId);
-    return toCircle(circleRepository.save(circle));
+    return toCircle(circleRepository.save(circle), currentUserId);
   }
 
   public NetworkCircleDto removeCircleMember(Long currentUserId, Long circleId, Long userId) {
     CircleEntity circle = ownedCircle(currentUserId, circleId);
     circle.getMemberUserIds().remove(userId);
-    return toCircle(circleRepository.save(circle));
+    return toCircle(circleRepository.save(circle), currentUserId);
   }
 
   private CircleEntity ownedCircle(Long ownerId, Long circleId) {
@@ -179,11 +180,13 @@ public class NetworkService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
   }
 
-  private NetworkCircleDto toCircle(CircleEntity circle) {
+  private NetworkCircleDto toCircle(CircleEntity circle, Long currentUserId) {
     List<RelationshipEntity> relationships = relationshipRepository.findByOwnerUserId(circle.getOwnerUserId());
     List<NetworkPersonDto> members = circle.getMemberUserIds().stream()
         .map(this::requireUser).map(user -> toPerson(user, relationshipName(relationships, user.getId()))).toList();
-    return new NetworkCircleDto(circle.getId(), circle.getName(), circle.getDescription(), members);
+    String ownerName = profileDisplayName(requireUser(circle.getOwnerUserId()));
+    return new NetworkCircleDto(circle.getId(), circle.getName(), circle.getDescription(), members,
+        ownerName, currentUserId.equals(circle.getOwnerUserId()));
   }
 
   private NetworkPersonDto toPerson(UserEntity user) { return toPerson(user, null); }
