@@ -289,7 +289,7 @@ export async function updateUser(id: number, payload: { username: string; email?
 
 export type NetworkPerson = { id: number; firstName?: string; surname?: string; displayName: string; phoneNumber?: string | null; location?: string; accountStatus: 'ACTIVE' | 'INVITED'; profilePhoto?: string | null };
 export type VisibilityScope = 'PUBLIC' | 'FRIENDS' | 'RELATIVES' | 'COLLEAGUES';
-export type NetworkRelationship = { id: number; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string | null; person: NetworkPerson };
+export type NetworkRelationship = { id: number; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string | null; contactPhone?: string | null; contactEmail?: string | null; person: NetworkPerson };
 export type NetworkCircleMember = { person: NetworkPerson; admin: boolean; creator: boolean };
 export type NetworkCircle = { id: number; name: string; description: string; members: NetworkCircleMember[]; ownerName: string; ownerPhoto?: string | null; ownedByCurrentUser: boolean; currentUserAdmin: boolean };
 
@@ -321,7 +321,7 @@ export async function removeMyRelationship(id: number) {
   return authenticatedRequest<void>(`/api/network/relationships/${id}`, { method: 'DELETE' });
 }
 
-export async function updateMyRelationship(id: number, payload: { contactName: string; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string }) {
+export async function updateMyRelationship(id: number, payload: { contactName: string; contactPhone?: string; contactEmail?: string; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string }) {
   return authenticatedRequest<NetworkRelationship>(`/api/network/relationships/${id}`, {
     method: 'PUT', body: JSON.stringify(payload),
   });

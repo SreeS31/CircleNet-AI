@@ -27,6 +27,12 @@ public class RelationshipEntity {
   @Column(name = "contact_name")
   private String contactName;
 
+  @Column(name = "contact_phone")
+  private String contactPhone;
+
+  @Column(name = "contact_email")
+  private String contactEmail;
+
   @Column(name = "visibility_scope", nullable = false)
   private String visibilityScope = "FRIENDS";
 
@@ -51,6 +57,10 @@ public class RelationshipEntity {
   public void setRelatedUserId(Long relatedUserId) { this.relatedUserId = relatedUserId; }
   public String getContactName() { return contactName; }
   public void setContactName(String contactName) { this.contactName = contactName; }
+  public String getContactPhone() { return contactPhone; }
+  public void setContactPhone(String contactPhone) { this.contactPhone = contactPhone; }
+  public String getContactEmail() { return contactEmail; }
+  public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
   public String getVisibilityScope() { return visibilityScope; }
   public void setVisibilityScope(String visibilityScope) { this.visibilityScope = visibilityScope; }
   public String getVisibilityCompany() { return visibilityCompany; }

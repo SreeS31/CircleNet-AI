@@ -70,7 +70,7 @@ public class NetworkService {
   @Transactional(readOnly = true)
   public List<NetworkRelationshipDto> relationships(Long currentUserId) {
     return relationshipRepository.findByOwnerUserId(currentUserId).stream()
-        .map(entity -> new NetworkRelationshipDto(entity.getId(), entity.getType(), entity.getVisibilityScope(), entity.getVisibilityCompany(),
+        .map(entity -> new NetworkRelationshipDto(entity.getId(), entity.getType(), entity.getVisibilityScope(), entity.getContactPhone(), entity.getContactEmail(), entity.getVisibilityCompany(),
             toPerson(requireUser(entity.getRelatedUserId()), entity.getContactName())))
         .toList();
   }
@@ -129,6 +129,8 @@ public class NetworkService {
     relationship.setRelatedUserId(person.getId());
     relationship.setType(type);
     relationship.setContactName(fullName);
+    relationship.setContactPhone(phoneNumber);
+    relationship.setContactEmail(cleanEmail(request.email()));
     applyVisibility(currentUserId, relationship, request.visibilityScope(), request.visibilityCompany());
     relationship = relationshipRepository.save(relationship);
     return relationshipDto(relationship, person);
@@ -153,6 +155,9 @@ public class NetworkService {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this relationship");
     }
     relationship.setContactName(requireText(request.contactName(), "Person name"));
+    relationship.setContactPhone(request.contactPhone() == null || request.contactPhone().isBlank()
+        ? null : normalizePhoneNumber(request.contactPhone()));
+    relationship.setContactEmail(cleanEmail(request.contactEmail()));
     relationship.setType(normalizeRelationshipType(request.type()));
     applyVisibility(currentUserId, relationship, request.visibilityScope(), request.visibilityCompany());
     relationship = relationshipRepository.save(relationship);
@@ -260,8 +265,17 @@ public class NetworkService {
   }
 
   private NetworkRelationshipDto relationshipDto(RelationshipEntity relationship, UserEntity person) {
-    return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), relationship.getVisibilityScope(),
+    return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), relationship.getVisibilityScope(), relationship.getContactPhone(), relationship.getContactEmail(),
         relationship.getVisibilityCompany(), toPerson(person, relationship.getContactName()));
+  }
+
+  private String cleanEmail(String email) {
+    if (email == null || email.isBlank()) return null;
+    String value = email.trim().toLowerCase();
+    if (!value.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a valid email address");
+    }
+    return value;
   }
 
   private void applyVisibility(Long ownerUserId, RelationshipEntity relationship, String requestedScope, String requestedCompany) {

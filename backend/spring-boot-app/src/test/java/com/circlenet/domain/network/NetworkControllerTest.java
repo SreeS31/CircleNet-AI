@@ -97,9 +97,11 @@ class NetworkControllerTest {
 
     mockMvc.perform(put("/api/network/relationships/" + relationshipId).header(auth(), "Bearer " + token)
         .contentType(MediaType.APPLICATION_JSON)
-        .content("{\"contactName\":\"Rambabu Updated\",\"type\":\"Relative\",\"visibilityScope\":\"RELATIVES\"}"))
+        .content("{\"contactName\":\"Rambabu Updated\",\"contactPhone\":\"+15550110006\",\"contactEmail\":\"private-contact@test.example\",\"type\":\"Relative\",\"visibilityScope\":\"RELATIVES\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.person.displayName").value("Rambabu Updated"))
+        .andExpect(jsonPath("$.contactPhone").value("+15550110006"))
+        .andExpect(jsonPath("$.contactEmail").value("private-contact@test.example"))
         .andExpect(jsonPath("$.type").value("Relative"))
         .andExpect(jsonPath("$.visibilityScope").value("RELATIVES"));
 
@@ -110,6 +112,8 @@ class NetworkControllerTest {
     mockMvc.perform(get("/api/network/relationships").header(auth(), "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].person.phoneNumber").doesNotExist())
+        .andExpect(jsonPath("$[0].contactPhone").value("+15550110006"))
+        .andExpect(jsonPath("$[0].contactEmail").value("private-contact@test.example"))
         .andExpect(jsonPath("$[0].visibilityScope").value("RELATIVES"));
   }
 
