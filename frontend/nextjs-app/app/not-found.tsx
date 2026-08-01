@@ -2,9 +2,10 @@ import Link from 'next/link';
 
 export default function NotFound() {
   return (
-    <main className="container" style={{ paddingTop: '3rem' }}>
+    <main className="container empty-state">
       <div className="card" style={{ maxWidth: '32rem' }}>
-        <h1 style={{ marginTop: 0 }}>Page not found</h1>
+        <p className="eyebrow">ERROR 404</p>
+        <h1 style={{ marginTop: '.5rem', fontSize: '2.5rem' }}>This page drifted out of the circle.</h1>
         <p style={{ color: '#64748b' }}>The page you requested could not be found.</p>
         <Link href="/" className="btn btn-primary">
           Back home

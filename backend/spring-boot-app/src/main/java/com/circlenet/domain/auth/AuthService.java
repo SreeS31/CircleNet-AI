@@ -55,16 +55,17 @@ public class AuthService {
       identifier = request.getEmail();
     }
     if (identifier == null || identifier.isBlank() || request.getPassword() == null || request.getPassword().isBlank()) {
-      throw new IllegalArgumentException("Invalid email, phone number, or password");
+      throw new IllegalArgumentException("Invalid username, email, phone number, or password");
     }
 
     String normalizedIdentifier = identifier.trim();
     UserEntity user = userRepository.findByEmail(normalizedIdentifier.toLowerCase())
       .or(() -> userRepository.findByPhoneNumber(normalizePhoneNumber(normalizedIdentifier)))
-      .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
+      .or(() -> userRepository.findByUsername(normalizedIdentifier))
+      .orElseThrow(() -> new IllegalArgumentException("Invalid username, email, phone number, or password"));
 
     if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-      throw new IllegalArgumentException("Invalid email or password");
+      throw new IllegalArgumentException("Invalid username, email, phone number, or password");
     }
 
     return issueNewSession(user, null);

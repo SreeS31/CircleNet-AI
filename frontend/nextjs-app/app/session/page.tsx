@@ -108,7 +108,7 @@ export default function SessionPage() {
   };
 
   return (
-    <main className="container" style={{ paddingTop: '3rem' }}>
+    <main className="container session-shell">
       <div className="nav">
         <div style={{ fontWeight: 800 }}>Session Control Center</div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -117,25 +117,26 @@ export default function SessionPage() {
         </div>
       </div>
 
-      <section className="card" style={{ marginTop: '1rem' }}>
-        <h1 style={{ marginTop: 0 }}>Milestone 10: Web Session Control Center</h1>
+      <section className="card session-hero">
+        <p className="eyebrow">SECURITY & ACCESS</p>
+        <h1 style={{ marginTop: '.4rem' }}>Session control center</h1>
         <p style={{ color: '#64748b' }}>
           View current session identity and token lifetime, then refresh, revoke, or end the session safely.
         </p>
 
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginTop: '1rem' }}>
-          <div className="card" style={{ padding: '1rem' }}>
+          <div className="card session-stat" style={{ padding: '1rem' }}>
             <h3 style={{ marginTop: 0 }}>Session Identity</h3>
             <p style={{ marginBottom: '0.35rem' }}><strong>User:</strong> {profile?.username || '-'}</p>
             <p style={{ marginBottom: 0 }}><strong>Email:</strong> {profile?.email || '-'}</p>
           </div>
-          <div className="card" style={{ padding: '1rem' }}>
+          <div className="card session-stat" style={{ padding: '1rem' }}>
             <h3 style={{ marginTop: 0 }}>Token Timing</h3>
             <p style={{ marginBottom: '0.35rem' }}><strong>Issued:</strong> {issuedAtLabel}</p>
             <p style={{ marginBottom: '0.35rem' }}><strong>Expires:</strong> {expiresAtLabel}</p>
             <p style={{ marginBottom: 0 }}><strong>Seconds Remaining:</strong> {secondsRemaining}</p>
           </div>
-          <div className="card" style={{ padding: '1rem' }}>
+          <div className="card session-stat" style={{ padding: '1rem' }}>
             <h3 style={{ marginTop: 0 }}>Service Health</h3>
             <p style={{ marginBottom: 0 }}><strong>Auth API:</strong> {authHealth}</p>
           </div>

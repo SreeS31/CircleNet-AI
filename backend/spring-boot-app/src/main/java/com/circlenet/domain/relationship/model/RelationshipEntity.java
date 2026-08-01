@@ -18,6 +18,12 @@ public class RelationshipEntity {
   @Column(nullable = false)
   private String type;
 
+  @Column(name = "owner_user_id")
+  private Long ownerUserId;
+
+  @Column(name = "related_user_id")
+  private Long relatedUserId;
+
   public Long getId() {
     return id;
   }
@@ -29,4 +35,9 @@ public class RelationshipEntity {
   public void setType(String type) {
     this.type = type;
   }
+
+  public Long getOwnerUserId() { return ownerUserId; }
+  public void setOwnerUserId(Long ownerUserId) { this.ownerUserId = ownerUserId; }
+  public Long getRelatedUserId() { return relatedUserId; }
+  public void setRelatedUserId(Long relatedUserId) { this.relatedUserId = relatedUserId; }
 }

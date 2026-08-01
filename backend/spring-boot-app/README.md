@@ -26,24 +26,26 @@ User registration requires a unique mobile number. Email is optional and, when s
 
 ## Run locally
 
-```bash
-mvn spring-boot:run
-```
-
-This starts the backend with the default H2 in-memory database profile.
-
-## Run with PostgreSQL
-
-1. Start infrastructure services from the repository root:
+Start the persistent PostgreSQL database from the repository root:
 
 ```bash
 docker compose up -d postgres
 ```
 
-2. Start backend with PostgreSQL profile:
+Then start the backend:
 
 ```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=postgres
+mvn spring-boot:run
+```
+
+PostgreSQL is the default datasource. All API repositories, authentication tokens,
+and dashboard database queries use this one datasource. Data is retained in the
+Docker volume named `postgres-data` when containers or the backend restart.
+
+To check database readiness:
+
+```bash
+docker compose ps postgres
 ```
 
 ## Run in production profile (no dev seeds)
@@ -59,6 +61,9 @@ The PostgreSQL profile reads these environment variables (with defaults):
 - POSTGRES_DB=circlenet_ai
 - POSTGRES_USER=circlenet
 - POSTGRES_PASSWORD=circlenet123
+
+Automated tests use an isolated H2 in-memory datasource under `src/test/resources`;
+H2 is never used by the running application.
 
 ## Database migrations (Flyway)
 

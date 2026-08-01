@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { bulkUpdateMilestoneStatus, createCircle, createMilestone, createPerson, createProject, createRelationship, createTask, createTaskGroup, createUser, deleteMilestone, fetchCircles, fetchDashboardSummary, fetchMilestones, fetchPeople, fetchPermissions, fetchProjects, fetchRelationships, fetchSessionProfile, fetchTasks, fetchUsers, hasAuthSession, isUnauthorizedError, logout, updateCircle, updateMilestone, updatePermission, updatePerson, updateProject, updateRelationship, updateTask, updateUser } from '../lib/api';
+import { bulkUpdateMilestoneStatus, createCircle, createMilestone, createPerson, createProject, createRelationship, createTask, createTaskGroup, createUser, deleteMilestone, fetchCircles, fetchDashboardSummary, fetchMilestones, fetchPeople, fetchPermissions, fetchProjects, fetchRelationships, fetchSessionProfile, fetchTaskGroups, fetchTasks, fetchUsers, hasAuthSession, isUnauthorizedError, logout, updateCircle, updateMilestone, updatePermission, updatePerson, updateProject, updateRelationship, updateTask, updateUser } from '../lib/api';
+import UserNetworkDashboard from './UserNetworkDashboard';
 
 type ResourceType = 'user' | 'person' | 'circle' | 'project' | 'task' | 'milestone';
 type ToastTone = 'success' | 'error';
@@ -17,6 +18,7 @@ export default function DashboardPage() {
   const [permissions, setPermissions] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [taskGroups, setTaskGroups] = useState<any[]>([]);
   const [milestones, setMilestones] = useState<any[]>([]);
   const [sessionUser, setSessionUser] = useState<{ username: string; email: string; role: string } | null>(null);
   const [resourceType, setResourceType] = useState<ResourceType>('user');
@@ -46,6 +48,7 @@ export default function DashboardPage() {
     phoneNumber: '',
     password: '',
     fullName: '',
+    personGender: 'Unspecified',
     circleName: '',
     description: '',
     projectName: '',
@@ -65,8 +68,10 @@ export default function DashboardPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [profileData, usersData, peopleData, circlesData, relationshipsData, permissionsData, projectsData, tasksData, milestonesData, summaryData] = await Promise.all([fetchSessionProfile(), fetchUsers(), fetchPeople(), fetchCircles(), fetchRelationships(), fetchPermissions(), fetchProjects(), fetchTasks(), fetchMilestones(), fetchDashboardSummary()]);
-        setSessionUser({ username: profileData.username, email: profileData.email, role: profileData.role });
+      const profileData = await fetchSessionProfile();
+      setSessionUser({ username: profileData.username, email: profileData.email, role: profileData.role });
+      if (profileData.role !== 'ADMIN') return;
+      const [usersData, peopleData, circlesData, relationshipsData, permissionsData, projectsData, tasksData, taskGroupsData, milestonesData, summaryData] = await Promise.all([fetchUsers(), fetchPeople(), fetchCircles(), fetchRelationships(), fetchPermissions(), fetchProjects(), fetchTasks(), fetchTaskGroups(), fetchMilestones(), fetchDashboardSummary()]);
         setUsers(usersData);
         setPeople(peopleData);
         setCircles(circlesData);
@@ -74,6 +79,7 @@ export default function DashboardPage() {
         setPermissions(permissionsData);
         setProjects(projectsData);
         setTasks(tasksData);
+        setTaskGroups(taskGroupsData);
         setMilestones(milestonesData);
         setSummary(summaryData);
     } catch (error) {
@@ -89,6 +95,7 @@ export default function DashboardPage() {
       setPermissions([]);
       setProjects([]);
       setTasks([]);
+      setTaskGroups([]);
       setMilestones([]);
       setSessionUser(null);
       setSummary({ userCount: 0, personCount: 0, circleCount: 0, relationshipCount: 0, permissionCount: 0 });
@@ -469,6 +476,7 @@ export default function DashboardPage() {
         await createPerson({
           fullName: formState.fullName,
           email: formState.email,
+          gender: formState.personGender,
         });
       } else if (resourceType === 'circle') {
         await createCircle({
@@ -518,6 +526,7 @@ export default function DashboardPage() {
         phoneNumber: '',
         password: '',
         fullName: '',
+        personGender: 'Unspecified',
         circleName: '',
         description: '',
         projectName: '',
@@ -591,8 +600,9 @@ export default function DashboardPage() {
       } else if (recordType === 'person') {
         const fullName = promptValue('Full name', record.fullName);
         const email = promptValue('Email', record.email);
-        if (fullName === null || email === null) return;
-        await updatePerson(record.id, { fullName, email });
+        const gender = promptValue('Gender', record.gender || 'Unspecified');
+        if (fullName === null || email === null || gender === null) return;
+        await updatePerson(record.id, { fullName, email, gender });
       } else if (recordType === 'circle') {
         const name = promptValue('Circle name', record.name);
         const description = promptValue('Description', record.description);
@@ -632,6 +642,20 @@ export default function DashboardPage() {
     }
   };
 
+  const taskStatusCounts = {
+    todo: tasks.filter((task) => task.status === 'Todo').length,
+    inProgress: tasks.filter((task) => task.status === 'In Progress').length,
+    done: tasks.filter((task) => task.status === 'Done').length,
+  };
+  const taskTotal = tasks.length;
+  const completionRate = taskTotal === 0 ? 0 : Math.round((taskStatusCounts.done / taskTotal) * 100);
+  const chartMaximum = Math.max(taskStatusCounts.todo, taskStatusCounts.inProgress, taskStatusCounts.done, 1);
+  const activeMilestones = milestones.filter((milestone) => milestone.status !== 'Completed').length;
+
+  if (sessionUser?.role !== 'ADMIN') {
+    return sessionUser ? <UserNetworkDashboard username={sessionUser.username} /> : <main className="container"><p>Loading your network…</p></main>;
+  }
+
   return (
     <main className="container" style={{ paddingTop: '3rem' }}>
       {toast && (
@@ -658,7 +682,47 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: '1rem' }}>
+      <section className="dashboard-welcome">
+        <div>
+          <p className="eyebrow">CIRCLENET OVERVIEW</p>
+          <h1>Good to see you{sessionUser ? `, ${sessionUser.username}` : ''}.</h1>
+          <p>See your circles, people, and project work at a glance.</p>
+        </div>
+        <div className="welcome-orbit" aria-hidden="true"><span /><span /><span /></div>
+      </section>
+
+      <section className="metric-grid">
+        <div className="summary-card metric-purple"><div><p className="summary-label">Users</p><h2 className="summary-value">{summary.userCount}</h2><p className="summary-meta">Signed-in accounts</p></div><div className="summary-icon">U</div></div>
+        <div className="summary-card metric-pink"><div><p className="summary-label">People</p><h2 className="summary-value">{summary.personCount}</h2><p className="summary-meta">Profiles in the network</p></div><div className="summary-icon">P</div></div>
+        <div className="summary-card metric-mint"><div><p className="summary-label">Circles</p><h2 className="summary-value">{summary.circleCount}</h2><p className="summary-meta">Active communities</p></div><div className="summary-icon">C</div></div>
+        <div className="summary-card metric-amber"><div><p className="summary-label">Relationships</p><h2 className="summary-value">{summary.relationshipCount}</h2><p className="summary-meta">Connections tracked</p></div><div className="summary-icon">R</div></div>
+        <div className="summary-card metric-sky"><div><p className="summary-label">Tasks complete</p><h2 className="summary-value">{completionRate}%</h2><p className="summary-meta">{taskStatusCounts.done} of {taskTotal} tasks done</p></div><div className="summary-icon">✓</div></div>
+      </section>
+
+      <section className="analytics-grid">
+        <article className="analytics-card task-chart-card">
+          <div className="chart-heading"><div><p className="eyebrow">WORKFLOW</p><h2>Task momentum</h2></div><span className="chart-badge">{taskTotal} total</span></div>
+          <div className="bar-chart" role="img" aria-label={`Tasks: ${taskStatusCounts.todo} to do, ${taskStatusCounts.inProgress} in progress, and ${taskStatusCounts.done} done`}>
+            {[{ label: 'To do', value: taskStatusCounts.todo, tone: 'bar-lilac' }, { label: 'Working', value: taskStatusCounts.inProgress, tone: 'bar-peach' }, { label: 'Done', value: taskStatusCounts.done, tone: 'bar-mint' }].map((item) => <div className="bar-column" key={item.label}><span className="bar-value">{item.value}</span><div className="bar-track"><span className={`bar-fill ${item.tone}`} style={{ height: `${Math.max((item.value / chartMaximum) * 100, item.value ? 12 : 0)}%` }} /></div><span className="bar-label">{item.label}</span></div>)}
+          </div>
+        </article>
+        <article className="analytics-card progress-chart-card">
+          <div className="chart-heading"><div><p className="eyebrow">DELIVERY</p><h2>Completion</h2></div><span className="chart-badge">Live</span></div>
+          <div className="donut-layout"><div className="donut-chart" style={{ background: `conic-gradient(#6ed0ad 0 ${completionRate}%, #edf0f7 ${completionRate}% 100%)` }}><div><strong>{completionRate}%</strong><span>done</span></div></div><div className="chart-legend"><p><i className="legend-dot dot-mint" />Done <b>{taskStatusCounts.done}</b></p><p><i className="legend-dot dot-peach" />In progress <b>{taskStatusCounts.inProgress}</b></p><p><i className="legend-dot dot-lilac" />To do <b>{taskStatusCounts.todo}</b></p></div></div>
+        </article>
+        <article className="analytics-card network-chart-card">
+          <div className="chart-heading"><div><p className="eyebrow">CONNECTIONS</p><h2>Circle network</h2></div><span className="chart-badge">{summary.relationshipCount} links</span></div>
+          <div className="network-visual" role="img" aria-label={`${summary.personCount} people, ${summary.circleCount} circles, and ${summary.relationshipCount} relationships`}><span className="network-link link-one" /><span className="network-link link-two" /><span className="network-link link-three" /><span className="network-node node-center">{summary.personCount}</span><span className="network-node node-pink">P</span><span className="network-node node-blue">C</span><span className="network-node node-yellow">R</span></div>
+          <p className="network-caption"><b>{summary.personCount}</b> people connected through <b>{summary.circleCount}</b> circles.</p>
+        </article>
+        <article className="analytics-card milestone-chart-card">
+          <div className="chart-heading"><div><p className="eyebrow">ROADMAP</p><h2>Milestone focus</h2></div><span className="chart-badge">{activeMilestones} active</span></div>
+          <div className="milestone-visual"><div className="milestone-wave"><span /><span /><span /><span /><span /></div><div className="milestone-stat"><strong>{milestones.length}</strong><span>Milestones</span></div></div>
+          <p className="network-caption">Keep the next milestone moving with clear, visible progress.</p>
+        </article>
+      </section>
+
+      <section className="grid legacy-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: '1rem' }}>
         <div className="summary-card">
           <div>
             <p className="summary-label">Users</p>
@@ -787,6 +851,15 @@ export default function DashboardPage() {
                   onChange={(event) => setFormState({ ...formState, email: event.target.value })}
                   style={{ padding: '0.7rem', borderRadius: '0.75rem', border: '1px solid #dbe3ee' }}
                 />
+              </label>
+              <label style={{ display: 'grid', gap: '0.35rem' }}>
+                <span>Gender</span>
+                <select value={formState.personGender} onChange={(event) => setFormState({ ...formState, personGender: event.target.value })} style={{ padding: '0.7rem', borderRadius: '0.75rem', border: '1px solid #dbe3ee' }}>
+                  <option value="Unspecified">Prefer not to say</option>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
+                  <option value="Non-binary">Non-binary</option>
+                </select>
               </label>
             </>
           )}
@@ -998,7 +1071,10 @@ export default function DashboardPage() {
         </div>
         <div className="card">
           <h3>People</h3>
-          <ul>{people.map((person) => <li key={person.id || person.email}>{person.fullName} {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => handleAdminEdit('person', person)}>Edit</button>}</li>)}</ul>
+          <div>{people.map((person) => {
+            const gender = String(person.gender || 'Unspecified').toLowerCase().replace(/\s+/g, '-');
+            return <div className={`person-chip gender-${gender}`} key={person.id || person.email}><span className="person-avatar">{String(person.fullName || '?').charAt(0)}</span><span><strong>{person.fullName}</strong><small style={{ display: 'block' }}>{person.gender || 'Unspecified'}</small></span>{sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: 'auto' }} onClick={() => handleAdminEdit('person', person)}>Edit</button>}</div>;
+          })}</div>
         </div>
         <div className="card">
           <h3>Circles</h3>
@@ -1007,7 +1083,7 @@ export default function DashboardPage() {
         <div className="card">
           <h3>Relationships</h3>
           {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem' }} onClick={() => handleAdminCreate('relationship')}>Add relationship</button>}
-          <ul>{relationships.map((relationship) => <li key={relationship.id || relationship.type}>{relationship.type} {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => handleAdminEdit('relationship', relationship)}>Edit</button>}</li>)}</ul>
+          <div>{relationships.map((relationship) => <div key={relationship.id || relationship.type}><div className="relationship-line" /><span>{relationship.type}</span>{sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => handleAdminEdit('relationship', relationship)}>Edit</button>}</div>)}</div>
         </div>
         <div className="card">
           <h3>Permissions</h3>
@@ -1023,6 +1099,7 @@ export default function DashboardPage() {
         <div className="card">
           <h3>Tasks</h3>
           {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem' }} onClick={() => handleAdminCreate('task group')}>Add task group</button>}
+          <p style={{ color: '#64748b' }}>Groups: {taskGroups.length ? taskGroups.map((group) => group.name).join(', ') : 'None'}</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.5rem' }}>
             {sessionUser?.role === 'ADMIN' && tasks.map((task) => <button key={`edit-task-${task.id}`} type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem' }} onClick={() => handleAdminEdit('task', task)}>Edit {task.title}</button>)}
           </div>
@@ -1060,7 +1137,7 @@ export default function DashboardPage() {
               onChange={(event) => setRoadmapStatusFilter(event.target.value)}
               style={{ padding: '0.55rem 0.65rem', borderRadius: '0.6rem', border: '1px solid #cbd5e1' }}
             >
-              <option value="all">All statuses</option>
+              <option value="all">All status</option>
               <option value="Planned">Planned</option>
               <option value="In Progress">In Progress</option>
               <option value="Blocked">Blocked</option>

@@ -2,8 +2,11 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'CircleNet-AI',
-  description: 'Enterprise AI platform experience'
+  title: {
+    default: 'CircleNet Intelligence Cloud',
+    template: '%s | CircleNet'
+  },
+  description: 'Enterprise relationship intelligence, project delivery and team analytics in one connected workspace.'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

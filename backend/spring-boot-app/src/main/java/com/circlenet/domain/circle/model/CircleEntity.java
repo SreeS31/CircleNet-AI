@@ -6,6 +6,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.JoinColumn;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "circles")
@@ -20,6 +25,14 @@ public class CircleEntity {
 
   @Column(nullable = false)
   private String description;
+
+  @Column(name = "owner_user_id")
+  private Long ownerUserId;
+
+  @ElementCollection
+  @CollectionTable(name = "circle_members", joinColumns = @JoinColumn(name = "circle_id"))
+  @Column(name = "user_id")
+  private Set<Long> memberUserIds = new HashSet<>();
 
   public Long getId() {
     return id;
@@ -40,4 +53,8 @@ public class CircleEntity {
   public void setDescription(String description) {
     this.description = description;
   }
+
+  public Long getOwnerUserId() { return ownerUserId; }
+  public void setOwnerUserId(Long ownerUserId) { this.ownerUserId = ownerUserId; }
+  public Set<Long> getMemberUserIds() { return memberUserIds; }
 }

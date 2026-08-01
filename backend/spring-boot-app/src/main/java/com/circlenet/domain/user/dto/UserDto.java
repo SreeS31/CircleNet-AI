@@ -6,6 +6,9 @@ public class UserDto {
   private String email;
   private String phoneNumber;
   private String role;
+  private String firstName;
+  private String surname;
+  private String location;
 
   public Long getId() {
     return id;
@@ -46,4 +49,11 @@ public class UserDto {
   public void setRole(String role) {
     this.role = role;
   }
+
+  public String getFirstName() { return firstName; }
+  public void setFirstName(String firstName) { this.firstName = firstName; }
+  public String getSurname() { return surname; }
+  public void setSurname(String surname) { this.surname = surname; }
+  public String getLocation() { return location; }
+  public void setLocation(String location) { this.location = location; }
 }

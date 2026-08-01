@@ -30,6 +30,10 @@ public class UserEntity {
   @Column(nullable = false)
   private String passwordHash;
 
+  private String firstName;
+  private String surname;
+  private String location;
+
   public Long getId() {
     return id;
   }
@@ -73,4 +77,11 @@ public class UserEntity {
   public void setPasswordHash(String passwordHash) {
     this.passwordHash = passwordHash;
   }
+
+  public String getFirstName() { return firstName; }
+  public void setFirstName(String firstName) { this.firstName = firstName; }
+  public String getSurname() { return surname; }
+  public void setSurname(String surname) { this.surname = surname; }
+  public String getLocation() { return location; }
+  public void setLocation(String location) { this.location = location; }
 }

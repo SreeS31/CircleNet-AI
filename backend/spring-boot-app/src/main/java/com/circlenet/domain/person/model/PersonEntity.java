@@ -20,6 +20,8 @@ public class PersonEntity {
 
   @Column(nullable = false)
   private String email;
+  @Column(nullable = false)
+  private String gender = "Unspecified";
 
   public Long getId() {
     return id;
@@ -40,4 +42,6 @@ public class PersonEntity {
   public void setEmail(String email) {
     this.email = email;
   }
+  public String getGender() { return gender; }
+  public void setGender(String gender) { this.gender = gender; }
 }

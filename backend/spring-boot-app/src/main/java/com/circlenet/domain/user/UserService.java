@@ -43,7 +43,7 @@ public class UserService {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already in use");
     }
     if (userRepository.existsByPhoneNumber(phoneNumber)) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "Phone number is already in use");
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "This mobile number already belongs to an existing user. Search for them and add only the relationship.");
     }
 
     UserEntity entity = new UserEntity();
@@ -51,6 +51,9 @@ public class UserService {
     entity.setEmail(email);
     entity.setPhoneNumber(phoneNumber);
     entity.setPasswordHash(passwordEncoder.encode(password));
+    entity.setFirstName(optionalText(request.getFirstName()));
+    entity.setSurname(optionalText(request.getSurname()));
+    entity.setLocation(optionalText(request.getLocation()));
     return toDto(userRepository.save(entity));
   }
 
@@ -67,12 +70,15 @@ public class UserService {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already in use");
     }
     if (!entity.getPhoneNumber().equals(phoneNumber) && userRepository.existsByPhoneNumber(phoneNumber)) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "Phone number is already in use");
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "This mobile number already belongs to an existing user. Search for them and add only the relationship.");
     }
 
     entity.setUsername(username);
     entity.setEmail(email);
     entity.setPhoneNumber(phoneNumber);
+    entity.setFirstName(optionalText(request.getFirstName()));
+    entity.setSurname(optionalText(request.getSurname()));
+    entity.setLocation(optionalText(request.getLocation()));
     if (request.getPassword() != null && !request.getPassword().isBlank()) {
       entity.setPasswordHash(passwordEncoder.encode(request.getPassword()));
     }
@@ -90,6 +96,9 @@ public class UserService {
     dto.setEmail(entity.getEmail());
     dto.setPhoneNumber(entity.getPhoneNumber());
     dto.setRole(entity.getRole());
+    dto.setFirstName(entity.getFirstName());
+    dto.setSurname(entity.getSurname());
+    dto.setLocation(entity.getLocation());
     return dto;
   }
 
@@ -105,6 +114,10 @@ public class UserService {
       return null;
     }
     return value.trim().toLowerCase();
+  }
+
+  private String optionalText(String value) {
+    return value == null || value.isBlank() ? null : value.trim();
   }
 
   private String normalizePhoneNumber(String value) {

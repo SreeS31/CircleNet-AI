@@ -1,0 +1,1 @@
+ALTER TABLE people ADD COLUMN gender VARCHAR(32) NOT NULL DEFAULT 'Unspecified';

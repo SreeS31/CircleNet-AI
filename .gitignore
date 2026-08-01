@@ -19,6 +19,7 @@ dist/
 build/
 target/
 .gradle/
+*.tsbuildinfo
 
 # Environment files
 .env

@@ -266,7 +266,7 @@ export async function fetchUsers() {
   return authenticatedRequest<any[]>('/api/users');
 }
 
-export async function createUser(payload: { username: string; email?: string; phoneNumber: string; password: string }) {
+export async function createUser(payload: { username: string; email?: string; phoneNumber: string; password: string; firstName?: string; surname?: string; location?: string }) {
   return request<any>('/api/users', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -278,18 +278,60 @@ export async function updateUser(id: number, payload: { username: string; email?
   return authenticatedRequest<any>(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
+export type NetworkPerson = { id: number; username: string; firstName?: string; surname?: string; displayName: string; phoneNumber: string; location?: string };
+export type NetworkRelationship = { id: number; type: string; person: NetworkPerson };
+export type NetworkCircle = { id: number; name: string; description: string; members: NetworkPerson[] };
+
+export async function searchNetworkPeople(query: string) {
+  return authenticatedRequest<NetworkPerson[]>(`/api/network/search?q=${encodeURIComponent(query)}`);
+}
+
+export async function fetchMyRelationships() {
+  return authenticatedRequest<NetworkRelationship[]>('/api/network/relationships');
+}
+
+export async function addMyRelationship(relatedUserId: number, type: string) {
+  return authenticatedRequest<NetworkRelationship>('/api/network/relationships', {
+    method: 'POST', body: JSON.stringify({ relatedUserId, type }),
+  });
+}
+
+export async function removeMyRelationship(id: number) {
+  return authenticatedRequest<void>(`/api/network/relationships/${id}`, { method: 'DELETE' });
+}
+
+export async function fetchMyCircles() {
+  return authenticatedRequest<NetworkCircle[]>('/api/network/circles');
+}
+
+export async function createMyCircle(name: string, description: string) {
+  return authenticatedRequest<NetworkCircle>('/api/network/circles', {
+    method: 'POST', body: JSON.stringify({ name, description }),
+  });
+}
+
+export async function addMemberToMyCircle(circleId: number, userId: number) {
+  return authenticatedRequest<NetworkCircle>(`/api/network/circles/${circleId}/members`, {
+    method: 'POST', body: JSON.stringify({ userId }),
+  });
+}
+
+export async function removeMemberFromMyCircle(circleId: number, userId: number) {
+  return authenticatedRequest<NetworkCircle>(`/api/network/circles/${circleId}/members/${userId}`, { method: 'DELETE' });
+}
+
 export async function fetchPeople() {
   return authenticatedRequest<any[]>('/api/people');
 }
 
-export async function createPerson(payload: { fullName: string; email: string }) {
+export async function createPerson(payload: { fullName: string; email: string; gender?: string }) {
   return authenticatedRequest<any>('/api/people', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
-export async function updatePerson(id: number, payload: { fullName: string; email: string }) {
+export async function updatePerson(id: number, payload: { fullName: string; email: string; gender?: string }) {
   return authenticatedRequest<any>(`/api/people/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
@@ -318,6 +360,10 @@ export async function createRelationship(payload: { type: string }) {
 
 export async function createTaskGroup(payload: { name: string; description: string }) {
   return authenticatedRequest<any>('/api/task-groups', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function fetchTaskGroups() {
+  return authenticatedRequest<any[]>('/api/task-groups');
 }
 
 export async function updateRelationship(id: number, payload: { type: string }) {

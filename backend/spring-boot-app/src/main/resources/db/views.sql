@@ -1,4 +1,4 @@
-CREATE VIEW IF NOT EXISTS dashboard_summary AS
+CREATE OR REPLACE VIEW dashboard_summary AS
 SELECT
   (SELECT COUNT(*) FROM users) AS user_count,
   (SELECT COUNT(*) FROM people) AS person_count,

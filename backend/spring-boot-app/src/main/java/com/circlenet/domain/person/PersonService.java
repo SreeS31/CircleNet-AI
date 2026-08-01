@@ -29,6 +29,7 @@ public class PersonService {
     PersonEntity entity = new PersonEntity();
     entity.setFullName(request.getFullName());
     entity.setEmail(request.getEmail());
+    entity.setGender(normalizeGender(request.getGender()));
     return toDto(personRepository.save(entity));
   }
 
@@ -36,6 +37,7 @@ public class PersonService {
     PersonEntity entity = personRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Person not found"));
     entity.setFullName(request.getFullName());
     entity.setEmail(request.getEmail());
+    entity.setGender(normalizeGender(request.getGender()));
     return toDto(personRepository.save(entity));
   }
 
@@ -48,6 +50,11 @@ public class PersonService {
     dto.setId(entity.getId());
     dto.setFullName(entity.getFullName());
     dto.setEmail(entity.getEmail());
+    dto.setGender(entity.getGender());
     return dto;
+  }
+
+  private String normalizeGender(String gender) {
+    return gender == null || gender.isBlank() ? "Unspecified" : gender.trim();
   }
 }

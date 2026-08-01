@@ -31,6 +31,7 @@ public class SecurityConfig {
         .requestMatchers("/actuator/health").permitAll()
         .requestMatchers("/api/auth/health", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout", "/api/auth/revoke").permitAll()
         .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
+        .requestMatchers(HttpMethod.DELETE, "/api/network/**").authenticated()
         .requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN")
         .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
         .requestMatchers("/api/**").authenticated()
