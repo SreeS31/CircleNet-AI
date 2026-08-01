@@ -39,14 +39,17 @@ public class UserService {
     if (userRepository.existsByUsername(username)) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Username is already in use");
     }
-    if (email != null && userRepository.existsByEmail(email)) {
+    UserEntity invitedUser = userRepository.findByPhoneNumber(phoneNumber)
+        .filter(user -> "INVITED".equals(user.getAccountStatus())).orElse(null);
+    if (email != null && userRepository.findByEmail(email)
+        .filter(user -> invitedUser == null || !user.getId().equals(invitedUser.getId())).isPresent()) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already in use");
     }
-    if (userRepository.existsByPhoneNumber(phoneNumber)) {
+    if (invitedUser == null && userRepository.existsByPhoneNumber(phoneNumber)) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "This mobile number already belongs to an existing user. Search for them and add only the relationship.");
     }
 
-    UserEntity entity = new UserEntity();
+    UserEntity entity = invitedUser == null ? new UserEntity() : invitedUser;
     entity.setUsername(username);
     entity.setEmail(email);
     entity.setPhoneNumber(phoneNumber);
@@ -54,6 +57,7 @@ public class UserService {
     entity.setFirstName(optionalText(request.getFirstName()));
     entity.setSurname(optionalText(request.getSurname()));
     entity.setLocation(optionalText(request.getLocation()));
+    entity.setAccountStatus("ACTIVE");
     return toDto(userRepository.save(entity));
   }
 

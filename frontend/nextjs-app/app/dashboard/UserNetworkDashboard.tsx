@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { addMemberToMyCircle, addMyRelationship, ApiError, createMyCircle, fetchMyCircles,
+import { addMemberToMyCircle, addMyRelationship, addPersonToMyNetwork, ApiError, createMyCircle, fetchMyCircles,
   fetchMyRelationships, fetchRelationshipTypes, logout, NetworkCircle, NetworkPerson, NetworkRelationship,
   removeMemberFromMyCircle, removeMyRelationship, searchNetworkPeople } from '../lib/api';
 
@@ -91,22 +91,17 @@ export default function UserNetworkDashboard({ username }: { username: string })
     setInviteMobile('');
     setCommunication(null);
     try {
-      const normalized = mobileToAdd.replace(/[\s()-]/g, '');
-      const matches = await searchNetworkPeople(normalized);
-      const existing = matches.find(person => person.phoneNumber.replace(/[\s()-]/g, '') === normalized);
-      if (!existing) {
-        setInviteMobile(normalized);
-        setCommunication({ name: fullNameToAdd.trim(), mobile: normalized, email: emailToAdd.trim(), relationship: directRelationshipType, existing: false });
-        setMessage('No CircleNet account uses this mobile number yet. Invite this person to register; their mobile number will remain unique.');
-        return;
-      }
-      await addMyRelationship(existing.id, directRelationshipType);
+      const relationship = await addPersonToMyNetwork({ fullName: fullNameToAdd, phoneNumber: mobileToAdd, email: emailToAdd || undefined, type: directRelationshipType });
+      const existing = relationship.person.accountStatus === 'ACTIVE';
       await refresh();
-      setCommunication({ name: fullNameToAdd.trim() || existing.displayName, mobile: existing.phoneNumber, email: emailToAdd.trim(), relationship: directRelationshipType, existing: true });
+      setInviteMobile(existing ? '' : relationship.person.phoneNumber);
+      setCommunication({ name: fullNameToAdd.trim() || relationship.person.displayName, mobile: relationship.person.phoneNumber, email: emailToAdd.trim(), relationship: directRelationshipType, existing });
       setMobileToAdd('');
       setFullNameToAdd('');
       setEmailToAdd('');
-      setMessage(`${existing.displayName} already exists. Only the ${directRelationshipType.toLowerCase()} relationship was added—no duplicate user was created.`);
+      setMessage(existing
+        ? `${relationship.person.displayName} already exists. Only the ${directRelationshipType.toLowerCase()} relationship was added—no duplicate user was created.`
+        : `${relationship.person.displayName} was added to My Relationships as an invited user. Send the registration invitation so they can claim the account.`);
     } catch (error) { setMessage(errorMessage(error)); }
     finally { setBusy(false); }
   };
@@ -168,7 +163,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
       <aside className="card create-circle-card"><p className="eyebrow">ORGANIZE</p><h2>Create a circle</h2><form onSubmit={createCircle}><input required value={circleName} onChange={e => setCircleName(e.target.value)} placeholder="Family, Close friends…" /><textarea value={circleDescription} onChange={e => setCircleDescription(e.target.value)} placeholder="Optional description" /><button className="btn btn-primary" disabled={busy}>Create circle</button></form></aside>
     </section>
 
-    <section className="network-section"><div className="section-heading"><div><p className="eyebrow">CONNECTIONS</p><h2>My relationships</h2></div><span>{relationships.length}</span></div><div className="relationship-grid">{relationships.map(item => <article className="relationship-card" key={item.id}><span className="person-avatar">{item.person.displayName.charAt(0)}</span><div><strong>{item.person.displayName}</strong><p>{item.person.phoneNumber}</p><span className="relationship-badge">{item.type}</span></div><button className="text-button danger" onClick={async () => { await removeMyRelationship(item.id); await refresh(); }}>Remove</button></article>)}</div>{!relationships.length && <p className="empty-state">Search for someone above to start your network.</p>}</section>
+    <section className="network-section"><div className="section-heading"><div><p className="eyebrow">CONNECTIONS</p><h2>My relationships</h2></div><span>{relationships.length}</span></div><div className="relationship-grid">{relationships.map(item => <article className="relationship-card" key={item.id}><span className="person-avatar">{item.person.displayName.charAt(0)}</span><div className="relationship-identity"><strong>{item.person.displayName}</strong><p>{item.person.phoneNumber}</p><div><span className="relationship-badge">{item.type}</span>{item.person.accountStatus === 'INVITED' && <span className="pending-badge">Invitation pending</span>}</div></div><div className="relationship-circle-controls"><select value={circleChoice[item.person.id] || ''} onChange={e => setCircleChoice({...circleChoice, [item.person.id]: e.target.value})}><option value="">Choose circle</option>{circles.map(circle => <option value={circle.id} key={circle.id}>{circle.name}</option>)}</select><button className="btn btn-secondary" disabled={busy || !circles.length} onClick={() => addToCircle(item.person)}>Add to circle</button></div><button className="text-button danger" onClick={async () => { await removeMyRelationship(item.id); await refresh(); }}>Remove</button></article>)}</div>{!relationships.length && <p className="empty-state">Add someone above to start your network.</p>}</section>
 
     <section className="network-section"><div className="section-heading"><div><p className="eyebrow">MY GROUPS</p><h2>My circles</h2></div><span>{circles.length}</span></div><div className="circle-grid">{circles.map(circle => <article className="circle-card" key={circle.id}><h3>{circle.name}</h3><p>{circle.description || 'Your private circle'}</p><div className="circle-members">{circle.members.map(member => <div key={member.id}><span>{member.displayName}</span><button className="text-button danger" onClick={async () => { await removeMemberFromMyCircle(circle.id, member.id); await refresh(); }}>Remove</button></div>)}</div>{!circle.members.length && <small>No members yet. Add one from search results.</small>}</article>)}</div></section>
   </main>;

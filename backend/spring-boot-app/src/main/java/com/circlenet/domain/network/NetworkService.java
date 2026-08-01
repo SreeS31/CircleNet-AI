@@ -8,10 +8,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.UUID;
 
 import com.circlenet.domain.circle.CircleRepository;
 import com.circlenet.domain.circle.model.CircleEntity;
 import com.circlenet.domain.network.dto.AddRelationshipRequest;
+import com.circlenet.domain.network.dto.AddPersonRequest;
 import com.circlenet.domain.network.dto.CreateNetworkCircleRequest;
 import com.circlenet.domain.network.dto.NetworkCircleDto;
 import com.circlenet.domain.network.dto.NetworkPersonDto;
@@ -30,12 +33,14 @@ public class NetworkService {
   private final UserRepository userRepository;
   private final RelationshipRepository relationshipRepository;
   private final CircleRepository circleRepository;
+  private final PasswordEncoder passwordEncoder;
 
   public NetworkService(UserRepository userRepository, RelationshipRepository relationshipRepository,
-      CircleRepository circleRepository) {
+      CircleRepository circleRepository, PasswordEncoder passwordEncoder) {
     this.userRepository = userRepository;
     this.relationshipRepository = relationshipRepository;
     this.circleRepository = circleRepository;
+    this.passwordEncoder = passwordEncoder;
   }
 
   @Transactional(readOnly = true)
@@ -78,6 +83,33 @@ public class NetworkService {
     relationship.setType(type);
     relationship = relationshipRepository.save(relationship);
     return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), toPerson(related));
+  }
+
+  public NetworkRelationshipDto addPerson(Long currentUserId, AddPersonRequest request) {
+    String fullName = requireText(request.fullName(), "Full name");
+    String phoneNumber = normalizePhoneNumber(request.phoneNumber());
+    String type = normalizeRelationshipType(request.type());
+    UserEntity person = userRepository.findByPhoneNumber(phoneNumber).orElseGet(() -> {
+      UserEntity invited = new UserEntity();
+      invited.setUsername("invite_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+      invited.setFirstName(fullName);
+      invited.setPhoneNumber(phoneNumber);
+      invited.setEmail(request.email() == null || request.email().isBlank() ? null : request.email().trim().toLowerCase());
+      invited.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+      invited.setRole("USER");
+      invited.setAccountStatus("INVITED");
+      return userRepository.save(invited);
+    });
+    if (currentUserId.equals(person.getId())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot add yourself");
+    }
+    RelationshipEntity relationship = relationshipRepository
+        .findByOwnerUserIdAndRelatedUserId(currentUserId, person.getId()).orElseGet(RelationshipEntity::new);
+    relationship.setOwnerUserId(currentUserId);
+    relationship.setRelatedUserId(person.getId());
+    relationship.setType(type);
+    relationship = relationshipRepository.save(relationship);
+    return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), toPerson(person));
   }
 
   public void removeRelationship(Long currentUserId, Long relationshipId) {
@@ -148,7 +180,7 @@ public class NetworkService {
         user.getSurname() == null ? "" : user.getSurname()).trim();
     if (displayName.isBlank()) displayName = user.getUsername();
     return new NetworkPersonDto(user.getId(), user.getUsername(), user.getFirstName(), user.getSurname(),
-        displayName, user.getPhoneNumber(), user.getLocation());
+        displayName, user.getPhoneNumber(), user.getLocation(), user.getAccountStatus());
   }
 
   private String normalizeRelationshipType(String type) {
@@ -160,5 +192,13 @@ public class NetworkService {
   private String requireText(String value, String label) {
     if (value == null || value.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + " is required");
     return value.trim();
+  }
+
+  private String normalizePhoneNumber(String value) {
+    String phone = requireText(value, "Mobile number").replaceAll("[\\s()-]", "");
+    if (!phone.matches("\\+?[0-9]{7,15}")) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mobile number must contain 7 to 15 digits");
+    }
+    return phone;
   }
 }

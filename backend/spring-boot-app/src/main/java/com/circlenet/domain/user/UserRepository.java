@@ -24,7 +24,7 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
 	boolean existsByPhoneNumber(String phoneNumber);
 
 	@Query("""
-		select u from UserEntity u where u.id <> :currentUserId and (
+		select u from UserEntity u where u.id <> :currentUserId and u.accountStatus = 'ACTIVE' and (
 		  lower(u.username) like lower(concat('%', :query, '%')) or
 		  lower(coalesce(u.firstName, '')) like lower(concat('%', :query, '%')) or
 		  lower(coalesce(u.surname, '')) like lower(concat('%', :query, '%')) or

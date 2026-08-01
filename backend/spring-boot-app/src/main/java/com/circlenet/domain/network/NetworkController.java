@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.circlenet.domain.network.dto.AddRelationshipRequest;
+import com.circlenet.domain.network.dto.AddPersonRequest;
 import com.circlenet.domain.network.dto.CircleMemberRequest;
 import com.circlenet.domain.network.dto.CreateNetworkCircleRequest;
 import com.circlenet.domain.network.dto.NetworkCircleDto;
@@ -42,6 +43,11 @@ public class NetworkController {
   @PostMapping("/relationships")
   public NetworkRelationshipDto addRelationship(Principal principal, @RequestBody AddRelationshipRequest request) {
     return networkService.addRelationship(userId(principal), request);
+  }
+
+  @PostMapping("/relationships/add-person")
+  public NetworkRelationshipDto addPerson(Principal principal, @RequestBody AddPersonRequest request) {
+    return networkService.addPerson(userId(principal), request);
   }
 
   @DeleteMapping("/relationships/{id}")

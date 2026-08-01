@@ -34,6 +34,9 @@ public class UserEntity {
   private String surname;
   private String location;
 
+  @Column(name = "account_status", nullable = false)
+  private String accountStatus = "ACTIVE";
+
   public Long getId() {
     return id;
   }
@@ -84,4 +87,6 @@ public class UserEntity {
   public void setSurname(String surname) { this.surname = surname; }
   public String getLocation() { return location; }
   public void setLocation(String location) { this.location = location; }
+  public String getAccountStatus() { return accountStatus; }
+  public void setAccountStatus(String accountStatus) { this.accountStatus = accountStatus; }
 }
