@@ -36,8 +36,8 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const [mobileToAdd, setMobileToAdd] = useState('');
   const [fullNameToAdd, setFullNameToAdd] = useState('');
   const [emailToAdd, setEmailToAdd] = useState('');
-  const [directRelationshipType, setDirectRelationshipType] = useState('Friend');
-  const [directVisibility, setDirectVisibility] = useState<VisibilityScope>('FRIENDS');
+  const [directRelationshipType, setDirectRelationshipType] = useState('');
+  const [directVisibility, setDirectVisibility] = useState<VisibilityScope | ''>('');
   const [directCompany, setDirectCompany] = useState('');
   const [employmentCompanies, setEmploymentCompanies] = useState<string[]>([]);
   const [editingRelationship, setEditingRelationship] = useState<{ id: number; contactName: string; type: string; visibilityScope: VisibilityScope; visibilityCompany: string } | null>(null);
@@ -73,10 +73,12 @@ export default function UserNetworkDashboard({ username }: { username: string })
   };
 
   const connect = async (person: NetworkPerson) => {
+    const selectedRelation = relationshipType[person.id];
+    const scope = visibilityChoice[person.id];
+    if (!selectedRelation || !scope) { setMessage('Relation and View are mandatory. Please select both.'); return; }
     setBusy(true);
     try {
-      const scope = visibilityChoice[person.id] || 'FRIENDS';
-      await addMyRelationship(person.id, relationshipType[person.id] || 'Friend', scope,
+      await addMyRelationship(person.id, selectedRelation, scope,
         scope === 'COLLEAGUES' ? companyChoice[person.id] : undefined);
       await refresh();
       setMessage(`${person.displayName} already exists, so only the relationship was added.`);
@@ -110,6 +112,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
 
   const addByMobile = async (event: FormEvent) => {
     event.preventDefault();
+    if (!directRelationshipType || !directVisibility) { setMessage('Relation and View are mandatory. Please select both.'); return; }
     setBusy(true);
     setInviteMobile('');
     setCommunication(null);
@@ -124,6 +127,9 @@ export default function UserNetworkDashboard({ username }: { username: string })
       setMobileToAdd('');
       setFullNameToAdd('');
       setEmailToAdd('');
+      setDirectRelationshipType('');
+      setDirectVisibility('');
+      setDirectCompany('');
       setMessage(existing
         ? `${relationship.person.displayName} already exists. Only the ${directRelationshipType.toLowerCase()} relationship was added—no duplicate user was created.`
         : `${relationship.person.displayName} was added to My Relationships as an invited user. Send the registration invitation so they can claim the account.`);
@@ -202,8 +208,8 @@ export default function UserNetworkDashboard({ username }: { username: string })
         <input className="quick-add-name" type="text" required value={fullNameToAdd} onChange={e => setFullNameToAdd(e.target.value)} placeholder="Full name" />
         <input className="quick-add-mobile" type="tel" required value={mobileToAdd} onChange={e => setMobileToAdd(e.target.value)} placeholder="Mobile number, e.g. +919876543210" />
         <input className="quick-add-email" type="email" value={emailToAdd} onChange={e => setEmailToAdd(e.target.value)} placeholder="Email address (optional)" />
-        <select className="quick-add-relationship" value={directRelationshipType} onChange={e => setDirectRelationshipType(e.target.value)}>{relationshipTypes.map(type => <option key={type}>{type}</option>)}</select>
-        <select className="quick-add-visibility" aria-label="Who can view this person" value={directVisibility} onChange={e => setDirectVisibility(e.target.value as VisibilityScope)}>{visibilityOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}</select>
+        <select className="quick-add-relationship" required value={directRelationshipType} onChange={e => setDirectRelationshipType(e.target.value)}><option value="" disabled>Relation</option>{relationshipTypes.map(type => <option key={type}>{type}</option>)}</select>
+        <select className="quick-add-visibility" required aria-label="Who can view this person" value={directVisibility} onChange={e => setDirectVisibility(e.target.value as VisibilityScope)}><option value="" disabled>View</option>{visibilityOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}</select>
         {directVisibility === 'COLLEAGUES' && <select className="quick-add-company" required value={directCompany} onChange={e => setDirectCompany(e.target.value)}><option value="">Select company</option>{employmentCompanies.map(company => <option key={company}>{company}</option>)}</select>}
         <button className="btn btn-primary" disabled={busy}>{busy ? 'Checking…' : 'Add person'}</button>
       </form>
@@ -224,9 +230,9 @@ export default function UserNetworkDashboard({ username }: { username: string })
               <PersonAvatar name={person.displayName} photo={person.profilePhoto}/>
               <div className="people-identity"><strong>{person.displayName}</strong><small>{person.location || 'Location not provided'}</small><span className={`status-tag ${person.accountStatus === 'INVITED' ? 'status-not-verified' : 'status-verified'}`}>{person.accountStatus === 'INVITED' ? 'Not Verified' : 'Verified'}</span></div>
               {!relationship ? <div className="people-controls">
-                <select value={relationshipType[person.id] || 'Friend'} onChange={e => setRelationshipType({...relationshipType, [person.id]: e.target.value})}>{relationshipTypes.map(type => <option key={type}>{type}</option>)}</select>
-                <select aria-label="Who can view this person" value={visibilityChoice[person.id] || 'FRIENDS'} onChange={e => setVisibilityChoice({...visibilityChoice, [person.id]: e.target.value as VisibilityScope})}>{visibilityOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}</select>
-                {(visibilityChoice[person.id] || 'FRIENDS') === 'COLLEAGUES' && <select required value={companyChoice[person.id] || ''} onChange={e => setCompanyChoice({...companyChoice, [person.id]: e.target.value})}><option value="">Select company</option>{employmentCompanies.map(company => <option key={company}>{company}</option>)}</select>}
+                <select required value={relationshipType[person.id] || ''} onChange={e => setRelationshipType({...relationshipType, [person.id]: e.target.value})}><option value="" disabled>Relation</option>{relationshipTypes.map(type => <option key={type}>{type}</option>)}</select>
+                <select required aria-label="Who can view this person" value={visibilityChoice[person.id] || ''} onChange={e => setVisibilityChoice({...visibilityChoice, [person.id]: e.target.value as VisibilityScope})}><option value="" disabled>View</option>{visibilityOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}</select>
+                {visibilityChoice[person.id] === 'COLLEAGUES' && <select required value={companyChoice[person.id] || ''} onChange={e => setCompanyChoice({...companyChoice, [person.id]: e.target.value})}><option value="">Select company</option>{employmentCompanies.map(company => <option key={company}>{company}</option>)}</select>}
                 <button className="btn btn-primary" disabled={busy} onClick={() => connect(person)}>Add relationship</button>
               </div> : <div className="people-controls"><span className="relationship-badge">{relationship.type}</span><select value={circleChoice[person.id] || ''} onChange={e => setCircleChoice({...circleChoice, [person.id]: e.target.value})}><option value="">Choose circle</option>{administeredCircles.map(circle => <option value={circle.id} key={circle.id}>{circle.name}</option>)}</select><button className="btn btn-secondary" disabled={busy || !administeredCircles.length} onClick={() => addToCircle(person)}>Add to circle</button></div>}
             </div>;
