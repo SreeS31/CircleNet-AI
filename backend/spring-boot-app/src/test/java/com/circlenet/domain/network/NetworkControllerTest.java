@@ -74,6 +74,29 @@ class NetworkControllerTest {
   }
 
   @Test
+  void shouldCreateManagedChildAndNonClaimableMemorialWithoutContactDetails() throws Exception {
+    JsonNode owner = createUser("managed-owner", "+15550110021", "Managed", "Owner", "Pune");
+    String token = login(owner.get("phoneNumber").asText());
+
+    mockMvc.perform(post("/api/network/relationships/add-person").header(auth(), "Bearer " + token)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"fullName\":\"Little Tara\",\"type\":\"Child\",\"visibilityScope\":\"RELATIVES\",\"identityType\":\"MANAGED\",\"managedCategory\":\"CHILD\",\"dateOfBirth\":\"2020-03-14\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.contactPhone").doesNotExist())
+        .andExpect(jsonPath("$.person.accountStatus").value("MANAGED"))
+        .andExpect(jsonPath("$.person.identityType").value("MANAGED"))
+        .andExpect(jsonPath("$.person.managedCategory").value("CHILD"))
+        .andExpect(jsonPath("$.person.claimStatus").value("GUARDIAN_APPROVAL_REQUIRED"));
+
+    mockMvc.perform(post("/api/network/relationships/add-person").header(auth(), "Bearer " + token)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"fullName\":\"Family Elder\",\"type\":\"Relative\",\"visibilityScope\":\"RELATIVES\",\"identityType\":\"MANAGED\",\"managedCategory\":\"MEMORIAL\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.person.managedCategory").value("MEMORIAL"))
+        .andExpect(jsonPath("$.person.claimStatus").value("NOT_CLAIMABLE"));
+  }
+
+  @Test
   void shouldRejectDuplicateMobileWithRelationshipGuidance() throws Exception {
     createUser("unique-mobile-one", "+15550110003", "Ravi", "Kumar", "Delhi");
     mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)

@@ -11,6 +11,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.UUID;
 import java.util.LinkedHashMap;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 import com.circlenet.domain.circle.CircleRepository;
 import com.circlenet.domain.circle.model.CircleEntity;
@@ -109,19 +111,53 @@ public class NetworkService {
 
   public NetworkRelationshipDto addPerson(Long currentUserId, AddPersonRequest request) {
     String fullName = requireText(request.fullName(), "Full name");
-    String phoneNumber = normalizePhoneNumber(request.phoneNumber());
     String type = normalizeRelationshipType(request.type());
-    UserEntity person = userRepository.findByPhoneNumber(phoneNumber).orElseGet(() -> {
+    String identityType = request.identityType() == null || request.identityType().isBlank()
+        ? "ACCOUNT" : request.identityType().trim().toUpperCase();
+    if (!Set.of("ACCOUNT", "MANAGED").contains(identityType)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported person type");
+    }
+
+    String phoneNumber = request.phoneNumber() == null || request.phoneNumber().isBlank()
+        ? null : normalizePhoneNumber(request.phoneNumber());
+    UserEntity person;
+    if ("MANAGED".equals(identityType)) {
+      String category = requireText(request.managedCategory(), "Managed person category").toUpperCase();
+      if (!Set.of("CHILD", "MEMORIAL", "OTHER").contains(category)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported managed person category");
+      }
+      UserEntity managed = new UserEntity();
+      managed.setUsername("managed_" + UUID.randomUUID().toString().replace("-", ""));
+      managed.setFirstName(fullName);
+      managed.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+      managed.setRole("USER");
+      managed.setAccountStatus("MANAGED");
+      managed.setIdentityType("MANAGED");
+      managed.setManagedCategory(category);
+      managed.setGuardianUserId(currentUserId);
+      managed.setClaimStatus("MEMORIAL".equals(category) ? "NOT_CLAIMABLE" : "GUARDIAN_APPROVAL_REQUIRED");
+      managed.setManagedDateOfBirth(cleanDate(request.dateOfBirth(), "Date of birth"));
+      managed.setManagedDateOfDeath(cleanDate(request.dateOfDeath(), "Date of death"));
+      managed.setManagedNotes(request.notes() == null || request.notes().isBlank() ? null : request.notes().trim());
+      person = userRepository.save(managed);
+    } else {
+      if (phoneNumber == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mobile number is required for a CircleNet account");
+      }
+      final String accountPhone = phoneNumber;
+      person = userRepository.findByPhoneNumber(accountPhone).orElseGet(() -> {
       UserEntity invited = new UserEntity();
       invited.setUsername("invite_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
       invited.setFirstName(fullName);
-      invited.setPhoneNumber(phoneNumber);
+      invited.setPhoneNumber(accountPhone);
       invited.setEmail(request.email() == null || request.email().isBlank() ? null : request.email().trim().toLowerCase());
       invited.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
       invited.setRole("USER");
       invited.setAccountStatus("INVITED");
+      invited.setIdentityType("ACCOUNT");
       return userRepository.save(invited);
-    });
+      });
+    }
     if (currentUserId.equals(person.getId())) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot add yourself");
     }
@@ -263,7 +299,8 @@ public class NetworkService {
     if (displayName.isBlank()) displayName = profileDisplayName(user);
     return new NetworkPersonDto(user.getId(), user.getFirstName(), user.getSurname(),
         displayName, null, user.getLocation(), user.getAccountStatus(),
-        profileRepository.findById(user.getId()).map(profile -> profile.getProfilePhoto()).orElse(null));
+        profileRepository.findById(user.getId()).map(profile -> profile.getProfilePhoto()).orElse(null),
+        user.getIdentityType(), user.getManagedCategory(), user.getClaimStatus());
   }
 
   private NetworkRelationshipDto relationshipDto(RelationshipEntity relationship, UserEntity person) {
@@ -278,6 +315,15 @@ public class NetworkService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a valid email address");
     }
     return value;
+  }
+
+  private String cleanDate(String date, String label) {
+    if (date == null || date.isBlank()) return null;
+    try {
+      return LocalDate.parse(date.trim()).toString();
+    } catch (DateTimeParseException exception) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + " must be a valid date");
+    }
   }
 
   private void applyVisibility(Long ownerUserId, RelationshipEntity relationship, String requestedScope, String requestedCompany) {

@@ -21,7 +21,7 @@ public class UserEntity {
   @Column(unique = true)
   private String email;
 
-  @Column(name = "phone_number", nullable = false, unique = true)
+  @Column(name = "phone_number", unique = true)
   private String phoneNumber;
 
   @Column(nullable = false)
@@ -36,6 +36,27 @@ public class UserEntity {
 
   @Column(name = "account_status", nullable = false)
   private String accountStatus = "ACTIVE";
+
+  @Column(name = "identity_type", nullable = false)
+  private String identityType = "ACCOUNT";
+
+  @Column(name = "managed_category")
+  private String managedCategory;
+
+  @Column(name = "guardian_user_id")
+  private Long guardianUserId;
+
+  @Column(name = "claim_status", nullable = false)
+  private String claimStatus = "NONE";
+
+  @Column(name = "managed_date_of_birth")
+  private String managedDateOfBirth;
+
+  @Column(name = "managed_date_of_death")
+  private String managedDateOfDeath;
+
+  @Column(name = "managed_notes", length = 2000)
+  private String managedNotes;
 
   public Long getId() {
     return id;
@@ -89,4 +110,18 @@ public class UserEntity {
   public void setLocation(String location) { this.location = location; }
   public String getAccountStatus() { return accountStatus; }
   public void setAccountStatus(String accountStatus) { this.accountStatus = accountStatus; }
+  public String getIdentityType() { return identityType; }
+  public void setIdentityType(String identityType) { this.identityType = identityType; }
+  public String getManagedCategory() { return managedCategory; }
+  public void setManagedCategory(String managedCategory) { this.managedCategory = managedCategory; }
+  public Long getGuardianUserId() { return guardianUserId; }
+  public void setGuardianUserId(Long guardianUserId) { this.guardianUserId = guardianUserId; }
+  public String getClaimStatus() { return claimStatus; }
+  public void setClaimStatus(String claimStatus) { this.claimStatus = claimStatus; }
+  public String getManagedDateOfBirth() { return managedDateOfBirth; }
+  public void setManagedDateOfBirth(String managedDateOfBirth) { this.managedDateOfBirth = managedDateOfBirth; }
+  public String getManagedDateOfDeath() { return managedDateOfDeath; }
+  public void setManagedDateOfDeath(String managedDateOfDeath) { this.managedDateOfDeath = managedDateOfDeath; }
+  public String getManagedNotes() { return managedNotes; }
+  public void setManagedNotes(String managedNotes) { this.managedNotes = managedNotes; }
 }

@@ -64,6 +64,10 @@ public class AuthService {
       .or(() -> userRepository.findByUsername(normalizedIdentifier))
       .orElseThrow(() -> new IllegalArgumentException("Invalid username, email, phone number, or password"));
 
+    if (!"ACTIVE".equals(user.getAccountStatus())) {
+      throw new IllegalArgumentException("This profile cannot sign in");
+    }
+
     if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
       throw new IllegalArgumentException("Invalid username, email, phone number, or password");
     }
