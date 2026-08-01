@@ -290,7 +290,7 @@ export async function updateUser(id: number, payload: { username: string; email?
 export type NetworkPerson = { id: number; firstName?: string; surname?: string; displayName: string; phoneNumber: string; location?: string; accountStatus: 'ACTIVE' | 'INVITED'; profilePhoto?: string | null };
 export type NetworkRelationship = { id: number; type: string; person: NetworkPerson };
 export type NetworkCircleMember = { person: NetworkPerson; admin: boolean; creator: boolean };
-export type NetworkCircle = { id: number; name: string; description: string; members: NetworkCircleMember[]; ownerName: string; ownedByCurrentUser: boolean; currentUserAdmin: boolean };
+export type NetworkCircle = { id: number; name: string; description: string; members: NetworkCircleMember[]; ownerName: string; ownerPhoto?: string | null; ownedByCurrentUser: boolean; currentUserAdmin: boolean };
 
 export async function searchNetworkPeople(query: string) {
   return authenticatedRequest<NetworkPerson[]>(`/api/network/search?q=${encodeURIComponent(query)}`);

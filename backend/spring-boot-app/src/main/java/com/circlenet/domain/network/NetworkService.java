@@ -214,8 +214,9 @@ public class NetworkService {
         .map(user -> new NetworkCircleMemberDto(toPerson(user, relationshipName(relationships, user.getId())),
             circle.getAdminUserIds().contains(user.getId()), circle.getOwnerUserId().equals(user.getId()))).toList();
     String ownerName = profileDisplayName(requireUser(circle.getOwnerUserId()));
+    String ownerPhoto = profileRepository.findById(circle.getOwnerUserId()).map(profile -> profile.getProfilePhoto()).orElse(null);
     return new NetworkCircleDto(circle.getId(), circle.getName(), circle.getDescription(), members,
-        ownerName, currentUserId.equals(circle.getOwnerUserId()), circle.getAdminUserIds().contains(currentUserId));
+        ownerName, ownerPhoto, currentUserId.equals(circle.getOwnerUserId()), circle.getAdminUserIds().contains(currentUserId));
   }
 
   private NetworkPersonDto toPerson(UserEntity user) { return toPerson(user, null); }
