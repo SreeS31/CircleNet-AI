@@ -1,5 +1,14 @@
 # CircleNet-AI
 
+## User-uploaded media storage
+
+Profile photos and gallery files are never written into the application JAR/WAR and are not stored as database blobs. The backend stores files through `ProfileMediaStorage`; PostgreSQL stores only their URLs.
+
+- `CIRCLENET_UPLOAD_DIR` sets the external/persistent upload directory. The local default is `./var/circlenet/uploads` relative to the backend process.
+- `CIRCLENET_MEDIA_BASE_URL` sets the externally reachable backend origin used in stored media URLs. The local default is `http://localhost:8080`.
+- In Docker/Kubernetes, mount `CIRCLENET_UPLOAD_DIR` as a persistent volume.
+- For AWS or GCP production, replace the storage implementation with an S3 or Google Cloud Storage provider while retaining the existing upload API and database URL fields.
+
 CircleNet-AI is an enterprise-grade platform architecture for AI-native collaboration, identity, and knowledge workflows. This repository establishes the initial foundation for the platform and is structured to support future frontend, backend, infrastructure, and AI modules.
 
 ## Milestone 1: Foundation Repository

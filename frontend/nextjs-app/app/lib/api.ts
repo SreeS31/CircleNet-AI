@@ -32,6 +32,10 @@ export type UserProfile = Record<string, string | string[] | null> & { phoneNumb
 
 export async function fetchUserProfile() { return authenticatedRequest<UserProfile>('/api/profile/me'); }
 export async function saveUserProfile(profile: UserProfile) { return authenticatedRequest<UserProfile>('/api/profile/me', { method: 'PUT', body: JSON.stringify(profile) }); }
+export async function uploadProfilePhoto(file: File) { const body=new FormData();body.append('file',file);return authenticatedRequest<UserProfile>('/api/profile/me/photo',{method:'POST',body}); }
+export async function removeProfilePhoto() { return authenticatedRequest<UserProfile>('/api/profile/me/photo',{method:'DELETE'}); }
+export async function uploadGalleryPhoto(file: File) { const body=new FormData();body.append('file',file);return authenticatedRequest<UserProfile>('/api/profile/me/photos',{method:'POST',body}); }
+export async function removeGalleryPhoto(index: number) { return authenticatedRequest<UserProfile>(`/api/profile/me/photos/${index}`,{method:'DELETE'}); }
 
 type RequestOptions = RequestInit & {
   skipAuth?: boolean;
@@ -132,7 +136,7 @@ export function isUnauthorizedError(error: unknown): boolean {
 async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   const session = getStoredAuthSession();
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...(init?.headers as Record<string, string> || {}),
   };
 
