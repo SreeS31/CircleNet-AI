@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.UUID;
+import java.util.LinkedHashMap;
 
 import com.circlenet.domain.circle.CircleRepository;
 import com.circlenet.domain.circle.model.CircleEntity;
@@ -45,8 +46,14 @@ public class NetworkService {
 
   @Transactional(readOnly = true)
   public List<NetworkPersonDto> search(Long currentUserId, String query) {
-    return userRepository.searchPeople(currentUserId, query == null ? "" : query.trim())
-        .stream().limit(50).map(this::toPerson).toList();
+    String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
+    LinkedHashMap<Long, UserEntity> matches = new LinkedHashMap<>();
+    userRepository.searchPeople(currentUserId, normalizedQuery).forEach(user -> matches.put(user.getId(), user));
+    relationshipRepository.findByOwnerUserId(currentUserId).stream()
+        .map(RelationshipEntity::getRelatedUserId).filter(id -> id != null)
+        .map(this::requireUser).filter(user -> matchesSearch(user, normalizedQuery))
+        .forEach(user -> matches.putIfAbsent(user.getId(), user));
+    return matches.values().stream().limit(50).map(this::toPerson).toList();
   }
 
   @Transactional(readOnly = true)
@@ -200,5 +207,11 @@ public class NetworkService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mobile number must contain 7 to 15 digits");
     }
     return phone;
+  }
+
+  private boolean matchesSearch(UserEntity user, String query) {
+    if (query.isBlank()) return true;
+    return java.util.stream.Stream.of(user.getUsername(), user.getFirstName(), user.getSurname(), user.getLocation(), user.getPhoneNumber())
+        .filter(value -> value != null).anyMatch(value -> value.toLowerCase().contains(query));
   }
 }

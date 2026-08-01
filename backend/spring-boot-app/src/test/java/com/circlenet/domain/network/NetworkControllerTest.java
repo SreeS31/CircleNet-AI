@@ -57,6 +57,27 @@ class NetworkControllerTest {
         .andExpect(jsonPath("$.message").value("This mobile number already belongs to an existing user. Search for them and add only the relationship."));
   }
 
+  @Test
+  void shouldPersistAndSearchInvitedRelationship() throws Exception {
+    JsonNode owner = createUser("invite-owner", "+15550110004", "Invite", "Owner", "Hyderabad");
+    String token = login(owner.get("phoneNumber").asText());
+
+    mockMvc.perform(post("/api/network/relationships/add-person").header(auth(), "Bearer " + token)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"fullName\":\"Rambabu Test\",\"phoneNumber\":\"+15550110005\",\"email\":\"rambabu@test.example\",\"type\":\"Friend\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.person.displayName").value("Rambabu Test"))
+        .andExpect(jsonPath("$.person.accountStatus").value("INVITED"));
+
+    mockMvc.perform(get("/api/network/search").param("q", "Rambabu").header(auth(), "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].displayName").value("Rambabu Test"));
+
+    mockMvc.perform(get("/api/network/relationships").header(auth(), "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].person.phoneNumber").value("+15550110005"));
+  }
+
   private JsonNode createUser(String username, String phone, String firstName, String surname, String location) throws Exception {
     MvcResult result = mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
         .content(userJson(username, phone, firstName, surname, location)))
