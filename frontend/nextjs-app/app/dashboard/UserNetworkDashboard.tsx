@@ -131,7 +131,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
   return <main className="container user-network-dashboard">
     <header className="network-header">
       <div><p className="eyebrow">MY CIRCLENET</p><h1>Welcome, {username}</h1><p>Find people you know, define the relationship, and organize them into circles.</p></div>
-      <div className="network-actions"><Link href="/session" className="btn btn-secondary">Session</Link><button className="btn btn-secondary" onClick={async () => { await logout(); router.replace('/auth'); }}>Sign out</button></div>
+      <div className="network-actions"><Link href="/profile" className="btn btn-secondary">My profile</Link><Link href="/session" className="btn btn-secondary">Session</Link><button className="btn btn-secondary" onClick={async () => { await logout(); router.replace('/auth'); }}>Sign out</button></div>
     </header>
 
     <p className="network-message" role="status">{message}</p>

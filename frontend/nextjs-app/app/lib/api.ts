@@ -28,6 +28,11 @@ export type SessionProfile = {
   role: string;
 };
 
+export type UserProfile = Record<string, string | string[] | null> & { phoneNumber: string; photos: string[]; profilePhoto: string | null };
+
+export async function fetchUserProfile() { return authenticatedRequest<UserProfile>('/api/profile/me'); }
+export async function saveUserProfile(profile: UserProfile) { return authenticatedRequest<UserProfile>('/api/profile/me', { method: 'PUT', body: JSON.stringify(profile) }); }
+
 type RequestOptions = RequestInit & {
   skipAuth?: boolean;
 };

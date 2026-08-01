@@ -1,0 +1,30 @@
+'use client';
+import Link from 'next/link';
+import Image from 'next/image';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { fetchUserProfile, hasAuthSession, saveUserProfile, UserProfile } from '../lib/api';
+import { useRouter } from 'next/navigation';
+
+const blank = { firstName:'',surname:'',email:'',phoneNumber:'',location:'',dateOfBirth:'',gender:'',bio:'',addressLine1:'',addressLine2:'',city:'',state:'',postalCode:'',country:'',alternatePhone:'',website:'',whatsapp:'',linkedin:'',facebook:'',instagram:'',xHandle:'',highestQualification:'',institution:'',fieldOfStudy:'',graduationYear:'',employmentStatus:'',employer:'',jobTitle:'',industry:'',workLocation:'',profilePhoto:null,photos:[] } as UserProfile;
+const fields: Record<string, Array<[string,string,string?]>> = {
+  'Personal details': [['firstName','First name'],['surname','Surname'],['email','Email','email'],['phoneNumber','Mobile number','tel'],['dateOfBirth','Date of birth','date'],['gender','Gender'],['location','General location'],['bio','About me']],
+  'Address': [['addressLine1','Address line 1'],['addressLine2','Address line 2'],['city','City'],['state','State'],['postalCode','Postal code'],['country','Country']],
+  'Communication & social media': [['alternatePhone','Alternate phone','tel'],['website','Website','url'],['whatsapp','WhatsApp'],['linkedin','LinkedIn','url'],['facebook','Facebook','url'],['instagram','Instagram'],['xHandle','X / Twitter handle']],
+  'Education': [['highestQualification','Highest qualification'],['institution','School / College / University'],['fieldOfStudy','Field of study'],['graduationYear','Graduation year']],
+  'Employment': [['employmentStatus','Employment status'],['employer','Employer / Organization'],['jobTitle','Job title'],['industry','Industry'],['workLocation','Work location']],
+};
+
+export default function ProfilePage(){
+ const router=useRouter(); const [profile,setProfile]=useState<UserProfile>(blank); const [message,setMessage]=useState(''); const [busy,setBusy]=useState(true);
+ useEffect(()=>{if(!hasAuthSession()){router.replace('/auth');return;}fetchUserProfile().then(p=>setProfile({...blank,...p,photos:p.photos||[]})).catch(()=>setMessage('Unable to load profile.')).finally(()=>setBusy(false));},[router]);
+ const set=(key:string,value:string|string[]|null)=>setProfile(p=>({...p,[key]:value}));
+ const readImage=(file:File)=>new Promise<string>((resolve,reject)=>{if(!file.type.startsWith('image/')||file.size>2*1024*1024){reject(new Error('Choose an image under 2 MB.'));return;}const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file);});
+ const profilePhoto=async(e:ChangeEvent<HTMLInputElement>)=>{const file=e.target.files?.[0];if(!file)return;try{set('profilePhoto',await readImage(file));}catch(err){setMessage((err as Error).message);}};
+ const gallery=async(e:ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files||[]);try{const images=await Promise.all(files.map(readImage));const current=profile.photos as string[];if(current.length+images.length>8)throw new Error('Maximum 8 gallery photos.');set('photos',[...current,...images]);}catch(err){setMessage((err as Error).message);}};
+ const submit=async(e:FormEvent)=>{e.preventDefault();setBusy(true);setMessage('');try{setProfile(await saveUserProfile(profile));setMessage('Profile saved successfully.');}catch(err){setMessage(err instanceof Error?err.message:'Unable to save profile.');}finally{setBusy(false);}};
+ return <main className="container profile-page"><header className="profile-header"><div><p className="eyebrow">MY CIRCLENET PROFILE</p><h1>My profile</h1><p>Keep your personal, communication, education and employment details together.</p></div><Link className="btn btn-secondary" href="/dashboard">Back to dashboard</Link></header>
+ {busy&&!profile.phoneNumber?<p className="network-message">Loading profile…</p>:<form onSubmit={submit} className="profile-form"><p className="network-message" role="status">{message}</p><section className="profile-photo-card card"><div className="profile-photo-preview">{profile.profilePhoto?<Image unoptimized width={112} height={112} src={profile.profilePhoto as string} alt="Profile"/>:<span>{String(profile.firstName||'U').charAt(0)}</span>}</div><div><h2>Profile photo</h2><p>JPG, PNG or WebP, maximum 2 MB.</p><label className="btn btn-secondary">Choose photo<input hidden type="file" accept="image/*" onChange={profilePhoto}/></label>{profile.profilePhoto&&<button type="button" className="action-tag action-tag-danger" onClick={()=>set('profilePhoto',null)}>Remove</button>}</div></section>
+ {Object.entries(fields).map(([title,items])=><section className="card profile-section" key={title}><h2>{title}</h2><div className="profile-fields">{items.map(([key,label,type])=><label key={key} className={key==='bio'?'profile-wide':''}><span>{label}</span>{key==='bio'?<textarea rows={4} value={String(profile[key]||'')} onChange={e=>set(key,e.target.value)}/>:<input type={type||'text'} readOnly={key==='phoneNumber'} value={String(profile[key]||'')} onChange={e=>set(key,e.target.value)}/>}</label>)}</div></section>)}
+ <section className="card profile-section"><div className="profile-section-heading"><div><h2>Photo gallery</h2><p>Add up to eight photos, maximum 2 MB each.</p></div><label className="btn btn-secondary">Add photos<input hidden multiple type="file" accept="image/*" onChange={gallery}/></label></div><div className="profile-gallery">{(profile.photos as string[]).map((photo,index)=><figure key={index}><Image unoptimized fill sizes="(max-width: 820px) 50vw, 180px" src={photo} alt={`Gallery photo ${index+1}`}/><button type="button" className="action-tag action-tag-danger" onClick={()=>set('photos',(profile.photos as string[]).filter((_,i)=>i!==index))}>Remove</button></figure>)}</div></section>
+ <div className="profile-save"><button className="btn btn-primary" disabled={busy}>{busy?'Saving…':'Save profile'}</button></div></form>}</main>;
+}
