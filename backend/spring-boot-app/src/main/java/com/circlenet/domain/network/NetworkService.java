@@ -100,6 +100,8 @@ public class NetworkService {
     relationship.setRelatedUserId(related.getId());
     relationship.setType(type);
     relationship.setContactName(profileDisplayName(related));
+    if (relationship.getContactPhone() == null) relationship.setContactPhone(related.getPhoneNumber());
+    if (relationship.getContactEmail() == null) relationship.setContactEmail(related.getEmail());
     applyVisibility(currentUserId, relationship, request.visibilityScope(), request.visibilityCompany());
     relationship = relationshipRepository.save(relationship);
     return relationshipDto(relationship, related);

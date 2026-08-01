@@ -38,6 +38,7 @@ class NetworkControllerTest {
         .content("{\"fullName\":\"Meera Shah\",\"phoneNumber\":\"+15550110002\",\"type\":\"Friend\",\"visibilityScope\":\"PUBLIC\"}"))
         .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("Friend"))
         .andExpect(jsonPath("$.visibilityScope").value("PUBLIC"))
+        .andExpect(jsonPath("$.contactPhone").value("+15550110002"))
         .andExpect(jsonPath("$.person.phoneNumber").doesNotExist());
 
     mockMvc.perform(get("/api/network/search").param("q", "Mumbai").header(auth(), "Bearer " + token))
@@ -91,6 +92,8 @@ class NetworkControllerTest {
         .content("{\"fullName\":\"Rambabu Test\",\"phoneNumber\":\"+15550110005\",\"email\":\"rambabu@test.example\",\"type\":\"Friend\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.person.displayName").value("Rambabu Test"))
+        .andExpect(jsonPath("$.contactPhone").value("+15550110005"))
+        .andExpect(jsonPath("$.contactEmail").value("rambabu@test.example"))
         .andExpect(jsonPath("$.person.username").doesNotExist())
         .andExpect(jsonPath("$.person.accountStatus").value("INVITED")).andReturn();
     long relationshipId = objectMapper.readTree(relationshipResult.getResponse().getContentAsString()).get("id").asLong();
