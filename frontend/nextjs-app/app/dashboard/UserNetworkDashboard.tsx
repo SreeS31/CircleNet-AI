@@ -20,8 +20,11 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const [circleName, setCircleName] = useState('');
   const [circleDescription, setCircleDescription] = useState('');
   const [mobileToAdd, setMobileToAdd] = useState('');
+  const [fullNameToAdd, setFullNameToAdd] = useState('');
+  const [emailToAdd, setEmailToAdd] = useState('');
   const [directRelationshipType, setDirectRelationshipType] = useState('Friend');
   const [inviteMobile, setInviteMobile] = useState('');
+  const [communication, setCommunication] = useState<{ name: string; mobile: string; email: string; relationship: string; existing: boolean } | null>(null);
   const [message, setMessage] = useState('Search by name, surname, mobile number, username, or location.');
   const [busy, setBusy] = useState(false);
 
@@ -84,27 +87,38 @@ export default function UserNetworkDashboard({ username }: { username: string })
     event.preventDefault();
     setBusy(true);
     setInviteMobile('');
+    setCommunication(null);
     try {
       const normalized = mobileToAdd.replace(/[\s()-]/g, '');
       const matches = await searchNetworkPeople(normalized);
       const existing = matches.find(person => person.phoneNumber.replace(/[\s()-]/g, '') === normalized);
       if (!existing) {
         setInviteMobile(normalized);
+        setCommunication({ name: fullNameToAdd.trim(), mobile: normalized, email: emailToAdd.trim(), relationship: directRelationshipType, existing: false });
         setMessage('No CircleNet account uses this mobile number yet. Invite this person to register; their mobile number will remain unique.');
         return;
       }
       await addMyRelationship(existing.id, directRelationshipType);
       await refresh();
+      setCommunication({ name: fullNameToAdd.trim() || existing.displayName, mobile: existing.phoneNumber, email: emailToAdd.trim(), relationship: directRelationshipType, existing: true });
       setMobileToAdd('');
+      setFullNameToAdd('');
+      setEmailToAdd('');
       setMessage(`${existing.displayName} already exists. Only the ${directRelationshipType.toLowerCase()} relationship was added—no duplicate user was created.`);
     } catch (error) { setMessage(errorMessage(error)); }
     finally { setBusy(false); }
   };
 
   const copyInvitation = async () => {
-    const invitation = `Join me on CircleNet. Create your account with mobile number ${inviteMobile}: ${window.location.origin}/auth`;
+    const invitation = communicationMessage(communication);
     await navigator.clipboard.writeText(invitation);
     setMessage('Invitation copied. Send it to your contact so they can create their account.');
+  };
+
+  const communicationMessage = (target: typeof communication) => {
+    if (!target) return '';
+    const action = target.existing ? `added you as their ${target.relationship}` : `invited you as their ${target.relationship}`;
+    return `Hello ${target.name}, ${username} ${action} on CircleNet-AI. Please log in to the application and create your own circles: ${window.location.origin}/auth`;
   };
 
   return <main className="container user-network-dashboard">
@@ -116,13 +130,15 @@ export default function UserNetworkDashboard({ username }: { username: string })
     <p className="network-message" role="status">{message}</p>
 
     <section className="card quick-add-card">
-      <div><p className="eyebrow">ADD TO MY NETWORK</p><h2>Add a friend, relative, or family member</h2><p>Mobile number is mandatory and checked first to prevent duplicate users.</p></div>
+      <div><p className="eyebrow">ADD TO MY NETWORK</p><h2>Add a friend, relative, or family member</h2><p>Full name, mobile number, and relationship are required. Email is optional. Mobile is checked first to prevent duplicate users.</p></div>
       <form onSubmit={addByMobile} className="quick-add-form">
+        <input type="text" required value={fullNameToAdd} onChange={e => setFullNameToAdd(e.target.value)} placeholder="Full name" />
         <input type="tel" required value={mobileToAdd} onChange={e => setMobileToAdd(e.target.value)} placeholder="Mobile number, e.g. +919876543210" />
+        <input type="email" value={emailToAdd} onChange={e => setEmailToAdd(e.target.value)} placeholder="Email (optional)" />
         <select value={directRelationshipType} onChange={e => setDirectRelationshipType(e.target.value)}>{relationshipTypes.map(type => <option key={type}>{type}</option>)}</select>
         <button className="btn btn-primary" disabled={busy}>{busy ? 'Checking…' : 'Add person'}</button>
       </form>
-      {inviteMobile && <div className="invite-callout"><span>No user found for <strong>{inviteMobile}</strong>.</span><button type="button" className="btn btn-secondary" onClick={copyInvitation}>Copy registration invite</button></div>}
+      {communication && <div className="invite-callout"><span>{communication.existing ? `${communication.name} was added. Send them a notification:` : `No user found for ${inviteMobile}. Send a registration invitation:`}</span><div className="communication-actions"><a className="btn btn-secondary" href={`sms:${communication.mobile}?body=${encodeURIComponent(communicationMessage(communication))}`}>Send SMS</a>{communication.email && <a className="btn btn-secondary" href={`mailto:${communication.email}?subject=${encodeURIComponent('CircleNet-AI relationship notification')}&body=${encodeURIComponent(communicationMessage(communication))}`}>Send email</a>}<button type="button" className="btn btn-secondary" onClick={copyInvitation}>Copy message</button></div></div>}
     </section>
 
     <section className="network-layout">
