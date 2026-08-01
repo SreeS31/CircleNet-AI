@@ -252,6 +252,10 @@ public class NetworkService {
     if (!circle.getMemberUserIds().contains(userId)) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only circle members can become admins");
     }
+    UserEntity member = requireUser(userId);
+    if (!"ACTIVE".equals(member.getAccountStatus()) || "MANAGED".equals(member.getIdentityType())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only active CircleNet accounts with their own login can become admins");
+    }
     circle.getAdminUserIds().add(userId);
     return toCircle(circleRepository.save(circle), currentUserId);
   }
