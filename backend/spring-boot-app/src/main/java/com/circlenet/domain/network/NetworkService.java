@@ -25,6 +25,7 @@ import com.circlenet.domain.relationship.RelationshipRepository;
 import com.circlenet.domain.relationship.model.RelationshipEntity;
 import com.circlenet.domain.user.UserRepository;
 import com.circlenet.domain.user.model.UserEntity;
+import com.circlenet.domain.profile.UserProfileRepository;
 
 @Service
 @Transactional
@@ -36,13 +37,15 @@ public class NetworkService {
   private final RelationshipRepository relationshipRepository;
   private final CircleRepository circleRepository;
   private final PasswordEncoder passwordEncoder;
+  private final UserProfileRepository profileRepository;
 
   public NetworkService(UserRepository userRepository, RelationshipRepository relationshipRepository,
-      CircleRepository circleRepository, PasswordEncoder passwordEncoder) {
+      CircleRepository circleRepository, PasswordEncoder passwordEncoder, UserProfileRepository profileRepository) {
     this.userRepository = userRepository;
     this.relationshipRepository = relationshipRepository;
     this.circleRepository = circleRepository;
     this.passwordEncoder = passwordEncoder;
+    this.profileRepository = profileRepository;
   }
 
   @Transactional(readOnly = true)
@@ -224,7 +227,8 @@ public class NetworkService {
     if (contactName != null && !contactName.isBlank()) displayName = contactName.trim();
     if (displayName.isBlank()) displayName = profileDisplayName(user);
     return new NetworkPersonDto(user.getId(), user.getFirstName(), user.getSurname(),
-        displayName, user.getPhoneNumber(), user.getLocation(), user.getAccountStatus());
+        displayName, user.getPhoneNumber(), user.getLocation(), user.getAccountStatus(),
+        profileRepository.findById(user.getId()).map(profile -> profile.getProfilePhoto()).orElse(null));
   }
 
   private String normalizeRelationshipType(String type) {
