@@ -321,6 +321,12 @@ export async function removeMyRelationship(id: number) {
   return authenticatedRequest<void>(`/api/network/relationships/${id}`, { method: 'DELETE' });
 }
 
+export async function updateMyRelationship(id: number, payload: { contactName: string; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string }) {
+  return authenticatedRequest<NetworkRelationship>(`/api/network/relationships/${id}`, {
+    method: 'PUT', body: JSON.stringify(payload),
+  });
+}
+
 export async function fetchMyCircles() {
   return authenticatedRequest<NetworkCircle[]>('/api/network/circles');
 }

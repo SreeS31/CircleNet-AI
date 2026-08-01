@@ -5,7 +5,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { addMemberToMyCircle, addMyRelationship, addPersonToMyNetwork, ApiError, createMyCircle, fetchMyCircles,
   fetchMyRelationships, fetchRelationshipTypes, fetchUserProfile, logout, NetworkCircle, NetworkPerson, NetworkRelationship,
-  demoteCircleAdmin, promoteCircleAdmin, removeMemberFromMyCircle, removeMyRelationship, searchNetworkPeople } from '../lib/api';
+  demoteCircleAdmin, promoteCircleAdmin, removeMemberFromMyCircle, removeMyRelationship, searchNetworkPeople, updateMyRelationship } from '../lib/api';
 import type { VisibilityScope } from '../lib/api';
 
 const defaultRelationshipTypes = ['Friend', 'Spouse', 'Parent', 'Child', 'Sibling', 'Colleague', 'Relative', 'Other'];
@@ -39,6 +39,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const [directVisibility, setDirectVisibility] = useState<VisibilityScope>('FRIENDS');
   const [directCompany, setDirectCompany] = useState('');
   const [employmentCompanies, setEmploymentCompanies] = useState<string[]>([]);
+  const [editingRelationship, setEditingRelationship] = useState<{ id: number; contactName: string; type: string; visibilityScope: VisibilityScope; visibilityCompany: string } | null>(null);
   const [inviteMobile, setInviteMobile] = useState('');
   const [communication, setCommunication] = useState<{ name: string; mobile: string; email: string; relationship: string; existing: boolean } | null>(null);
   const [message, setMessage] = useState('Search by person name, surname, mobile number, or location.');
@@ -140,13 +141,30 @@ export default function UserNetworkDashboard({ username }: { username: string })
     return `Hello ${target.name}, ${username} ${action} on CircleNet-AI. Please log in to the application and create your own circles: ${window.location.origin}/auth`;
   };
 
+  const saveRelationshipEdit = async () => {
+    if (!editingRelationship) return;
+    setBusy(true);
+    try {
+      await updateMyRelationship(editingRelationship.id, {
+        contactName: editingRelationship.contactName, type: editingRelationship.type,
+        visibilityScope: editingRelationship.visibilityScope,
+        visibilityCompany: editingRelationship.visibilityScope === 'COLLEAGUES' ? editingRelationship.visibilityCompany : undefined,
+      });
+      setEditingRelationship(null);
+      await refresh();
+      setMessage('Relationship updated successfully.');
+    } catch (error) { setMessage(errorMessage(error)); }
+    finally { setBusy(false); }
+  };
+
   const spouseRelationships = relationships.filter(item => item.type.toLowerCase() === 'spouse');
   const otherRelationships = relationships.filter(item => item.type.toLowerCase() !== 'spouse');
   const ownedCircles = circles.filter(circle => circle.ownedByCurrentUser);
   const administeredCircles = circles.filter(circle => circle.currentUserAdmin);
 
   const relationshipNode = (item: NetworkRelationship, paired = false) => <article className={`relationship-node ${paired ? 'spouse-node' : ''}`} key={item.id}>
-    <div className="relationship-node-main"><PersonAvatar name={item.person.displayName} photo={item.person.profilePhoto}/><div className="relationship-identity"><strong>{item.person.displayName}</strong><div><span className="relationship-badge">{item.type}</span><span className="status-tag status-view">{visibilityOptions.find(option => option.value === item.visibilityScope)?.label || 'Friends'}{item.visibilityCompany ? ` · ${item.visibilityCompany}` : ''}</span><span className={`status-tag ${item.person.accountStatus === 'INVITED' ? 'status-not-verified' : 'status-verified'}`}>{item.person.accountStatus === 'INVITED' ? 'Not Verified' : 'Verified'}</span></div></div><button className="action-tag action-tag-danger" onClick={async () => { await removeMyRelationship(item.id); await refresh(); }}>Remove</button></div>
+    <div className="relationship-node-main"><PersonAvatar name={item.person.displayName} photo={item.person.profilePhoto}/><div className="relationship-identity"><strong>{item.person.displayName}</strong><div><span className="relationship-badge">{item.type}</span><span className="status-tag status-view">{visibilityOptions.find(option => option.value === item.visibilityScope)?.label || 'Friends'}{item.visibilityCompany ? ` · ${item.visibilityCompany}` : ''}</span><span className={`status-tag ${item.person.accountStatus === 'INVITED' ? 'status-not-verified' : 'status-verified'}`}>{item.person.accountStatus === 'INVITED' ? 'Not Verified' : 'Verified'}</span></div></div><div className="relationship-actions"><button className="action-tag action-tag-admin" onClick={() => setEditingRelationship({ id:item.id, contactName:item.person.displayName, type:item.type, visibilityScope:item.visibilityScope || 'FRIENDS', visibilityCompany:item.visibilityCompany || '' })}>Edit</button><button className="action-tag action-tag-danger" onClick={async () => { await removeMyRelationship(item.id); await refresh(); }}>Remove</button></div></div>
+    {editingRelationship?.id === item.id && <div className="relationship-edit-panel"><label><span>Person name</span><input required value={editingRelationship.contactName} onChange={e => setEditingRelationship({...editingRelationship,contactName:e.target.value})}/></label><label><span>Relationship</span><select value={editingRelationship.type} onChange={e => setEditingRelationship({...editingRelationship,type:e.target.value})}>{relationshipTypes.map(type => <option key={type}>{type}</option>)}</select></label><label><span>View</span><select value={editingRelationship.visibilityScope} onChange={e => setEditingRelationship({...editingRelationship,visibilityScope:e.target.value as VisibilityScope})}>{visibilityOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>{editingRelationship.visibilityScope === 'COLLEAGUES' && <label><span>Company</span><select required value={editingRelationship.visibilityCompany} onChange={e => setEditingRelationship({...editingRelationship,visibilityCompany:e.target.value})}><option value="">Select company</option>{employmentCompanies.map(company => <option key={company}>{company}</option>)}</select></label>}<div className="relationship-edit-actions"><button type="button" className="action-tag action-tag-admin" disabled={busy || !editingRelationship.contactName.trim()} onClick={saveRelationshipEdit}>Save</button><button type="button" className="action-tag action-tag-danger" disabled={busy} onClick={() => setEditingRelationship(null)}>Cancel</button></div></div>}
     <details className="circle-picker"><summary className={`action-tag action-tag-admin ${!administeredCircles.length ? 'disabled' : ''}`}>Add to circle</summary><div className="circle-picker-menu">{administeredCircles.map(circle => <button type="button" key={circle.id} disabled={busy} onClick={event => { void addToCircle(item.person, circle.id); event.currentTarget.closest('details')?.removeAttribute('open'); }}>{circle.name}</button>)}{!administeredCircles.length && <span>No circles you administer</span>}</div></details>
   </article>;
 

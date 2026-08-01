@@ -21,6 +21,7 @@ import com.circlenet.domain.network.dto.NetworkCircleDto;
 import com.circlenet.domain.network.dto.NetworkCircleMemberDto;
 import com.circlenet.domain.network.dto.NetworkPersonDto;
 import com.circlenet.domain.network.dto.NetworkRelationshipDto;
+import com.circlenet.domain.network.dto.UpdateRelationshipRequest;
 import com.circlenet.domain.relationship.RelationshipRepository;
 import com.circlenet.domain.relationship.model.RelationshipEntity;
 import com.circlenet.domain.user.UserRepository;
@@ -142,6 +143,19 @@ public class NetworkService {
       if (circle.getMemberUserIds().remove(entity.getRelatedUserId())) circleRepository.save(circle);
     });
     relationshipRepository.delete(entity);
+  }
+
+  public NetworkRelationshipDto updateRelationship(Long currentUserId, Long relationshipId, UpdateRelationshipRequest request) {
+    RelationshipEntity relationship = relationshipRepository.findById(relationshipId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Relationship not found"));
+    if (!currentUserId.equals(relationship.getOwnerUserId())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this relationship");
+    }
+    relationship.setContactName(requireText(request.contactName(), "Person name"));
+    relationship.setType(normalizeRelationshipType(request.type()));
+    applyVisibility(currentUserId, relationship, request.visibilityScope(), request.visibilityCompany());
+    relationship = relationshipRepository.save(relationship);
+    return relationshipDto(relationship, requireUser(relationship.getRelatedUserId()));
   }
 
   @Transactional(readOnly = true)

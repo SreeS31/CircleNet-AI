@@ -33,6 +33,7 @@ public class SecurityConfig {
         .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
         .requestMatchers(HttpMethod.GET, "/api/profile/media/**").permitAll()
         .requestMatchers(HttpMethod.PUT, "/api/profile/me").authenticated()
+        .requestMatchers(HttpMethod.PUT, "/api/network/relationships/**").authenticated()
         .requestMatchers(HttpMethod.DELETE, "/api/network/**").authenticated()
         .requestMatchers(HttpMethod.DELETE, "/api/profile/me/**").authenticated()
         .requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN")

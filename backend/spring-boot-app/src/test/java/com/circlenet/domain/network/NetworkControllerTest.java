@@ -2,6 +2,7 @@ package com.circlenet.domain.network;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -77,22 +78,31 @@ class NetworkControllerTest {
     JsonNode owner = createUser("invite-owner", "+15550110004", "Invite", "Owner", "Hyderabad");
     String token = login(owner.get("phoneNumber").asText());
 
-    mockMvc.perform(post("/api/network/relationships/add-person").header(auth(), "Bearer " + token)
+    MvcResult relationshipResult = mockMvc.perform(post("/api/network/relationships/add-person").header(auth(), "Bearer " + token)
         .contentType(MediaType.APPLICATION_JSON)
         .content("{\"fullName\":\"Rambabu Test\",\"phoneNumber\":\"+15550110005\",\"email\":\"rambabu@test.example\",\"type\":\"Friend\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.person.displayName").value("Rambabu Test"))
         .andExpect(jsonPath("$.person.username").doesNotExist())
-        .andExpect(jsonPath("$.person.accountStatus").value("INVITED"));
+        .andExpect(jsonPath("$.person.accountStatus").value("INVITED")).andReturn();
+    long relationshipId = objectMapper.readTree(relationshipResult.getResponse().getContentAsString()).get("id").asLong();
 
-    mockMvc.perform(get("/api/network/search").param("q", "Rambabu").header(auth(), "Bearer " + token))
+    mockMvc.perform(put("/api/network/relationships/" + relationshipId).header(auth(), "Bearer " + token)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"contactName\":\"Rambabu Updated\",\"type\":\"Relative\",\"visibilityScope\":\"RELATIVES\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].displayName").value("Rambabu Test"));
+        .andExpect(jsonPath("$.person.displayName").value("Rambabu Updated"))
+        .andExpect(jsonPath("$.type").value("Relative"))
+        .andExpect(jsonPath("$.visibilityScope").value("RELATIVES"));
+
+    mockMvc.perform(get("/api/network/search").param("q", "Updated").header(auth(), "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].displayName").value("Rambabu Updated"));
 
     mockMvc.perform(get("/api/network/relationships").header(auth(), "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].person.phoneNumber").doesNotExist())
-        .andExpect(jsonPath("$[0].visibilityScope").value("FRIENDS"));
+        .andExpect(jsonPath("$[0].visibilityScope").value("RELATIVES"));
   }
 
   private JsonNode createUser(String username, String phone, String firstName, String surname, String location) throws Exception {
