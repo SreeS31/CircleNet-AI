@@ -5,7 +5,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { addMemberToMyCircle, addMyRelationship, addPersonToMyNetwork, ApiError, createMyCircle, fetchMyCircles,
   fetchMyRelationships, fetchRelationshipTypes, fetchUserProfile, logout, NetworkCircle, NetworkPerson, NetworkRelationship,
-  demoteCircleAdmin, promoteCircleAdmin, removeMemberFromMyCircle, removeMyRelationship, searchNetworkPeople, updateMyRelationship } from '../lib/api';
+  demoteCircleAdmin, promoteCircleAdmin, removeMemberFromMyCircle, removeMyRelationship, searchNetworkPeople, updateMyRelationship, updateMyCircle } from '../lib/api';
 import type { VisibilityScope } from '../lib/api';
 
 const defaultRelationshipTypes = ['Friend', 'Spouse', 'Parent', 'Child', 'Sibling', 'Colleague', 'Relative', 'Other'];
@@ -40,6 +40,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const [directCompany, setDirectCompany] = useState('');
   const [employmentCompanies, setEmploymentCompanies] = useState<string[]>([]);
   const [editingRelationship, setEditingRelationship] = useState<{ id: number; contactName: string; type: string; visibilityScope: VisibilityScope; visibilityCompany: string } | null>(null);
+  const [editingCircle, setEditingCircle] = useState<{ id: number; name: string; description: string } | null>(null);
   const [inviteMobile, setInviteMobile] = useState('');
   const [communication, setCommunication] = useState<{ name: string; mobile: string; email: string; relationship: string; existing: boolean } | null>(null);
   const [message, setMessage] = useState('Search by person name, surname, mobile number, or location.');
@@ -157,6 +158,18 @@ export default function UserNetworkDashboard({ username }: { username: string })
     finally { setBusy(false); }
   };
 
+  const saveCircleEdit = async () => {
+    if (!editingCircle) return;
+    setBusy(true);
+    try {
+      await updateMyCircle(editingCircle.id, editingCircle.name, editingCircle.description);
+      setEditingCircle(null);
+      await refresh();
+      setMessage('Circle information updated successfully.');
+    } catch (error) { setMessage(errorMessage(error)); }
+    finally { setBusy(false); }
+  };
+
   const spouseRelationships = relationships.filter(item => item.type.toLowerCase() === 'spouse');
   const otherRelationships = relationships.filter(item => item.type.toLowerCase() !== 'spouse');
   const ownedCircles = circles.filter(circle => circle.ownedByCurrentUser);
@@ -223,6 +236,10 @@ export default function UserNetworkDashboard({ username }: { username: string })
 
     <section className="network-section relationship-tree-section"><div className="section-heading"><div><p className="eyebrow">MY RELATIONSHIP MAP</p><h2>My relationships</h2></div><span>{relationships.length}</span></div>{relationships.length ? <div className="relationship-tree"><div className={`partnership-row ${spouseRelationships.length ? 'has-spouse' : ''}`}><article className="self-node"><PersonAvatar name={username} photo={selfPhoto} self/><div><strong>{username}</strong><small>You</small></div></article>{spouseRelationships.map(item => <div className="spouse-pair" key={item.id}><span className="partner-connector"><i>♥</i></span>{relationshipNode(item, true)}</div>)}</div>{otherRelationships.length > 0 && <div className={`relationship-branches ${spouseRelationships.length ? 'from-paired-self' : ''}`}>{otherRelationships.map(item => <div className="relationship-branch" key={item.id}><span className="relationship-branch-line" />{relationshipNode(item)}</div>)}</div>}</div> : <p className="circle-empty-state">Add someone above to start your relationship tree.</p>}</section>
 
-    <section className="network-section circle-tree-section"><div className="section-heading"><div><p className="eyebrow">MY NETWORK MAP</p><h2>My circles</h2><p className="circle-summary">{ownedCircles.length} created by me · {circles.length - ownedCircles.length} added by others</p></div><span>{circles.length}</span></div><div className="circle-forest">{circles.map(circle => { const visibleMembers = circle.members.filter(member => !member.creator); return <article className="circle-tree" key={circle.id}><div className="circle-root"><PersonAvatar name={circle.ownerName} photo={circle.ownerPhoto}/><div><h3>{circle.name}</h3><p>{circle.description || 'Private circle'}</p><small>{circle.ownedByCurrentUser ? 'Created by you' : `Created by ${circle.ownerName}`} · {circle.members.length} {circle.members.length === 1 ? 'member' : 'members'}{circle.currentUserAdmin ? ' · You are an admin' : ''}</small></div></div>{visibleMembers.length > 0 && <div className="circle-branches">{visibleMembers.map(member => <div className="circle-branch" key={member.person.id}><span className="branch-line" /><div className="circle-member-node"><PersonAvatar name={member.person.displayName} photo={member.person.profilePhoto}/><div><strong>{member.person.displayName}</strong><div className="member-status-tags"><span className={`status-tag ${member.person.accountStatus === 'INVITED' ? 'status-not-verified' : 'status-verified'}`}>{member.person.accountStatus === 'INVITED' ? 'Not Verified' : 'Verified'}</span>{member.admin && <span className="status-tag status-admin">Admin</span>}</div></div>{circle.currentUserAdmin && <div className="member-admin-actions"><button className="action-tag action-tag-admin" onClick={async () => { if (member.admin) await demoteCircleAdmin(circle.id, member.person.id); else await promoteCircleAdmin(circle.id, member.person.id); await refresh(); }}>{member.admin ? 'Remove admin' : 'Make admin'}</button><button className="action-tag action-tag-danger" onClick={async () => { await removeMemberFromMyCircle(circle.id, member.person.id); await refresh(); }}>Remove</button></div>}</div></div>)}</div>}</article>; })}</div>{!circles.length && <p className="circle-empty-state">You have not created or joined any circles yet.</p>}</section>
+    <section className="network-section circle-tree-section"><div className="section-heading"><div><p className="eyebrow">MY NETWORK MAP</p><h2>My circles</h2><p className="circle-summary">{ownedCircles.length} created by me · {circles.length - ownedCircles.length} added by others</p></div><span>{circles.length}</span></div><div className="circle-forest">{circles.map(circle => { const visibleMembers = circle.members.filter(member => !member.creator); return <article className="circle-tree" key={circle.id}>
+      <div className="circle-root"><PersonAvatar name={circle.ownerName} photo={circle.ownerPhoto}/><div className="circle-root-copy"><h3>{circle.name}</h3><p>{circle.description || 'Private circle'}</p><small>{circle.ownedByCurrentUser ? 'Created by you' : `Created by ${circle.ownerName}`} · {circle.members.length} {circle.members.length === 1 ? 'member' : 'members'}{circle.currentUserAdmin ? ' · You are an admin' : ''}</small></div>{circle.currentUserAdmin && <button className="action-tag circle-edit-trigger" onClick={() => setEditingCircle({id:circle.id,name:circle.name,description:circle.description || ''})}>Edit circle</button>}</div>
+      {editingCircle?.id === circle.id && <div className="circle-edit-panel"><label><span>Circle name</span><input required value={editingCircle.name} onChange={e => setEditingCircle({...editingCircle,name:e.target.value})}/></label><label><span>Description</span><textarea value={editingCircle.description} onChange={e => setEditingCircle({...editingCircle,description:e.target.value})}/></label><div><button className="action-tag action-tag-admin" disabled={busy || !editingCircle.name.trim()} onClick={saveCircleEdit}>Save</button><button className="action-tag action-tag-danger" disabled={busy} onClick={() => setEditingCircle(null)}>Cancel</button></div></div>}
+      {visibleMembers.length > 0 && <div className="circle-branches">{visibleMembers.map(member => <div className="circle-branch" key={member.person.id}><span className="branch-line" /><div className="circle-member-node"><PersonAvatar name={member.person.displayName} photo={member.person.profilePhoto}/><div><strong>{member.person.displayName}</strong><div className="member-status-tags"><span className={`status-tag ${member.person.accountStatus === 'INVITED' ? 'status-not-verified' : 'status-verified'}`}>{member.person.accountStatus === 'INVITED' ? 'Not Verified' : 'Verified'}</span>{member.admin && <span className="status-tag status-admin">Admin</span>}</div></div>{circle.currentUserAdmin && <div className="member-admin-actions"><button className="action-tag action-tag-admin" onClick={async () => { if (member.admin) await demoteCircleAdmin(circle.id, member.person.id); else await promoteCircleAdmin(circle.id, member.person.id); await refresh(); }}>{member.admin ? 'Remove admin' : 'Make admin'}</button><button className="action-tag action-tag-danger" onClick={async () => { await removeMemberFromMyCircle(circle.id, member.person.id); await refresh(); }}>Remove</button></div>}</div></div>)}</div>}
+    </article>; })}</div>{!circles.length && <p className="circle-empty-state">You have not created or joined any circles yet.</p>}</section>
   </main>;
 }

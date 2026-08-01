@@ -57,9 +57,17 @@ class NetworkControllerTest {
         .andExpect(jsonPath("$.members[?(@.person.id == " + friend.get("id").asLong() + " && @.admin == true)]").exists());
 
     String friendToken = login(friend.get("phoneNumber").asText());
+    mockMvc.perform(put("/api/network/circles/" + circleId).header(auth(), "Bearer " + friendToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"name\":\"Close friends updated\",\"description\":\"Updated by a circle admin\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.name").value("Close friends updated"))
+        .andExpect(jsonPath("$.description").value("Updated by a circle admin"));
+
     mockMvc.perform(get("/api/network/circles").header(auth(), "Bearer " + friendToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].id").value(circleId))
+        .andExpect(jsonPath("$[0].name").value("Close friends updated"))
         .andExpect(jsonPath("$[0].ownerName").value("Asha Rao"))
         .andExpect(jsonPath("$[0].ownedByCurrentUser").value(false));
   }

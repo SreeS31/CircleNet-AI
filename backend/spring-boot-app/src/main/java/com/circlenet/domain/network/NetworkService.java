@@ -22,6 +22,7 @@ import com.circlenet.domain.network.dto.NetworkCircleMemberDto;
 import com.circlenet.domain.network.dto.NetworkPersonDto;
 import com.circlenet.domain.network.dto.NetworkRelationshipDto;
 import com.circlenet.domain.network.dto.UpdateRelationshipRequest;
+import com.circlenet.domain.network.dto.UpdateNetworkCircleRequest;
 import com.circlenet.domain.relationship.RelationshipRepository;
 import com.circlenet.domain.relationship.model.RelationshipEntity;
 import com.circlenet.domain.user.UserRepository;
@@ -173,6 +174,13 @@ public class NetworkService {
     entity.getMemberUserIds().add(currentUserId);
     entity.getAdminUserIds().add(currentUserId);
     return toCircle(circleRepository.save(entity), currentUserId);
+  }
+
+  public NetworkCircleDto updateCircle(Long currentUserId, Long circleId, UpdateNetworkCircleRequest request) {
+    CircleEntity circle = administeredCircle(currentUserId, circleId);
+    circle.setName(requireText(request.name(), "Circle name"));
+    circle.setDescription(request.description() == null ? "" : request.description().trim());
+    return toCircle(circleRepository.save(circle), currentUserId);
   }
 
   public NetworkCircleDto addCircleMember(Long currentUserId, Long circleId, Long userId) {

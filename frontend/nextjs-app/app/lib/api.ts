@@ -337,6 +337,12 @@ export async function createMyCircle(name: string, description: string) {
   });
 }
 
+export async function updateMyCircle(circleId: number, name: string, description: string) {
+  return authenticatedRequest<NetworkCircle>(`/api/network/circles/${circleId}`, {
+    method: 'PUT', body: JSON.stringify({ name, description }),
+  });
+}
+
 export async function addMemberToMyCircle(circleId: number, userId: number) {
   return authenticatedRequest<NetworkCircle>(`/api/network/circles/${circleId}/members`, {
     method: 'POST', body: JSON.stringify({ userId }),

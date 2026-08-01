@@ -22,6 +22,7 @@ import com.circlenet.domain.network.dto.NetworkCircleDto;
 import com.circlenet.domain.network.dto.NetworkPersonDto;
 import com.circlenet.domain.network.dto.NetworkRelationshipDto;
 import com.circlenet.domain.network.dto.UpdateRelationshipRequest;
+import com.circlenet.domain.network.dto.UpdateNetworkCircleRequest;
 
 @RestController
 @RequestMapping("/api/network")
@@ -70,6 +71,12 @@ public class NetworkController {
   @PostMapping("/circles")
   public NetworkCircleDto createCircle(Principal principal, @RequestBody CreateNetworkCircleRequest request) {
     return networkService.createCircle(userId(principal), request);
+  }
+
+  @PutMapping("/circles/{circleId}")
+  public NetworkCircleDto updateCircle(Principal principal, @PathVariable Long circleId,
+      @RequestBody UpdateNetworkCircleRequest request) {
+    return networkService.updateCircle(userId(principal), circleId, request);
   }
 
   @PostMapping("/circles/{circleId}/members")
