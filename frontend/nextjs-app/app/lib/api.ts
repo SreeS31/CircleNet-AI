@@ -280,7 +280,8 @@ export async function updateUser(id: number, payload: { username: string; email?
 
 export type NetworkPerson = { id: number; firstName?: string; surname?: string; displayName: string; phoneNumber: string; location?: string; accountStatus: 'ACTIVE' | 'INVITED' };
 export type NetworkRelationship = { id: number; type: string; person: NetworkPerson };
-export type NetworkCircle = { id: number; name: string; description: string; members: NetworkPerson[]; ownerName: string; ownedByCurrentUser: boolean };
+export type NetworkCircleMember = { person: NetworkPerson; admin: boolean; creator: boolean };
+export type NetworkCircle = { id: number; name: string; description: string; members: NetworkCircleMember[]; ownerName: string; ownedByCurrentUser: boolean; currentUserAdmin: boolean };
 
 export async function searchNetworkPeople(query: string) {
   return authenticatedRequest<NetworkPerson[]>(`/api/network/search?q=${encodeURIComponent(query)}`);
@@ -328,6 +329,14 @@ export async function addMemberToMyCircle(circleId: number, userId: number) {
 
 export async function removeMemberFromMyCircle(circleId: number, userId: number) {
   return authenticatedRequest<NetworkCircle>(`/api/network/circles/${circleId}/members/${userId}`, { method: 'DELETE' });
+}
+
+export async function promoteCircleAdmin(circleId: number, userId: number) {
+  return authenticatedRequest<NetworkCircle>(`/api/network/circles/${circleId}/admins/${userId}`, { method: 'POST' });
+}
+
+export async function demoteCircleAdmin(circleId: number, userId: number) {
+  return authenticatedRequest<NetworkCircle>(`/api/network/circles/${circleId}/admins/${userId}`, { method: 'DELETE' });
 }
 
 export async function fetchPeople() {

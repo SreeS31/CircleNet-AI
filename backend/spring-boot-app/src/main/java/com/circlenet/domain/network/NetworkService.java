@@ -18,6 +18,7 @@ import com.circlenet.domain.network.dto.AddRelationshipRequest;
 import com.circlenet.domain.network.dto.AddPersonRequest;
 import com.circlenet.domain.network.dto.CreateNetworkCircleRequest;
 import com.circlenet.domain.network.dto.NetworkCircleDto;
+import com.circlenet.domain.network.dto.NetworkCircleMemberDto;
 import com.circlenet.domain.network.dto.NetworkPersonDto;
 import com.circlenet.domain.network.dto.NetworkRelationshipDto;
 import com.circlenet.domain.relationship.RelationshipRepository;
@@ -147,11 +148,13 @@ public class NetworkService {
     entity.setName(name);
     entity.setDescription(request.description() == null ? "" : request.description().trim());
     entity.setOwnerUserId(currentUserId);
+    entity.getMemberUserIds().add(currentUserId);
+    entity.getAdminUserIds().add(currentUserId);
     return toCircle(circleRepository.save(entity), currentUserId);
   }
 
   public NetworkCircleDto addCircleMember(Long currentUserId, Long circleId, Long userId) {
-    CircleEntity circle = ownedCircle(currentUserId, circleId);
+    CircleEntity circle = administeredCircle(currentUserId, circleId);
     requireUser(userId);
     if (relationshipRepository.findByOwnerUserIdAndRelatedUserId(currentUserId, userId).isEmpty()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Add this person as a relationship before adding them to a circle");
@@ -161,16 +164,38 @@ public class NetworkService {
   }
 
   public NetworkCircleDto removeCircleMember(Long currentUserId, Long circleId, Long userId) {
-    CircleEntity circle = ownedCircle(currentUserId, circleId);
+    CircleEntity circle = administeredCircle(currentUserId, circleId);
+    if (userId.equals(circle.getOwnerUserId())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The circle creator cannot be removed");
+    }
     circle.getMemberUserIds().remove(userId);
+    circle.getAdminUserIds().remove(userId);
     return toCircle(circleRepository.save(circle), currentUserId);
   }
 
-  private CircleEntity ownedCircle(Long ownerId, Long circleId) {
+  public NetworkCircleDto promoteCircleAdmin(Long currentUserId, Long circleId, Long userId) {
+    CircleEntity circle = administeredCircle(currentUserId, circleId);
+    if (!circle.getMemberUserIds().contains(userId)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only circle members can become admins");
+    }
+    circle.getAdminUserIds().add(userId);
+    return toCircle(circleRepository.save(circle), currentUserId);
+  }
+
+  public NetworkCircleDto demoteCircleAdmin(Long currentUserId, Long circleId, Long userId) {
+    CircleEntity circle = administeredCircle(currentUserId, circleId);
+    if (userId.equals(circle.getOwnerUserId())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The circle creator is a permanent admin");
+    }
+    circle.getAdminUserIds().remove(userId);
+    return toCircle(circleRepository.save(circle), currentUserId);
+  }
+
+  private CircleEntity administeredCircle(Long userId, Long circleId) {
     CircleEntity circle = circleRepository.findById(circleId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Circle not found"));
-    if (!ownerId.equals(circle.getOwnerUserId())) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this circle");
+    if (!circle.getAdminUserIds().contains(userId)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only circle admins can manage members");
     }
     return circle;
   }
@@ -182,11 +207,12 @@ public class NetworkService {
 
   private NetworkCircleDto toCircle(CircleEntity circle, Long currentUserId) {
     List<RelationshipEntity> relationships = relationshipRepository.findByOwnerUserId(circle.getOwnerUserId());
-    List<NetworkPersonDto> members = circle.getMemberUserIds().stream()
-        .map(this::requireUser).map(user -> toPerson(user, relationshipName(relationships, user.getId()))).toList();
+    List<NetworkCircleMemberDto> members = circle.getMemberUserIds().stream().map(this::requireUser)
+        .map(user -> new NetworkCircleMemberDto(toPerson(user, relationshipName(relationships, user.getId())),
+            circle.getAdminUserIds().contains(user.getId()), circle.getOwnerUserId().equals(user.getId()))).toList();
     String ownerName = profileDisplayName(requireUser(circle.getOwnerUserId()));
     return new NetworkCircleDto(circle.getId(), circle.getName(), circle.getDescription(), members,
-        ownerName, currentUserId.equals(circle.getOwnerUserId()));
+        ownerName, currentUserId.equals(circle.getOwnerUserId()), circle.getAdminUserIds().contains(currentUserId));
   }
 
   private NetworkPersonDto toPerson(UserEntity user) { return toPerson(user, null); }

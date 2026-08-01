@@ -45,7 +45,11 @@ class NetworkControllerTest {
 
     mockMvc.perform(post("/api/network/circles/" + circleId + "/members").header(auth(), "Bearer " + token)
         .contentType(MediaType.APPLICATION_JSON).content("{\"userId\":" + friend.get("id").asLong() + "}"))
-        .andExpect(status().isOk()).andExpect(jsonPath("$.members[0].id").value(friend.get("id").asLong()));
+        .andExpect(status().isOk()).andExpect(jsonPath("$.members[?(@.person.id == " + friend.get("id").asLong() + ")]").exists());
+
+    mockMvc.perform(post("/api/network/circles/" + circleId + "/admins/" + friend.get("id").asLong())
+        .header(auth(), "Bearer " + token)).andExpect(status().isOk())
+        .andExpect(jsonPath("$.members[?(@.person.id == " + friend.get("id").asLong() + " && @.admin == true)]").exists());
 
     String friendToken = login(friend.get("phoneNumber").asText());
     mockMvc.perform(get("/api/network/circles").header(auth(), "Bearer " + friendToken))

@@ -34,6 +34,11 @@ public class CircleEntity {
   @Column(name = "user_id")
   private Set<Long> memberUserIds = new HashSet<>();
 
+  @ElementCollection
+  @CollectionTable(name = "circle_admins", joinColumns = @JoinColumn(name = "circle_id"))
+  @Column(name = "user_id")
+  private Set<Long> adminUserIds = new HashSet<>();
+
   public Long getId() {
     return id;
   }
@@ -57,4 +62,5 @@ public class CircleEntity {
   public Long getOwnerUserId() { return ownerUserId; }
   public void setOwnerUserId(Long ownerUserId) { this.ownerUserId = ownerUserId; }
   public Set<Long> getMemberUserIds() { return memberUserIds; }
+  public Set<Long> getAdminUserIds() { return adminUserIds; }
 }

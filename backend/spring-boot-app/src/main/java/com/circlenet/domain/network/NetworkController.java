@@ -75,5 +75,15 @@ public class NetworkController {
     return networkService.removeCircleMember(userId(principal), circleId, userId);
   }
 
+  @PostMapping("/circles/{circleId}/admins/{memberUserId}")
+  public NetworkCircleDto promoteAdmin(Principal principal, @PathVariable Long circleId, @PathVariable Long memberUserId) {
+    return networkService.promoteCircleAdmin(userId(principal), circleId, memberUserId);
+  }
+
+  @DeleteMapping("/circles/{circleId}/admins/{memberUserId}")
+  public NetworkCircleDto demoteAdmin(Principal principal, @PathVariable Long circleId, @PathVariable Long memberUserId) {
+    return networkService.demoteCircleAdmin(userId(principal), circleId, memberUserId);
+  }
+
   private Long userId(Principal principal) { return Long.valueOf(principal.getName()); }
 }
