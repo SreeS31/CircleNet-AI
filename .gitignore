@@ -18,6 +18,7 @@ out/
 dist/
 build/
 target/
+backend/spring-boot-app/var/
 .gradle/
 *.tsbuildinfo
 
