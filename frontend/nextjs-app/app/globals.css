@@ -275,7 +275,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 
 .country-phone-input {
   display: grid;
-  grid-template-columns: minmax(135px, 170px) minmax(110px, 1fr);
+  grid-template-columns: 125px minmax(170px, 1fr);
   align-items: stretch;
   min-width: 0;
   overflow: visible;
