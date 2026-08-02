@@ -24,6 +24,9 @@ public class RelationshipEntity {
   @Column(name = "related_user_id")
   private Long relatedUserId;
 
+  @Column(name = "relative_to_user_id")
+  private Long relativeToUserId;
+
   @Column(name = "contact_name")
   private String contactName;
 
@@ -55,6 +58,8 @@ public class RelationshipEntity {
   public void setOwnerUserId(Long ownerUserId) { this.ownerUserId = ownerUserId; }
   public Long getRelatedUserId() { return relatedUserId; }
   public void setRelatedUserId(Long relatedUserId) { this.relatedUserId = relatedUserId; }
+  public Long getRelativeToUserId() { return relativeToUserId; }
+  public void setRelativeToUserId(Long relativeToUserId) { this.relativeToUserId = relativeToUserId; }
   public String getContactName() { return contactName; }
   public void setContactName(String contactName) { this.contactName = contactName; }
   public String getContactPhone() { return contactPhone; }

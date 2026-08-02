@@ -144,6 +144,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const [editingCircle, setEditingCircle] = useState<{ id: number; name: string; description: string } | null>(null);
   const [inviteMobile, setInviteMobile] = useState('');
   const [communication, setCommunication] = useState<{ name: string; mobile: string; email: string; relationship: string; existing: boolean } | null>(null);
+  const [addingRelativeTo, setAddingRelativeTo] = useState<NetworkPerson | null>(null);
   const [message, setMessage] = useState('Search by person name, surname, mobile number, or location.');
   const [busy, setBusy] = useState(false);
 
@@ -224,7 +225,8 @@ export default function UserNetworkDashboard({ username }: { username: string })
         managedCategory: identityType === 'MANAGED' ? managedCategory : undefined,
         dateOfBirth: identityType === 'MANAGED' ? managedDateOfBirth || undefined : undefined,
         dateOfDeath: identityType === 'MANAGED' && managedCategory === 'MEMORIAL' ? managedDateOfDeath || undefined : undefined,
-        notes: identityType === 'MANAGED' ? managedNotes || undefined : undefined });
+        notes: identityType === 'MANAGED' ? managedNotes || undefined : undefined,
+        relativeToUserId: addingRelativeTo?.id });
       const existing = relationship.person.accountStatus === 'ACTIVE';
       await refresh();
       setInviteMobile(identityType === 'ACCOUNT' && !existing ? mobileToAdd.trim() : '');
@@ -236,6 +238,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
       setDirectVisibility('');
       setDirectCompany('');
       setManagedDateOfBirth(''); setManagedDateOfDeath(''); setManagedNotes('');
+      setAddingRelativeTo(null);
       setMessage(identityType === 'MANAGED'
         ? `${relationship.person.displayName} was added as a managed profile. It can be used in relationships and circles but cannot sign in.`
         : existing
@@ -286,18 +289,20 @@ export default function UserNetworkDashboard({ username }: { username: string })
     finally { setBusy(false); }
   };
 
-  const spouseRelationships = relationships.filter(item => ['spouse','husband','wife'].includes(relationKey(item)));
-  const grandparentRelationships = relationships.filter(item => ['grandparent','grandfather','grandmother'].includes(relationKey(item)));
-  const parentRelationships = relationships.filter(item => ['parent','father','mother'].includes(relationKey(item)));
-  const siblingRelationships = relationships.filter(item => ['sibling','brother','sister'].includes(relationKey(item)));
-  const childRelationships = relationships.filter(item => ['child','son','daughter'].includes(relationKey(item)));
-  const grandchildRelationships = relationships.filter(item => ['grandchild','grandson','granddaughter'].includes(relationKey(item)));
+  const directRelationships = relationships.filter(item => !item.relativeToUserId);
+  const spouseRelationships = directRelationships.filter(item => ['spouse','husband','wife'].includes(relationKey(item)));
+  const grandparentRelationships = directRelationships.filter(item => ['grandparent','grandfather','grandmother'].includes(relationKey(item)));
+  const parentRelationships = directRelationships.filter(item => ['parent','father','mother'].includes(relationKey(item)));
+  const siblingRelationships = directRelationships.filter(item => ['sibling','brother','sister'].includes(relationKey(item)));
+  const childRelationships = directRelationships.filter(item => ['child','son','daughter'].includes(relationKey(item)));
+  const grandchildRelationships = directRelationships.filter(item => ['grandchild','grandson','granddaughter'].includes(relationKey(item)));
   const familyIds = new Set([...spouseRelationships,...grandparentRelationships,...parentRelationships,...siblingRelationships,...childRelationships,...grandchildRelationships].map(item => item.id));
-  const otherRelationships = relationships.filter(item => !familyIds.has(item.id));
+  const otherRelationships = directRelationships.filter(item => !familyIds.has(item.id));
   const ownedCircles = circles.filter(circle => circle.ownedByCurrentUser);
   const administeredCircles = circles.filter(circle => circle.currentUserAdmin);
 
   const relationshipNode = (item: NetworkRelationship, paired = false, treeRole = '') => {
+    const nodeRelations = relationships.filter(relationship => relationship.relativeToUserId === item.person.id);
     const availableCircles = administeredCircles.filter(circle => !circle.members.some(member => member.person.id === item.person.id));
     const allCirclesContainPerson = administeredCircles.length > 0 && availableCircles.length === 0;
     const circleQuery = (circleSearch[item.id] || '').trim().toLowerCase();
@@ -305,9 +310,10 @@ export default function UserNetworkDashboard({ username }: { username: string })
     const expanded = Boolean(expandedRelationships[item.id]) || editingRelationship?.id === item.id;
     const toggleExpanded = () => setExpandedRelationships(current => ({...current,[item.id]:!current[item.id]}));
     return <article className={`relationship-node relationship-node-compact ${expanded ? 'is-expanded' : ''} ${paired ? 'spouse-node' : ''} ${genderClass(item.person, item.type)}`} key={item.id} data-tree-role={treeRole || undefined} tabIndex={0} aria-label={`${item.person.displayName}, ${item.type}. Click to ${expanded ? 'collapse' : 'show details'}.`} onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,select,textarea,summary')) toggleExpanded(); }} onKeyDown={event => { if (!(event.target as HTMLElement).closest('button,a,input,select,textarea,summary') && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleExpanded(); } }}>
-    <span className="compact-relationship-label">{item.type}</span><div className="relationship-node-main"><PersonAvatar name={item.person.displayName} photo={item.person.profilePhoto}/><div className="relationship-identity"><strong>{item.person.displayName}</strong><div className="private-contact-display">{item.contactPhone && <span><i aria-hidden="true">☎</i>{item.contactPhone}</span>}{item.contactEmail && <span><i aria-hidden="true">✉</i>{item.contactEmail}</span>}</div><div><span className="relationship-badge">{item.type}</span><span className="status-tag status-view">{visibilityOptions.find(option => option.value === item.visibilityScope)?.label || 'Friends'}{item.visibilityCompany ? ` · ${item.visibilityCompany}` : ''}</span><PersonStatus person={item.person}/></div></div><div className="relationship-actions"><button className="action-tag action-tag-admin" onClick={() => setEditingRelationship({ id:item.id, contactName:item.person.displayName, contactPhone:item.contactPhone || '', contactEmail:item.contactEmail || '', type:item.type, visibilityScope:item.visibilityScope || 'FRIENDS', visibilityCompany:item.visibilityCompany || '' })}>Edit</button><button className="action-tag action-tag-danger" onClick={async () => { await removeMyRelationship(item.id); await refresh(); }}>Remove</button></div></div>
+    <span className="compact-relationship-label">{item.type}</span><div className="relationship-node-main"><PersonAvatar name={item.person.displayName} photo={item.person.profilePhoto}/><div className="relationship-identity"><strong>{item.person.displayName}</strong><div className="private-contact-display">{item.contactPhone && <span><i aria-hidden="true">☎</i>{item.contactPhone}</span>}{item.contactEmail && <span><i aria-hidden="true">✉</i>{item.contactEmail}</span>}</div><div><span className="relationship-badge">{item.type}</span><span className="status-tag status-view">{visibilityOptions.find(option => option.value === item.visibilityScope)?.label || 'Friends'}{item.visibilityCompany ? ` · ${item.visibilityCompany}` : ''}</span><PersonStatus person={item.person}/></div></div><div className="relationship-actions"><button className="action-tag action-tag-admin" onClick={() => { setAddingRelativeTo(item.person); document.getElementById('add-network-person')?.scrollIntoView({behavior:'smooth',block:'center'}); }}>+ Relation</button><button className="action-tag action-tag-admin" onClick={() => setEditingRelationship({ id:item.id, contactName:item.person.displayName, contactPhone:item.contactPhone || '', contactEmail:item.contactEmail || '', type:item.type, visibilityScope:item.visibilityScope || 'FRIENDS', visibilityCompany:item.visibilityCompany || '' })}>Edit</button><button className="action-tag action-tag-danger" onClick={async () => { await removeMyRelationship(item.id); await refresh(); }}>Remove</button></div></div>
     {editingRelationship?.id === item.id && <div className="relationship-edit-panel"><label><span>Person name</span><input required value={editingRelationship.contactName} onChange={e => setEditingRelationship({...editingRelationship,contactName:e.target.value})}/></label><label><span>Mobile number</span><CountryPhoneInput value={editingRelationship.contactPhone} onChange={contactPhone => setEditingRelationship({...editingRelationship,contactPhone})} placeholder="Private contact mobile"/></label><label><span>Email address</span><input type="email" value={editingRelationship.contactEmail} onChange={e => setEditingRelationship({...editingRelationship,contactEmail:e.target.value})} placeholder="Private contact email"/></label><label><span>Relationship</span><SearchableSelect value={editingRelationship.type} placeholder="Relation" options={relationshipTypes} onChange={type => setEditingRelationship({...editingRelationship,type})}/></label><label><span>View</span><SearchableSelect value={visibilityLabel(editingRelationship.visibilityScope)} placeholder="View" options={visibilityLabels} onChange={label => setEditingRelationship({...editingRelationship,visibilityScope:visibilityValue(label) as VisibilityScope})}/></label>{editingRelationship.visibilityScope === 'COLLEAGUES' && <label><span>Company</span><SearchableSelect value={editingRelationship.visibilityCompany} placeholder="Company" options={employmentCompanies} onChange={visibilityCompany => setEditingRelationship({...editingRelationship,visibilityCompany})}/></label>}<p className="private-contact-note">Mobile and email are private to your relationship record and are never shown to other users.</p><div className="relationship-edit-actions"><button type="button" className="action-tag action-tag-admin" disabled={busy || !editingRelationship.contactName.trim()} onClick={saveRelationshipEdit}>Save</button><button type="button" className="action-tag action-tag-danger" disabled={busy} onClick={() => setEditingRelationship(null)}>Cancel</button></div></div>}
     <details className="circle-picker"><summary className={`action-tag action-tag-admin ${!administeredCircles.length || allCirclesContainPerson ? 'disabled' : ''}`}>{allCirclesContainPerson ? '✓ In all circles' : 'Add to circle'}</summary><div className="circle-picker-menu"><input className="circle-picker-search" type="search" value={circleSearch[item.id] || ''} onChange={e => setCircleSearch({...circleSearch,[item.id]:e.target.value})} placeholder="Search circles…" aria-label="Search circles"/>{filteredCircles.map(circle => { const alreadyAdded = circle.members.some(member => member.person.id === item.person.id); return <button type="button" className={alreadyAdded ? 'circle-already-added' : ''} key={circle.id} disabled={busy || alreadyAdded} onClick={event => { void addToCircle(item.person, circle.id); event.currentTarget.closest('details')?.removeAttribute('open'); }}><span>{circle.name}</span>{alreadyAdded && <strong aria-label="Already in this circle">✓ Added</strong>}</button>; })}{!administeredCircles.length && <span>No circles you administer</span>}{administeredCircles.length > 0 && filteredCircles.length === 0 && <span>No matching circles</span>}</div></details>
+    {expanded && nodeRelations.length > 0 && <div className="node-relative-list"><strong>Relations of {item.person.displayName}</strong>{nodeRelations.map(relation => <div key={relation.id}><PersonAvatar name={relation.person.displayName} photo={relation.person.profilePhoto}/><span>{relation.person.displayName}<small>{relation.type}</small></span><button type="button" className="action-tag action-tag-admin" onClick={() => { setAddingRelativeTo(relation.person); document.getElementById('add-network-person')?.scrollIntoView({behavior:'smooth',block:'center'}); }}>+ Relation</button></div>)}</div>}
   </article>;
   };
 
@@ -319,9 +325,10 @@ export default function UserNetworkDashboard({ username }: { username: string })
 
     <p className="network-message" role="status">{message}</p>
 
-    <section className="card quick-add-card">
+    <section className="card quick-add-card" id="add-network-person">
       <div><p className="eyebrow">ADD TO MY NETWORK</p><h2>Add a friend, relative, or family member</h2><p>Choose a CircleNet account for someone who can sign in, or Managed person for a child, dependent, memorial, or someone without contact details. Contact details remain private.</p></div>
-      <form onSubmit={addByMobile} className="quick-add-form">
+      <form onSubmit={addByMobile} className={`quick-add-form ${addingRelativeTo ? 'has-relative-target' : ''}`}>
+        {addingRelativeTo && <div className="relative-to-banner"><span>Adding a relation to <strong>{addingRelativeTo.displayName}</strong></span><button type="button" className="action-tag action-tag-danger" onClick={() => setAddingRelativeTo(null)}>Cancel</button></div>}
         <fieldset className="quick-add-identity person-type-choice"><legend>Person type</legend><label><input type="radio" name="identityType" value="ACCOUNT" checked={identityType === 'ACCOUNT'} onChange={() => setIdentityType('ACCOUNT')}/><span><strong>CircleNet account</strong><small>Person can register and sign in</small></span></label><label><input type="radio" name="identityType" value="MANAGED" checked={identityType === 'MANAGED'} onChange={() => setIdentityType('MANAGED')}/><span><strong>Managed person</strong><small>Child, dependent, memorial, or no contact details</small></span></label></fieldset>
         <input className="quick-add-name" type="text" required value={fullNameToAdd} onChange={e => setFullNameToAdd(e.target.value)} placeholder="Full name" />
         <CountryPhoneInput className="quick-add-mobile" required={identityType === 'ACCOUNT'} value={mobileToAdd} onChange={setMobileToAdd} placeholder={identityType === 'ACCOUNT' ? 'Mobile number' : 'Mobile number (optional)'}/>

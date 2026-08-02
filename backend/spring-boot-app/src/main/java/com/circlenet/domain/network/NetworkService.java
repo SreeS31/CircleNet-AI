@@ -72,7 +72,7 @@ public class NetworkService {
   @Transactional(readOnly = true)
   public List<NetworkRelationshipDto> relationships(Long currentUserId) {
     return relationshipRepository.findByOwnerUserId(currentUserId).stream()
-        .map(entity -> new NetworkRelationshipDto(entity.getId(), entity.getType(), entity.getVisibilityScope(), entity.getContactPhone(), entity.getContactEmail(), entity.getVisibilityCompany(),
+        .map(entity -> new NetworkRelationshipDto(entity.getId(), entity.getType(), entity.getVisibilityScope(), entity.getContactPhone(), entity.getContactEmail(), entity.getVisibilityCompany(), entity.getRelativeToUserId(),
             toPerson(requireUser(entity.getRelatedUserId()), entity.getContactName())))
         .toList();
   }
@@ -162,10 +162,19 @@ public class NetworkService {
     if (currentUserId.equals(person.getId())) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot add yourself");
     }
+    Long relativeToUserId = request.relativeToUserId();
+    if (relativeToUserId != null) {
+      if (relativeToUserId.equals(person.getId())) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A person cannot be related to themselves");
+      }
+      relationshipRepository.findByOwnerUserIdAndRelatedUserId(currentUserId, relativeToUserId)
+          .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a person from your relationships"));
+    }
     RelationshipEntity relationship = relationshipRepository
         .findByOwnerUserIdAndRelatedUserId(currentUserId, person.getId()).orElseGet(RelationshipEntity::new);
     relationship.setOwnerUserId(currentUserId);
     relationship.setRelatedUserId(person.getId());
+    relationship.setRelativeToUserId(relativeToUserId);
     relationship.setType(type);
     relationship.setContactName(fullName);
     relationship.setContactPhone(phoneNumber);
@@ -311,7 +320,7 @@ public class NetworkService {
 
   private NetworkRelationshipDto relationshipDto(RelationshipEntity relationship, UserEntity person) {
     return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), relationship.getVisibilityScope(), relationship.getContactPhone(), relationship.getContactEmail(),
-        relationship.getVisibilityCompany(), toPerson(person, relationship.getContactName()));
+        relationship.getVisibilityCompany(), relationship.getRelativeToUserId(), toPerson(person, relationship.getContactName()));
   }
 
   private String cleanEmail(String email) {
