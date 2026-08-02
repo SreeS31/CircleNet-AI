@@ -143,7 +143,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const [expandedRelationships, setExpandedRelationships] = useState<Record<number, boolean>>({});
   const [editingCircle, setEditingCircle] = useState<{ id: number; name: string; description: string } | null>(null);
   const [inviteMobile, setInviteMobile] = useState('');
-  const [communication, setCommunication] = useState<{ name: string; mobile: string; email: string; relationship: string; existing: boolean } | null>(null);
+  const [communication, setCommunication] = useState<{ name: string; mobile: string; email: string; relationship: string; ownerName: string; existing: boolean } | null>(null);
   const [addingRelativeTo, setAddingRelativeTo] = useState<NetworkPerson | null>(null);
   const [message, setMessage] = useState('Search by person name, surname, mobile number, or location.');
   const [busy, setBusy] = useState(false);
@@ -218,6 +218,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
     setBusy(true);
     setInviteMobile('');
     setCommunication(null);
+    const relationshipOwnerName = addingRelativeTo?.displayName || username;
     try {
       const relationship = await addPersonToMyNetwork({ fullName: fullNameToAdd, phoneNumber: mobileToAdd || undefined, email: emailToAdd || undefined,
         type: directRelationshipType, visibilityScope: directVisibility,
@@ -230,7 +231,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
       const existing = relationship.person.accountStatus === 'ACTIVE';
       await refresh();
       setInviteMobile(identityType === 'ACCOUNT' && !existing ? mobileToAdd.trim() : '');
-      setCommunication(identityType === 'ACCOUNT' ? { name: fullNameToAdd.trim() || relationship.person.displayName, mobile: mobileToAdd.trim(), email: emailToAdd.trim(), relationship: directRelationshipType, existing } : null);
+      setCommunication(identityType === 'ACCOUNT' ? { name: fullNameToAdd.trim() || relationship.person.displayName, mobile: mobileToAdd.trim(), email: emailToAdd.trim(), relationship: directRelationshipType, ownerName: relationshipOwnerName, existing } : null);
       setMobileToAdd('');
       setFullNameToAdd('');
       setEmailToAdd('');
@@ -240,10 +241,10 @@ export default function UserNetworkDashboard({ username }: { username: string })
       setManagedDateOfBirth(''); setManagedDateOfDeath(''); setManagedNotes('');
       setAddingRelativeTo(null);
       setMessage(identityType === 'MANAGED'
-        ? `${relationship.person.displayName} was added as a managed profile. It can be used in relationships and circles but cannot sign in.`
+        ? `${relationship.person.displayName} was added as ${relationshipOwnerName}'s ${directRelationshipType.toLowerCase()}. It can be used in relationships and circles but cannot sign in.`
         : existing
-        ? `${relationship.person.displayName} already exists. Only the ${directRelationshipType.toLowerCase()} relationship was added—no duplicate user was created.`
-        : `${relationship.person.displayName} was added to My Relationships as an invited user. Send the registration invitation so they can claim the account.`);
+        ? `${relationship.person.displayName} already exists. Only the ${directRelationshipType.toLowerCase()} relationship to ${relationshipOwnerName} was added—no duplicate user was created.`
+        : `${relationship.person.displayName} was added as ${relationshipOwnerName}'s ${directRelationshipType.toLowerCase()}. Send the registration invitation so they can claim the account.`);
     } catch (error) { setMessage(errorMessage(error)); }
     finally { setBusy(false); }
   };
@@ -257,7 +258,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const communicationMessage = (target: typeof communication) => {
     if (!target) return '';
     const action = target.existing ? `added you as their ${target.relationship}` : `invited you as their ${target.relationship}`;
-    return `Hello ${target.name}, ${username} ${action} on CircleNet-AI. Please log in to the application and create your own circles: ${window.location.origin}/auth`;
+    return `Hello ${target.name}, ${target.ownerName} ${action} on CircleNet-AI. Please log in to the application and create your own circles: ${window.location.origin}/auth`;
   };
 
   const saveRelationshipEdit = async () => {
@@ -326,9 +327,9 @@ export default function UserNetworkDashboard({ username }: { username: string })
     <p className="network-message" role="status">{message}</p>
 
     <section className="card quick-add-card" id="add-network-person">
-      <div><p className="eyebrow">ADD TO MY NETWORK</p><h2>Add a friend, relative, or family member</h2><p>Choose a CircleNet account for someone who can sign in, or Managed person for a child, dependent, memorial, or someone without contact details. Contact details remain private.</p></div>
+      <div><p className="eyebrow">{addingRelativeTo ? 'ADD TO SELECTED PERSON' : 'ADD TO MY NETWORK'}</p><h2>{addingRelativeTo ? `Add a relation to ${addingRelativeTo.displayName}` : 'Add a friend, relative, or family member'}</h2><p>{addingRelativeTo ? `The selected relationship will belong to ${addingRelativeTo.displayName}, not directly to ${username}.` : 'Choose a CircleNet account for someone who can sign in, or Managed person for a child, dependent, memorial, or someone without contact details. Contact details remain private.'}</p></div>
       <form onSubmit={addByMobile} className={`quick-add-form ${addingRelativeTo ? 'has-relative-target' : ''}`}>
-        {addingRelativeTo && <div className="relative-to-banner"><span>Adding a relation to <strong>{addingRelativeTo.displayName}</strong></span><button type="button" className="action-tag action-tag-danger" onClick={() => setAddingRelativeTo(null)}>Cancel</button></div>}
+        {addingRelativeTo && <div className="relative-to-banner"><span>Relationship owner: <strong>{addingRelativeTo.displayName}</strong></span><button type="button" className="action-tag action-tag-danger" onClick={() => setAddingRelativeTo(null)}>Use me instead</button></div>}
         <fieldset className="quick-add-identity person-type-choice"><legend>Person type</legend><label><input type="radio" name="identityType" value="ACCOUNT" checked={identityType === 'ACCOUNT'} onChange={() => setIdentityType('ACCOUNT')}/><span><strong>CircleNet account</strong><small>Person can register and sign in</small></span></label><label><input type="radio" name="identityType" value="MANAGED" checked={identityType === 'MANAGED'} onChange={() => setIdentityType('MANAGED')}/><span><strong>Managed person</strong><small>Child, dependent, memorial, or no contact details</small></span></label></fieldset>
         <input className="quick-add-name" type="text" required value={fullNameToAdd} onChange={e => setFullNameToAdd(e.target.value)} placeholder="Full name" />
         <CountryPhoneInput className="quick-add-mobile" required={identityType === 'ACCOUNT'} value={mobileToAdd} onChange={setMobileToAdd} placeholder={identityType === 'ACCOUNT' ? 'Mobile number' : 'Mobile number (optional)'}/>

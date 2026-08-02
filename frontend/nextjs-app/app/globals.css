@@ -407,9 +407,11 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 .quick-add-form.has-relative-target .quick-add-email,.quick-add-form.has-relative-target .quick-add-visibility { grid-row:4; }
 .quick-add-form.has-relative-target .quick-add-company,.quick-add-form.has-relative-target .managed-person-fields { grid-row:5; }
 .quick-add-form.has-relative-target>.btn { grid-row:6; }
-.node-relative-list { grid-column:1/-1; display:grid; gap:.35rem; margin-top:.65rem; padding-top:.65rem; border-top:1px solid var(--border); }
+.node-relative-list { position:relative; grid-column:1/-1; display:grid; gap:.55rem; margin:1rem 0 3.2rem; padding:1.25rem .4rem .25rem 1.45rem; border-top:1px solid var(--border); border-left:2px solid var(--tree-line); }
+.node-relative-list::before { content:''; position:absolute; left:-2px; top:-.8rem; width:2px; height:.8rem; background:var(--tree-line); }
 .node-relative-list>strong { color:var(--text-muted); font-size:.74rem; }
-.node-relative-list>div { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.5rem; padding:.35rem; border-radius:.55rem; background:#faf9ff; }
+.node-relative-list>div { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.5rem; padding:.45rem; border:1px solid #e8e2f1; border-radius:.65rem; background:#faf9ff; }
+.node-relative-list>div::before { content:''; position:absolute; left:-1.48rem; top:50%; width:1.45rem; height:2px; background:var(--tree-line); }
 .node-relative-list .person-avatar { width:2rem!important; height:2rem!important; min-width:2rem!important; flex-basis:2rem!important; border-width:2px!important; }
 .node-relative-list span { display:grid; color:var(--text-body); font-size:.76rem; font-weight:700; }
 .node-relative-list small { color:var(--text-muted); font-size:.68rem; font-weight:500; }
