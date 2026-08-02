@@ -753,6 +753,65 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 }
 .family-lineage-generation { padding-top:1rem!important; padding-bottom:1rem!important; }
 
+.relationship-tree-section .section-heading { align-items:flex-start; flex-wrap:wrap; }
+.family-view-toolbar { display:flex; align-items:center; gap:.35rem; margin-left:auto; padding:.3rem; border:1px solid #e3ddf0; border-radius:.85rem; background:#f7f4fc; }
+.family-view-toolbar button { min-width:78px; padding:.42rem .6rem; display:flex; align-items:center; justify-content:center; gap:.35rem; border:1px solid transparent; border-radius:.62rem; color:#6d6380; background:transparent; font:inherit; font-size:.72rem; font-weight:750; cursor:pointer; transition:.15s ease; }
+.family-view-toolbar button:hover { color:#4f3c85; background:#fff; }
+.family-view-toolbar button.selected { border-color:#d8cff0; color:#4f3c85; background:#fff; box-shadow:0 4px 12px rgba(65,45,105,.1); }
+.family-view-toolbar i { font-style:normal; font-size:.9rem; }
+
+/* Option 1: Modern */
+.family-view-modern .family-household-row>.family-household { backdrop-filter:blur(8px); }
+.family-view-modern .family-self-household { border-color:#d5c9f0!important; background:linear-gradient(180deg,rgba(246,242,255,.94),rgba(255,255,255,.78))!important; box-shadow:0 14px 34px rgba(91,66,157,.1)!important; }
+
+/* Option 2: Heritage */
+.family-view-heritage {
+  --tree-line:#776957;
+  --tree-line-soft:#ddd2c2;
+  border-color:#e8dfd1;
+  background:
+    radial-gradient(circle at 50% 15%,rgba(192,164,116,.12),transparent 25rem),
+    linear-gradient(180deg,#fffdf8,#faf6ed);
+}
+.family-view-heritage .family-level-label { border-color:#d9cbb5; color:#6b5943; background:#fffaf0; box-shadow:none; font-family:Georgia,'Times New Roman',serif; font-size:.76rem; }
+.family-view-heritage .family-household-row>.family-household { border-color:transparent; background:transparent; box-shadow:none; }
+.family-view-heritage .family-household-row>.family-household::after { content:''; position:absolute; left:18%; right:18%; bottom:.3rem; height:1px; background:linear-gradient(90deg,transparent,#d8c9b0,transparent); }
+.family-view-heritage .relationship-node-compact:not(:hover):not(.is-expanded) .person-avatar,
+.family-view-heritage .self-node .self-avatar { border-color:#bfa778; background-color:#efe6d4; }
+.family-view-heritage .relationship-node-compact:not(:hover):not(.is-expanded) .relationship-identity>strong,
+.family-view-heritage .self-node strong { color:#3f352c; font-family:Georgia,'Times New Roman',serif; font-size:.79rem; }
+.family-view-heritage .compact-relationship-label { border-color:#a8916e; color:#6b5943; background:#fffaf0; font-family:Georgia,'Times New Roman',serif; }
+.family-view-heritage .partner-connector i { color:#a85563; background:#fff8f2; }
+
+/* Option 3: Compact */
+.family-view-compact { --tree-line:#b8adc9; padding:.75rem; background:#f7f6fb; }
+.family-view-compact>.family-generation-ancestors,
+.family-view-compact>.family-generation-parents,
+.family-view-compact>.family-branch-connector,
+.family-view-compact>.anchored-family-section { display:none; }
+.family-view-compact .family-lineage-generation>.family-level-label { margin-bottom:.8rem; }
+.family-view-compact .family-household-row { padding:0!important; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.65rem; }
+.family-view-compact .family-household-row::before,
+.family-view-compact .family-household-row::after,
+.family-view-compact .family-household-row>.family-household::before { display:none!important; }
+.family-view-compact .family-household-row>.family-household { padding:1.5rem .45rem .65rem; border-color:#dfd9e9; border-radius:.8rem; background:#fff; box-shadow:0 4px 12px rgba(57,43,82,.05); }
+.family-view-compact .household-couple,.family-view-compact .partnership-row { min-height:92px; }
+.family-view-compact .relationship-node-compact:not(:hover):not(.is-expanded),
+.family-view-compact .relationship-node-compact.spouse-node:not(:hover):not(.is-expanded),
+.family-view-compact .self-node { width:82px; min-width:82px; min-height:88px; }
+.family-view-compact .relationship-node-compact:not(:hover):not(.is-expanded) .person-avatar,
+.family-view-compact .self-node .self-avatar { width:48px; height:48px; flex-basis:48px; border-width:2px; }
+.family-view-compact .relationship-node-compact:not(:hover):not(.is-expanded) .relationship-identity>strong,
+.family-view-compact .self-node strong { max-width:82px; font-size:.66rem; }
+.family-view-compact .compact-relationship-label { top:-.65rem; font-size:.52rem; }
+.family-view-compact .partner-connector { width:1.2rem; flex-basis:1.2rem; }
+.family-view-compact .partner-connector i { width:1.15rem; height:1.15rem; }
+.family-view-compact .lineage-descendants { margin-top:.75rem; padding-top:.5rem; }
+.family-view-compact .lineage-descendants::before,.family-view-compact .lineage-children::before,.family-view-compact .lineage-child::before { display:none; }
+.family-view-compact .lineage-children { padding-top:.35rem; gap:.25rem; flex-wrap:wrap; }
+.family-view-compact .lineage-child { min-width:82px; padding-top:.55rem; border-top:1px dashed #ddd6e7; }
+.family-view-compact .family-generation-descendants,.family-view-compact .family-other-connections { margin-top:.75rem; }
+
 @media (max-width: 820px) {
   .family-tree { padding:.75rem .5rem 1.5rem; }
   .family-tree .family-household-row { grid-template-columns:1fr; gap:1.5rem; padding-top:1.5rem!important; }
