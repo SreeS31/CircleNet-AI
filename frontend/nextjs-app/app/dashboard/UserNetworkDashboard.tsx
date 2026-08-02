@@ -344,11 +344,34 @@ export default function UserNetworkDashboard({ username }: { username: string })
     return 0;
   };
   const selfGraphId = -1;
+  // Older relationship rows were created before a relation could be anchored to
+  // another person. Recover the missing parent anchor for the family graph only:
+  // e.g. an additional direct Mother belongs with a direct Father who already
+  // has a recorded father but no recorded mother.
+  const effectiveGraphAnchors = new Map<number,number | null>(relationships.map(relationship => [relationship.id,relationship.relativeToUserId || null]));
+  const directParentRelationships = relationships.filter(relationship => !relationship.relativeToUserId && ['parent','father','mother'].includes(relationKey(relationship)));
+  const usedLegacyParentAnchors = new Set<number>();
+  const inferLegacyParentAnchors = (extras: NetworkRelationship[],presentType: 'father' | 'mother',missingType: 'father' | 'mother') => {
+    extras.forEach(extra => {
+      const candidate = directParentRelationships.find(parent => {
+        if (parent.id===extra.id || usedLegacyParentAnchors.has(parent.person.id)) return false;
+        const anchoredParents=relationships.filter(relationship => relationship.relativeToUserId===parent.person.id && ['father','mother'].includes(relationKey(relationship)));
+        return anchoredParents.some(relationship => relationKey(relationship)===presentType) && !anchoredParents.some(relationship => relationKey(relationship)===missingType);
+      });
+      if (candidate) { effectiveGraphAnchors.set(extra.id,candidate.person.id); usedLegacyParentAnchors.add(candidate.person.id); }
+    });
+  };
+  const directFathers=directParentRelationships.filter(relationship => relationKey(relationship)==='father');
+  const directMothers=directParentRelationships.filter(relationship => relationKey(relationship)==='mother');
+  inferLegacyParentAnchors(directMothers.slice(1),'father','mother');
+  inferLegacyParentAnchors(directFathers.slice(1),'mother','father');
+  const graphAnchor = (relationship: NetworkRelationship) => effectiveGraphAnchors.get(relationship.id) || selfGraphId;
   const graphLevels = new Map<number,number>([[selfGraphId,0]]);
-  directRelationships.forEach(relationship => graphLevels.set(relationship.person.id,graphLevelDelta(relationship.type)));
+  relationships.filter(relationship => graphAnchor(relationship)===selfGraphId).forEach(relationship => graphLevels.set(relationship.person.id,graphLevelDelta(relationship.type)));
   for (let pass=0; pass<relationships.length + 2; pass++) relationships.forEach(relationship => {
-    if (!relationship.relativeToUserId || graphLevels.has(relationship.person.id) && graphLevels.has(relationship.relativeToUserId)) return;
-    const ownerLevel = graphLevels.get(relationship.relativeToUserId);
+    const ownerId=graphAnchor(relationship);
+    if (ownerId===selfGraphId || graphLevels.has(relationship.person.id) && graphLevels.has(ownerId)) return;
+    const ownerLevel = graphLevels.get(ownerId);
     if (ownerLevel !== undefined) graphLevels.set(relationship.person.id,ownerLevel + graphLevelDelta(relationship.type));
   });
   relationships.forEach(relationship => { if (!graphLevels.has(relationship.person.id)) graphLevels.set(relationship.person.id,0); });
@@ -364,11 +387,11 @@ export default function UserNetworkDashboard({ username }: { username: string })
   uniqueGraphPeople.forEach(person => { const level=graphLevels.get(person.id) || 0; peopleByLevel.set(level,[...(peopleByLevel.get(level)||[]),person]); });
   const spouseRelationshipsForGraph = relationships.filter(relationship => ['spouse','husband','wife'].includes(relationKey(relationship)));
   const parentRelationshipGroups = new Map<number,NetworkRelationship[]>();
-  relationships.filter(relationship => ['parent','father','mother'].includes(relationKey(relationship))).forEach(relationship => { const childId=relationship.relativeToUserId || selfGraphId; parentRelationshipGroups.set(childId,[...(parentRelationshipGroups.get(childId)||[]),relationship]); });
+  relationships.filter(relationship => ['parent','father','mother'].includes(relationKey(relationship))).forEach(relationship => { const childId=graphAnchor(relationship); parentRelationshipGroups.set(childId,[...(parentRelationshipGroups.get(childId)||[]),relationship]); });
   const inferredCouples:{source:number;target:number}[]=[];
   parentRelationshipGroups.forEach(parents => { const fathers=parents.filter(parent => ['father'].includes(relationKey(parent))); const mothers=parents.filter(parent => ['mother'].includes(relationKey(parent))); fathers.forEach((father,index) => { const mother=mothers[Math.min(index,mothers.length-1)]; if(mother) inferredCouples.push({source:father.person.id,target:mother.person.id}); }); });
   const spouseNeighbours = new Map<number,number[]>();
-  spouseRelationshipsForGraph.forEach(relationship => { const source=relationship.relativeToUserId || selfGraphId,target=relationship.person.id; spouseNeighbours.set(source,[...(spouseNeighbours.get(source)||[]),target]); spouseNeighbours.set(target,[...(spouseNeighbours.get(target)||[]),source]); });
+  spouseRelationshipsForGraph.forEach(relationship => { const source=graphAnchor(relationship),target=relationship.person.id; spouseNeighbours.set(source,[...(spouseNeighbours.get(source)||[]),target]); spouseNeighbours.set(target,[...(spouseNeighbours.get(target)||[]),source]); });
   inferredCouples.forEach(couple => { spouseNeighbours.set(couple.source,[...(spouseNeighbours.get(couple.source)||[]),couple.target]); spouseNeighbours.set(couple.target,[...(spouseNeighbours.get(couple.target)||[]),couple.source]); });
   const householdsByLevel = new Map<number,(typeof uniqueGraphPeople)[]>();
   peopleByLevel.forEach((people,level) => {
@@ -376,7 +399,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
     const visited=new Set<number>();
     const households:(typeof uniqueGraphPeople)[]=[];
     people.forEach(person => { if (visited.has(person.id)) return; const members:typeof uniqueGraphPeople=[]; const queue=[person.id]; while(queue.length){ const id=queue.shift()!; if(visited.has(id)||!peopleMap.has(id)) continue; visited.add(id); members.push(peopleMap.get(id)!); (spouseNeighbours.get(id)||[]).forEach(neighbour => queue.push(neighbour)); } members.sort((left,right) => { const leftIsTarget=spouseRelationshipsForGraph.some(relation => relation.person.id===left.id); const rightIsTarget=spouseRelationshipsForGraph.some(relation => relation.person.id===right.id); return Number(leftIsTarget)-Number(rightIsTarget); }); households.push(members); });
-    households.sort((left,right) => { const leftSelf=left.some(person => person.self),rightSelf=right.some(person => person.self); if(leftSelf!==rightSelf) return leftSelf?1:-1; const leftAnchor=left[0].relationship?.relativeToUserId || selfGraphId; const rightAnchor=right[0].relationship?.relativeToUserId || selfGraphId; return leftAnchor-rightAnchor || left[0].name.localeCompare(right[0].name); });
+    households.sort((left,right) => { const leftSelf=left.some(person => person.self),rightSelf=right.some(person => person.self); if(leftSelf!==rightSelf) return leftSelf?1:-1; const leftAnchor=left[0].relationship ? graphAnchor(left[0].relationship) : selfGraphId; const rightAnchor=right[0].relationship ? graphAnchor(right[0].relationship) : selfGraphId; return leftAnchor-rightAnchor || left[0].name.localeCompare(right[0].name); });
     householdsByLevel.set(level,households);
   });
   const widestGraphRow = Math.max(...Array.from(householdsByLevel.values()).map(households => households.reduce((width,household) => width+household.length*graphNodeWidth+Math.max(0,household.length-1)*spouseGap,0)+Math.max(0,households.length-1)*householdGap),1);
@@ -384,7 +407,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const graphCanvasHeight = (maxGraphLevel-minGraphLevel+1)*graphLevelHeight+130;
   const graphPositions = new Map<number,{x:number;y:number}>();
   householdsByLevel.forEach((households,level) => { const rowWidth=households.reduce((width,household) => width+household.length*graphNodeWidth+Math.max(0,household.length-1)*spouseGap,0)+Math.max(0,households.length-1)*householdGap; let cursor=(graphCanvasWidth-rowWidth)/2; households.forEach(household => { household.forEach(person => { graphPositions.set(person.id,{x:cursor,y:55+(level-minGraphLevel)*graphLevelHeight}); cursor+=graphNodeWidth+spouseGap; }); cursor+=householdGap-spouseGap; }); });
-  const graphEdges = relationships.map(relationship => ({ relationship,source:relationship.relativeToUserId || selfGraphId,target:relationship.person.id,inferredCouple:false })).filter(edge => graphPositions.has(edge.source)&&graphPositions.has(edge.target));
+  const graphEdges = relationships.map(relationship => ({ relationship,source:graphAnchor(relationship),target:relationship.person.id,inferredCouple:false })).filter(edge => graphPositions.has(edge.source)&&graphPositions.has(edge.target));
   const inferredGraphEdges = inferredCouples.map(couple => ({relationship:relationships.find(relationship => relationship.person.id===couple.target)!,source:couple.source,target:couple.target,inferredCouple:true})).filter(edge => edge.relationship&&graphPositions.has(edge.source)&&graphPositions.has(edge.target));
   const displayGraphEdges=[...graphEdges,...inferredGraphEdges];
   const descendantGraphEdges = graphEdges.filter(edge => graphLevelDelta(edge.relationship.type)>0);
