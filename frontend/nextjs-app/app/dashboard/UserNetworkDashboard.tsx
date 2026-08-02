@@ -42,7 +42,7 @@ function genderClass(person: NetworkPerson, relationshipType = '') {
 const relationKey = (relationship: NetworkRelationship) => relationship.type.trim().toLowerCase().replace(/[\s_-]+/g, '');
 
 function FamilyConnectors({ rootRef, version }: { rootRef: RefObject<HTMLDivElement | null>; version: string }) {
-  const [drawing, setDrawing] = useState({ width:0, height:0, paths:[] as string[] });
+  const [drawing, setDrawing] = useState({ width:0, height:0, paths:[] as { d:string; arrow:boolean }[] });
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -50,7 +50,7 @@ function FamilyConnectors({ rootRef, version }: { rootRef: RefObject<HTMLDivElem
     const draw = () => {
       const rootBox = root.getBoundingClientRect();
       const point = (element: Element, edge: 'top' | 'bottom') => { const box = element.getBoundingClientRect(); return { x:box.left - rootBox.left + root.scrollLeft + box.width / 2, y:(edge === 'top' ? box.top : box.bottom) - rootBox.top + root.scrollTop }; };
-      const paths: string[] = [];
+      const paths: { d:string; arrow:boolean }[] = [];
       const connect = (sourceSelector: string, targetSelector: string) => {
         const sources = Array.from(root.querySelectorAll(sourceSelector)).map(node => point(node,'bottom'));
         const targets = Array.from(root.querySelectorAll(targetSelector)).map(node => point(node,'top'));
@@ -61,10 +61,10 @@ function FamilyConnectors({ rootRef, version }: { rootRef: RefObject<HTMLDivElem
         const centerX = sources.reduce((sum,item) => sum + item.x,0) / sources.length;
         const joinY = sourceBottom + Math.max(18,(targetTop - sourceBottom) * .32);
         const branchY = targetTop - Math.max(18,(targetTop - sourceBottom) * .28);
-        sources.forEach(source => paths.push(`M ${source.x} ${source.y} V ${joinY} H ${centerX}`));
-        paths.push(`M ${centerX} ${joinY} V ${branchY}`);
-        if (targets.length > 1) paths.push(`M ${Math.min(...targets.map(item => item.x))} ${branchY} H ${Math.max(...targets.map(item => item.x))}`);
-        targets.forEach(target => paths.push(`M ${target.x} ${branchY} V ${target.y}`));
+        sources.forEach(source => paths.push({d:`M ${source.x} ${source.y} V ${joinY} H ${centerX}`,arrow:false}));
+        paths.push({d:`M ${centerX} ${joinY} V ${branchY}`,arrow:false});
+        if (targets.length > 1) paths.push({d:`M ${Math.min(...targets.map(item => item.x))} ${branchY} H ${Math.max(...targets.map(item => item.x))}`,arrow:false});
+        targets.forEach(target => paths.push({d:`M ${target.x} ${branchY} V ${target.y - 7}`,arrow:true}));
       };
       connect('[data-tree-role="grandparent"]','[data-tree-role="parent"]');
       connect('[data-tree-role="parent"]','[data-tree-role="current"],[data-tree-role="sibling"]');
@@ -84,7 +84,7 @@ function FamilyConnectors({ rootRef, version }: { rootRef: RefObject<HTMLDivElem
     draw();
     return () => { window.clearTimeout(timer); observer.disconnect(); root.removeEventListener('transitionend',schedule); root.removeEventListener('click',schedule); root.removeEventListener('pointerover',schedule); root.removeEventListener('pointerout',schedule); window.removeEventListener('resize',schedule); };
   }, [rootRef,version]);
-  return <svg className="family-connector-layer" width={drawing.width} height={drawing.height} aria-hidden="true"><g>{drawing.paths.map((path,index) => <path d={path} key={`${index}-${path}`}/>)}</g></svg>;
+  return <svg className="family-connector-layer" width={drawing.width} height={drawing.height} aria-hidden="true"><defs><marker id="family-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" className="family-arrow-head"/></marker></defs><g>{drawing.paths.map((path,index) => <path d={path.d} markerEnd={path.arrow ? 'url(#family-arrow)' : undefined} key={`${index}-${path.d}`}/>)}</g></svg>;
 }
 
 function SearchableSelect({ value, placeholder, options, onChange, className = '' }: { value: string; placeholder: string; options: string[]; onChange: (value: string) => void; className?: string }) {
