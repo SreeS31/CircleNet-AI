@@ -438,8 +438,26 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 }
 .relationship-node-compact:hover .relationship-identity,
 .relationship-node-compact.is-expanded .relationship-identity {
+  min-width:0;
   min-height:5.2rem;
-  padding-right:8.5rem;
+  padding-right:0;
+}
+.relationship-node-compact:hover .relationship-node-main,
+.relationship-node-compact.is-expanded .relationship-node-main {
+  grid-template-columns:auto minmax(0,1fr)!important;
+  align-items:start!important;
+  padding-right:9.25rem;
+}
+.relationship-node-compact:hover .relationship-identity>div:last-child,
+.relationship-node-compact.is-expanded .relationship-identity>div:last-child {
+  align-items:center;
+  flex-wrap:wrap;
+  gap:.35rem;
+  margin-top:.4rem;
+}
+.relationship-node-compact:hover .relationship-identity>div:last-child>span,
+.relationship-node-compact.is-expanded .relationship-identity>div:last-child>span {
+  margin:0;
 }
 .relationship-node-compact:hover>.relationship-bottom-actions,
 .relationship-node-compact.is-expanded>.relationship-bottom-actions {
@@ -839,6 +857,18 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 .family-view-compact .family-graph-node .relationship-node-compact:not(:hover):not(.is-expanded),
 .family-view-compact .family-graph-node .self-node { min-height:88px; border-radius:.7rem; }
 .family-view-compact .family-graph-edges .graph-edge path { stroke-width:2; }
+.family-tree .relationship-node-compact:hover .relationship-node-main,
+.family-tree .relationship-node-compact.is-expanded .relationship-node-main {
+  grid-template-columns:auto minmax(0,1fr)!important;
+  align-items:start!important;
+  padding-right:9.25rem;
+}
+.family-tree .relationship-node-compact:hover .relationship-identity>div:last-child,
+.family-tree .relationship-node-compact.is-expanded .relationship-identity>div:last-child {
+  display:flex;
+  flex-wrap:wrap;
+  gap:.35rem;
+}
 
 @media (max-width: 820px) {
   .family-tree { padding:.75rem .5rem 1.5rem; }
