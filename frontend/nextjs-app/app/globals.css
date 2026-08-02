@@ -275,7 +275,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 
 .country-phone-input {
   display: grid;
-  grid-template-columns: minmax(110px, 145px) auto minmax(110px, 1fr);
+  grid-template-columns: minmax(135px, 170px) minmax(110px, 1fr);
   align-items: stretch;
   min-width: 0;
   overflow: hidden;
@@ -284,7 +284,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
   background: #fff;
 }
 
-.country-phone-input select,
 .country-phone-input input {
   width: 100%;
   min-width: 0;
@@ -298,32 +297,85 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
   font: inherit;
 }
 
-.country-phone-input select {
-  border-right: 1px solid #e2deed !important;
-  text-overflow: ellipsis;
-}
-
 .country-phone-input input:focus,
-.country-phone-input select:focus {
+.country-code-select:focus-within {
   position: relative;
   z-index: 1;
   outline: 2px solid #8c70e8;
   outline-offset: -2px;
 }
 
-.country-calling-code {
-  display: flex;
-  align-items: center;
-  padding: 0 .65rem;
+.country-code-select {
+  position: relative;
+  min-width: 0;
   border-right: 1px solid #e2deed;
-  background: #f7f4ff;
-  color: #55428f;
-  font-weight: 700;
-  white-space: nowrap;
 }
 
-.quick-add-form .country-phone-input input,
-.quick-add-form .country-phone-input select {
+.country-code-select > summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: .65rem 1.9rem .65rem .75rem;
+  overflow: hidden;
+  color: #182d52;
+  font: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  list-style: none;
+}
+
+.country-code-select > summary::-webkit-details-marker { display: none; }
+.country-code-select > summary::after { content: '⌄'; position: absolute; right: .7rem; color: #66569c; }
+
+.country-code-menu {
+  position: absolute;
+  top: calc(100% + .35rem);
+  left: 0;
+  z-index: 30;
+  width: min(300px, 80vw);
+  padding: .45rem;
+  border: 1px solid #d8d0ee;
+  border-radius: .85rem;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(42, 30, 79, .16);
+}
+
+.country-code-menu > input {
+  min-height: 38px;
+  padding: .5rem .65rem;
+  border: 1px solid #ddd7ec !important;
+  border-radius: .6rem !important;
+}
+
+.country-code-options {
+  max-height: 220px;
+  margin-top: .35rem;
+  overflow-y: auto;
+}
+
+.country-code-options button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .42rem .55rem;
+  border: 0;
+  border-radius: .5rem;
+  background: transparent;
+  color: #182d52;
+  font: inherit;
+  font-size: .86rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.country-code-options button:hover,
+.country-code-options button.selected { background: #eee9ff; color: #513ea2; }
+.country-code-options strong { font-size: .8rem; white-space: nowrap; }
+
+.quick-add-form .country-phone-input input {
   min-height: 48px;
   padding: .65rem;
 }

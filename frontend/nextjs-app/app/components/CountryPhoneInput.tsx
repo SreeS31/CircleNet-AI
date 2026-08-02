@@ -35,11 +35,15 @@ function nationalDigits(value: string, country: CountryCode) {
 
 export default function CountryPhoneInput({ value, onChange, required = false, className = '', placeholder = 'Mobile number', ariaLabel = 'Mobile number' }: Props) {
   const [country, setCountry] = useState<CountryCode>(() => initialCountry(value));
+  const [query, setQuery] = useState('');
   const digits = useMemo(() => nationalDigits(value, country), [value, country]);
   const callingCode = getCountryCallingCode(country);
+  const selectedCountry = countries.find(item => item.code === country)!;
+  const filteredCountries = countries.filter(item => `${item.name} ${item.callingCode}`.toLowerCase().includes(query.trim().toLowerCase()));
 
   const updateCountry = (next: CountryCode) => {
     setCountry(next);
+    setQuery('');
     onChange(digits ? `+${getCountryCallingCode(next)}${digits}` : '');
   };
 
@@ -49,10 +53,13 @@ export default function CountryPhoneInput({ value, onChange, required = false, c
   };
 
   return <div className={`country-phone-input ${className}`}>
-    <select value={country} onChange={event => updateCountry(event.target.value as CountryCode)} aria-label="Country calling code">
-      {countries.map(item => <option key={item.code} value={item.code}>{item.name} (+{item.callingCode})</option>)}
-    </select>
-    <span className="country-calling-code">+{callingCode}</span>
+    <details className="country-code-select">
+      <summary>{selectedCountry.name} (+{selectedCountry.callingCode})</summary>
+      <div className="country-code-menu">
+        <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search country or code" aria-label="Search country calling code"/>
+        <div className="country-code-options">{filteredCountries.map(item => <button type="button" className={item.code === country ? 'selected' : ''} key={item.code} onClick={event => { updateCountry(item.code); event.currentTarget.closest('details')?.removeAttribute('open'); }}><span>{item.name}</span><strong>+{item.callingCode}</strong></button>)}</div>
+      </div>
+    </details>
     <input type="tel" inputMode="tel" required={required} value={digits} onChange={event => updateNumber(event.target.value)} placeholder={placeholder} aria-label={ariaLabel}/>
   </div>;
 }
