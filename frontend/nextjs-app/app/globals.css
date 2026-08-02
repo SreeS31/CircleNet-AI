@@ -812,6 +812,34 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 .family-view-compact .lineage-child { min-width:82px; padding-top:.55rem; border-top:1px dashed #ddd6e7; }
 .family-view-compact .family-generation-descendants,.family-view-compact .family-other-connections { margin-top:.75rem; }
 
+/* Single scalable graph: legacy generation sections stay in the DOM only for data compatibility. */
+.unified-family-tree>.family-generation,
+.unified-family-tree>.anchored-family-section,
+.unified-family-tree>.family-other-connections,
+.unified-family-tree>.family-connector-layer { display:none!important; }
+.unified-family-tree { position:relative; min-height:420px; padding:.75rem; overflow:auto; }
+.family-graph-canvas { position:relative; min-width:100%; margin:0 auto; }
+.family-graph-edges { position:absolute; z-index:1; inset:0; overflow:visible; pointer-events:none; }
+.family-graph-edges .graph-edge path { fill:none; stroke:#665683; stroke-width:2.25; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.family-graph-edges marker path { fill:#665683; }
+.family-graph-edges text { paint-order:stroke; stroke:#fff; stroke-width:5px; stroke-linejoin:round; fill:#55436f; font-family:var(--font-app); font-size:10px; font-weight:800; text-anchor:middle; }
+.family-graph-edges .graph-edge-spouse path { stroke:#da789c; stroke-width:2.5; }
+.family-graph-edges .graph-edge-spouse text { fill:#d35682; font-size:15px; stroke-width:6px; }
+.family-graph-node { position:absolute; z-index:3; display:flex; justify-content:center; transition:left .2s ease,top .2s ease; }
+.family-graph-node:has(.relationship-node:hover),.family-graph-node:has(.relationship-node.is-expanded) { z-index:50; }
+.family-graph-node .relationship-node-compact:not(:hover):not(.is-expanded),
+.family-graph-node .self-node { width:100%!important; min-width:0!important; }
+.family-graph-node .relationship-node-compact:not(:hover):not(.is-expanded) { min-height:105px; padding:.25rem!important; border:1px solid #e0d9ec!important; border-radius:.85rem; background:rgba(255,255,255,.96); box-shadow:0 7px 18px rgba(52,37,78,.09)!important; }
+.family-graph-node .self-node { min-height:105px; justify-content:center; border:1px solid #cfc2ec!important; border-radius:.85rem; background:linear-gradient(155deg,#f2edff,#fff)!important; box-shadow:0 9px 22px rgba(76,53,137,.12)!important; }
+.family-graph-node .compact-relationship-label { top:-.62rem; }
+.family-view-heritage .family-graph-node .relationship-node-compact:not(:hover):not(.is-expanded),
+.family-view-heritage .family-graph-node .self-node { border-color:#d8c9b1!important; background:#fffaf0!important; box-shadow:0 6px 14px rgba(90,70,43,.08)!important; }
+.family-view-heritage .family-graph-edges .graph-edge path { stroke:#776957; }
+.family-view-heritage .family-graph-edges marker path { fill:#776957; }
+.family-view-compact .family-graph-node .relationship-node-compact:not(:hover):not(.is-expanded),
+.family-view-compact .family-graph-node .self-node { min-height:88px; border-radius:.7rem; }
+.family-view-compact .family-graph-edges .graph-edge path { stroke-width:2; }
+
 @media (max-width: 820px) {
   .family-tree { padding:.75rem .5rem 1.5rem; }
   .family-tree .family-household-row { grid-template-columns:1fr; gap:1.5rem; padding-top:1.5rem!important; }

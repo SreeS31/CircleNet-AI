@@ -335,6 +335,49 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const descendantTree = (children: NetworkRelationship[], depth = 0): ReactNode => children.length ? <div className={`lineage-descendants lineage-depth-${Math.min(depth,3)}`}><div className="lineage-children">{children.map(child => <div className="lineage-child" key={child.id}>{relationshipUnit(child)}{descendantTree(anchoredChildren(child.person.id),depth + 1)}</div>)}</div></div> : null;
   const siblingHousehold = (item: NetworkRelationship) => <div className="family-household" key={item.id}><div className="household-couple">{relationshipUnit(item,'sibling')}</div>{descendantTree(anchoredChildren(item.person.id))}</div>;
 
+  const graphLevelDelta = (type: string) => {
+    const key = type.trim().toLowerCase().replace(/[\s_-]+/g,'');
+    if (['grandparent','grandfather','grandmother'].includes(key)) return -2;
+    if (['parent','father','mother'].includes(key)) return -1;
+    if (['child','son','daughter'].includes(key)) return 1;
+    if (['grandchild','grandson','granddaughter'].includes(key)) return 2;
+    return 0;
+  };
+  const selfGraphId = -1;
+  const graphLevels = new Map<number,number>([[selfGraphId,0]]);
+  directRelationships.forEach(relationship => graphLevels.set(relationship.person.id,graphLevelDelta(relationship.type)));
+  for (let pass=0; pass<relationships.length + 2; pass++) relationships.forEach(relationship => {
+    if (!relationship.relativeToUserId || graphLevels.has(relationship.person.id) && graphLevels.has(relationship.relativeToUserId)) return;
+    const ownerLevel = graphLevels.get(relationship.relativeToUserId);
+    if (ownerLevel !== undefined) graphLevels.set(relationship.person.id,ownerLevel + graphLevelDelta(relationship.type));
+  });
+  relationships.forEach(relationship => { if (!graphLevels.has(relationship.person.id)) graphLevels.set(relationship.person.id,0); });
+  const graphPeople = [{ id:selfGraphId, name:username, photo:selfPhoto, self:true, relationship:null as NetworkRelationship | null },...relationships.map(relationship => ({ id:relationship.person.id,name:relationship.person.displayName,photo:relationship.person.profilePhoto || null,self:false,relationship }))];
+  const uniqueGraphPeople = Array.from(new Map(graphPeople.map(person => [person.id,person])).values());
+  const minGraphLevel = Math.min(...Array.from(graphLevels.values()));
+  const maxGraphLevel = Math.max(...Array.from(graphLevels.values()));
+  const graphNodeWidth = treeView === 'compact' ? 112 : 142;
+  const graphColumnGap = treeView === 'compact' ? 34 : 56;
+  const graphLevelHeight = treeView === 'compact' ? 122 : 152;
+  const peopleByLevel = new Map<number,typeof uniqueGraphPeople>();
+  uniqueGraphPeople.forEach(person => { const level=graphLevels.get(person.id) || 0; peopleByLevel.set(level,[...(peopleByLevel.get(level)||[]),person]); });
+  peopleByLevel.forEach((people,level) => people.sort((left,right) => {
+    if (left.self) return 0;
+    if (right.self) return 1;
+    const leftAnchor=left.relationship?.relativeToUserId || selfGraphId;
+    const rightAnchor=right.relationship?.relativeToUserId || selfGraphId;
+    if (leftAnchor !== rightAnchor) return leftAnchor-rightAnchor;
+    const leftSpouse=['spouse','husband','wife'].includes(relationKey(left.relationship!));
+    const rightSpouse=['spouse','husband','wife'].includes(relationKey(right.relationship!));
+    return Number(rightSpouse)-Number(leftSpouse) || left.name.localeCompare(right.name);
+  }));
+  const widestGraphLevel = Math.max(...Array.from(peopleByLevel.values()).map(people => people.length),1);
+  const graphCanvasWidth = Math.max(960,widestGraphLevel*(graphNodeWidth+graphColumnGap)+160);
+  const graphCanvasHeight = (maxGraphLevel-minGraphLevel+1)*graphLevelHeight+130;
+  const graphPositions = new Map<number,{x:number;y:number}>();
+  peopleByLevel.forEach((people,level) => { const rowWidth=people.length*graphNodeWidth+Math.max(0,people.length-1)*graphColumnGap; const start=(graphCanvasWidth-rowWidth)/2; people.forEach((person,index) => graphPositions.set(person.id,{x:start+index*(graphNodeWidth+graphColumnGap),y:55+(level-minGraphLevel)*graphLevelHeight})); });
+  const graphEdges = relationships.map(relationship => ({ relationship,source:relationship.relativeToUserId || selfGraphId,target:relationship.person.id })).filter(edge => graphPositions.has(edge.source)&&graphPositions.has(edge.target));
+
   return <main className="container user-network-dashboard">
     <header className="network-header">
       <div><p className="eyebrow">MY CIRCLENET</p><h1>Welcome, {username}</h1><p>Find people you know, define the relationship, and organize them into circles.</p></div>
@@ -387,7 +430,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
       <aside className="card create-circle-card"><p className="eyebrow">ORGANIZE</p><h2>Create a circle</h2><form onSubmit={createCircle}><input required value={circleName} onChange={e => setCircleName(e.target.value)} placeholder="Family, Close friends…" /><textarea value={circleDescription} onChange={e => setCircleDescription(e.target.value)} placeholder="Optional description" /><button className="btn btn-primary" disabled={busy}>Create circle</button></form></aside>
     </section>
 
-    <section className="network-section relationship-tree-section"><div className="section-heading"><div><p className="eyebrow">MY FAMILY TREE</p><h2>My relationships</h2><p className="family-tree-help">Choose a view and explore your family relationships.</p></div><div className="family-view-toolbar" role="group" aria-label="Family tree view"><button type="button" className={treeView === 'modern' ? 'selected' : ''} onClick={() => selectTreeView('modern')}><i>◇</i><span>Modern</span></button><button type="button" className={treeView === 'heritage' ? 'selected' : ''} onClick={() => selectTreeView('heritage')}><i>♧</i><span>Heritage</span></button><button type="button" className={treeView === 'compact' ? 'selected' : ''} onClick={() => selectTreeView('compact')}><i>▦</i><span>Compact</span></button></div><span>{relationships.length}</span></div>{relationships.length ? <div className={`family-tree family-view-${treeView}`} ref={familyTreeRef}><FamilyConnectors rootRef={familyTreeRef} version={`${relationships.map(item => `${item.id}:${item.type}`).join('|')}:${Object.keys(expandedRelationships).filter(id => expandedRelationships[Number(id)]).join(',')}`}/>
+    <section className="network-section relationship-tree-section"><div className="section-heading"><div><p className="eyebrow">MY FAMILY TREE</p><h2>My relationships</h2><p className="family-tree-help">One connected tree that grows automatically in every direction.</p></div><div className="family-view-toolbar" role="group" aria-label="Family tree view"><button type="button" className={treeView === 'modern' ? 'selected' : ''} onClick={() => selectTreeView('modern')}><i>◇</i><span>Modern</span></button><button type="button" className={treeView === 'heritage' ? 'selected' : ''} onClick={() => selectTreeView('heritage')}><i>♧</i><span>Heritage</span></button><button type="button" className={treeView === 'compact' ? 'selected' : ''} onClick={() => selectTreeView('compact')}><i>▦</i><span>Compact</span></button></div><span>{relationships.length}</span></div>{relationships.length ? <div className={`family-tree family-view-${treeView} unified-family-tree`} ref={familyTreeRef}><div className="family-graph-canvas" style={{width:graphCanvasWidth,height:graphCanvasHeight}}><svg className="family-graph-edges" width={graphCanvasWidth} height={graphCanvasHeight} aria-hidden="true"><defs><marker id="family-edge-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker></defs>{graphEdges.map(edge => { const source=graphPositions.get(edge.source)!; const target=graphPositions.get(edge.target)!; const spouse=['spouse','husband','wife'].includes(relationKey(edge.relationship)); const sx=source.x+graphNodeWidth/2, tx=target.x+graphNodeWidth/2, sy=source.y+52, ty=target.y+52; const middle=(sy+ty)/2; const path=spouse?`M ${sx} ${sy} H ${tx}`:`M ${sx} ${sy} V ${middle} H ${tx} V ${ty}`; return <g key={edge.relationship.id} className={spouse?'graph-edge graph-edge-spouse':'graph-edge'}><path d={path} markerEnd={spouse?undefined:'url(#family-edge-arrow)'}/><text x={(sx+tx)/2} y={spouse?sy-7:middle-6}>{spouse?'♥':edge.relationship.type}</text></g>; })}</svg>{uniqueGraphPeople.map(person => { const position=graphPositions.get(person.id)!; return <div className="family-graph-node" style={{left:position.x,top:position.y,width:graphNodeWidth}} key={person.id}>{person.self?<article className={`self-node ${genderClass({gender:selfGender} as NetworkPerson)}`}><PersonAvatar name={username} photo={selfPhoto} self/><div><strong>{username}</strong><small>You</small></div></article>:relationshipNode(person.relationship!)}</div>; })}</div>
       {grandparentRelationships.length > 0 && <section className="family-generation family-generation-ancestors"><p className="family-level-label">Grandparents · 2 levels above</p><div className="family-generation-row family-couple-row">{grandparentRelationships.map((item,index) => <div className="family-couple-member" key={item.id}>{index > 0 && <span className="family-heart-connector" aria-label="Couple">♥</span>}{relationshipUnit(item,'grandparent')}</div>)}</div></section>}
       {parentRelationships.length > 0 && <section className={`family-generation family-generation-parents ${grandparentRelationships.length ? 'connected-from-above' : ''}`}><p className="family-level-label">Parents · 1 level above</p>{grandparentRelationships.length > 0 && <FamilyBranch targets={parentRelationships.length}/>}<div className="family-generation-row family-couple-row">{parentRelationships.map((item,index) => <div className="family-couple-member" key={item.id}>{index > 0 && <span className="family-heart-connector" aria-label="Couple">♥</span>}{relationshipNode(item,false,'parent')}</div>)}</div></section>}
       <section className={`family-generation family-generation-current family-lineage-generation ${parentRelationships.length || grandparentRelationships.length ? 'connected-from-above' : ''}`}><p className="family-level-label">Your generation and households</p>{(parentRelationships.length > 0 || grandparentRelationships.length > 0) && <FamilyBranch targets={siblingRelationships.length + 1}/>}<div className="family-generation-row family-peer-row family-household-row">{siblingRelationships.slice(0,Math.ceil(siblingRelationships.length / 2)).map(siblingHousehold)}<div className="family-household family-self-household"><div className="family-self-family"><div className={`partnership-row ${spouseRelationships.length ? 'has-spouse' : ''}`}><article className={`self-node ${genderClass({gender:selfGender} as NetworkPerson)}`} data-tree-role="current"><PersonAvatar name={username} photo={selfPhoto} self/><div><strong>{username}</strong><small>You</small></div></article>{spouseRelationships.map(item => <div className="spouse-pair" key={item.id}><span className="partner-connector"><i>♥</i></span>{relationshipNode(item,true,'current-spouse')}</div>)}</div></div>{descendantTree(childRelationships)}</div>{siblingRelationships.slice(Math.ceil(siblingRelationships.length / 2)).map(siblingHousehold)}</div></section>
