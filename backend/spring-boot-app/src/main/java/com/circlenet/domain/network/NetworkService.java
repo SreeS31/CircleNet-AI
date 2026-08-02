@@ -302,10 +302,11 @@ public class NetworkService {
         user.getSurname() == null ? "" : user.getSurname()).trim();
     if (contactName != null && !contactName.isBlank()) displayName = contactName.trim();
     if (displayName.isBlank()) displayName = profileDisplayName(user);
+    String gender = profileRepository.findById(user.getId()).map(profile -> profile.getGender()).orElse(null);
     return new NetworkPersonDto(user.getId(), user.getFirstName(), user.getSurname(),
         displayName, null, user.getLocation(), user.getAccountStatus(),
         profileRepository.findById(user.getId()).map(profile -> profile.getProfilePhoto()).orElse(null),
-        user.getIdentityType(), user.getManagedCategory(), user.getClaimStatus());
+        user.getIdentityType(), user.getManagedCategory(), user.getClaimStatus(), gender);
   }
 
   private NetworkRelationshipDto relationshipDto(RelationshipEntity relationship, UserEntity person) {
