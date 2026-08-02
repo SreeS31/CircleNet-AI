@@ -61,7 +61,11 @@ function FamilyConnectors({ rootRef, version }: { rootRef: RefObject<HTMLDivElem
         const centerX = sources.reduce((sum,item) => sum + item.x,0) / sources.length;
         const joinY = sourceBottom + Math.max(18,(targetTop - sourceBottom) * .32);
         const branchY = targetTop - Math.max(18,(targetTop - sourceBottom) * .28);
-        sources.forEach(source => paths.push({d:`M ${source.x} ${source.y} V ${joinY} H ${centerX}`,arrow:false}));
+        sources.forEach(source => {
+          const direction = source.x <= centerX ? 1 : -1;
+          const radius = Math.min(12,Math.abs(centerX - source.x) / 2);
+          paths.push({d:`M ${source.x} ${source.y} V ${joinY - radius} Q ${source.x} ${joinY} ${source.x + direction * radius} ${joinY} H ${centerX}`,arrow:false});
+        });
         paths.push({d:`M ${centerX} ${joinY} V ${branchY}`,arrow:false});
         if (targets.length > 1) paths.push({d:`M ${Math.min(...targets.map(item => item.x))} ${branchY} H ${Math.max(...targets.map(item => item.x))}`,arrow:false});
         targets.forEach(target => paths.push({d:`M ${target.x} ${branchY} V ${target.y - 7}`,arrow:true}));
@@ -84,7 +88,7 @@ function FamilyConnectors({ rootRef, version }: { rootRef: RefObject<HTMLDivElem
     draw();
     return () => { window.clearTimeout(timer); observer.disconnect(); root.removeEventListener('transitionend',schedule); root.removeEventListener('click',schedule); root.removeEventListener('pointerover',schedule); root.removeEventListener('pointerout',schedule); window.removeEventListener('resize',schedule); };
   }, [rootRef,version]);
-  return <svg className="family-connector-layer" width={drawing.width} height={drawing.height} aria-hidden="true"><defs><marker id="family-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" className="family-arrow-head"/></marker></defs><g>{drawing.paths.map((path,index) => <path d={path.d} markerEnd={path.arrow ? 'url(#family-arrow)' : undefined} key={`${index}-${path.d}`}/>)}</g></svg>;
+  return <svg className="family-connector-layer" width={drawing.width} height={drawing.height} aria-hidden="true"><g>{drawing.paths.map((path,index) => <path d={path.d} key={`${index}-${path.d}`}/>)}</g></svg>;
 }
 
 function SearchableSelect({ value, placeholder, options, onChange, className = '' }: { value: string; placeholder: string; options: string[]; onChange: (value: string) => void; className?: string }) {
