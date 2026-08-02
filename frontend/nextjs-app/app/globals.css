@@ -272,6 +272,65 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 .searchable-select { position:relative; min-width:0; font-family:var(--font-app); }.searchable-select>summary { min-height:48px; padding:.68rem 2.1rem .68rem .75rem; display:flex; align-items:center; position:relative; list-style:none; cursor:pointer; border:1px solid var(--border); border-radius:var(--radius-md); color:var(--text-body); background:var(--surface); font-family:var(--font-app); font-size:.9rem; font-weight:500; line-height:1.35; }.searchable-select>summary::-webkit-details-marker { display:none; }.searchable-select>summary::after { content:''; position:absolute; right:.85rem; top:50%; width:.42rem; height:.42rem; border-right:1.5px solid #594a78; border-bottom:1.5px solid #594a78; transform:translateY(-70%) rotate(45deg); }.searchable-select[open]>summary::after { transform:translateY(-30%) rotate(225deg); }.searchable-select[open]>summary { border-color:#8b76d2; box-shadow:0 0 0 3px rgba(112,91,208,.12); }.searchable-select>summary.placeholder { color:var(--text-muted); }.searchable-select-menu { position:absolute; z-index:60; top:calc(100% + .35rem); left:0; width:max(100%,220px); padding:.3rem; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface); box-shadow:0 14px 30px rgba(50,37,78,.16); }.searchable-select-menu>input { width:100%; min-height:34px; padding:.38rem .55rem; font-size:.78rem; }.searchable-select-menu>div { max-height:190px; margin-top:.25rem; display:grid; gap:.1rem; overflow-y:auto; }.searchable-select-menu button { min-height:32px; padding:.38rem .55rem; display:flex; align-items:center; justify-content:space-between; border:0; border-radius:.45rem; color:var(--text-body); background:transparent; font-family:var(--font-app); font-size:.79rem; font-weight:500; line-height:1.3; text-align:left; cursor:pointer; }.searchable-select-menu button:hover,.searchable-select-menu button.selected { color:var(--brand-dark); background:var(--brand-soft); }.searchable-select-menu button strong { color:var(--verified); }.searchable-select-menu p { margin:.25rem; padding:.4rem; color:var(--text-muted); font-size:.78rem; }.quick-add-form>.searchable-select { align-self:stretch; }.people-controls>.searchable-select { min-width:145px; }
 .circle-root-copy { min-width:0; flex:1; }.circle-edit-trigger { align-self:flex-start; color:#5846a1; background:rgba(255,255,255,.9); }.circle-edit-trigger:hover { background:white; }.circle-edit-panel { width:min(100%,620px); margin:1rem auto 0; padding:1rem; display:grid; grid-template-columns:1fr 1.5fr auto; align-items:end; gap:.7rem; border:1px solid #d8cff0; border-radius:1rem; background:#faf8ff; }.circle-edit-panel label { display:grid; gap:.35rem; color:#625878; font-size:.78rem; font-weight:800; }.circle-edit-panel input,.circle-edit-panel textarea { width:100%; min-height:44px; padding:.65rem .75rem; border:1px solid #d8d2e6; border-radius:.7rem; background:white; }.circle-edit-panel textarea { min-height:70px; resize:vertical; }.circle-edit-panel>div { display:flex; gap:.4rem; padding-bottom:.25rem; }
 .quick-add-identity { grid-column:1/-1; grid-row:1; }.quick-add-name { grid-column:1; grid-row:2; }.quick-add-mobile { grid-column:2; grid-row:2; }.quick-add-relationship { grid-column:3; grid-row:2; }.quick-add-email { grid-column:1/3; grid-row:3; }.quick-add-visibility { grid-column:3; grid-row:3; }.quick-add-company { grid-column:1/3; grid-row:4; }.quick-add-form .btn { grid-column:3; grid-row:5; }
+
+.country-phone-input {
+  display: grid;
+  grid-template-columns: minmax(110px, 145px) auto minmax(110px, 1fr);
+  align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #d8d4e7;
+  border-radius: .7rem;
+  background: #fff;
+}
+
+.country-phone-input select,
+.country-phone-input input {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: .7rem;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #fff;
+  color: #182d52;
+  font: inherit;
+}
+
+.country-phone-input select {
+  border-right: 1px solid #e2deed !important;
+  text-overflow: ellipsis;
+}
+
+.country-phone-input input:focus,
+.country-phone-input select:focus {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #8c70e8;
+  outline-offset: -2px;
+}
+
+.country-calling-code {
+  display: flex;
+  align-items: center;
+  padding: 0 .65rem;
+  border-right: 1px solid #e2deed;
+  background: #f7f4ff;
+  color: #55428f;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.quick-add-form .country-phone-input input,
+.quick-add-form .country-phone-input select {
+  min-height: 48px;
+  padding: .65rem;
+}
+
+.relationship-edit-panel .country-phone-input {
+  grid-column: 1 / -1;
+}
 .managed-person-fields { grid-column:1/-1; grid-row:4; display:grid; grid-template-columns:repeat(3,minmax(150px,1fr)); gap:.65rem; padding:.8rem; border:1px solid #ded7fa; border-radius:.8rem; background:#fbfaff; }.managed-person-fields label { display:grid; gap:.25rem; color:var(--text-muted); font-size:.78rem; font-weight:700; }.managed-person-fields textarea { grid-column:1/-1; min-height:72px; }.managed-person-fields p { grid-column:1/-1; margin:0; font-size:.8rem; }.status-managed { color:#28548f; background:#e4f1ff; }.status-memorial { color:#665873; background:#eee8f2; }
 .person-type-choice { min-width:0; margin:0; padding:.35rem; display:flex; align-items:stretch; gap:.45rem; border:1px solid var(--border); border-radius:var(--radius-md); background:#faf9ff; }.person-type-choice legend { padding:0 .35rem; color:var(--text-muted); font-size:.74rem; font-weight:750; }.person-type-choice label { min-width:0; flex:1; padding:.55rem .7rem; display:flex; align-items:center; gap:.55rem; border:1px solid transparent; border-radius:.65rem; cursor:pointer; }.person-type-choice label:has(input:checked) { border-color:#a894e6; background:#eee9ff; }.person-type-choice input { width:1rem; height:1rem; flex:0 0 auto; min-height:0; padding:0; accent-color:var(--brand); }.person-type-choice span { min-width:0; display:grid; gap:.08rem; }.person-type-choice strong { color:var(--text-body); font-size:.84rem; }.person-type-choice small { color:var(--text-muted); font-size:.72rem; font-weight:500; }
 

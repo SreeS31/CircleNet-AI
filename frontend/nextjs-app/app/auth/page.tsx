@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
 import { ApiError, createUser, hasAuthSession, login } from '../lib/api';
+import CountryPhoneInput from '../components/CountryPhoneInput';
 
 function AuthForm() {
   const router = useRouter();
@@ -101,7 +102,7 @@ function AuthForm() {
         </form> : <form onSubmit={handleRegistration} className="registration-form">
           <div className="registration-row"><label><span>First name</span><input required value={profile.firstName} onChange={e => setProfile({...profile, firstName:e.target.value})} /></label><label><span>Surname</span><input required value={profile.surname} onChange={e => setProfile({...profile, surname:e.target.value})} /></label></div>
           <label><span>Username</span><input required value={profile.username} onChange={e => setProfile({...profile, username:e.target.value})} /></label>
-          <label><span>Mobile number</span><input type="tel" required value={profile.phoneNumber} onChange={e => setProfile({...profile, phoneNumber:e.target.value})} placeholder="+919876543210" /></label>
+          <label><span>Mobile number</span><CountryPhoneInput required value={profile.phoneNumber} onChange={phoneNumber => setProfile({...profile, phoneNumber})}/></label>
           <label><span>Email (optional)</span><input type="email" value={profile.email} onChange={e => setProfile({...profile, email:e.target.value})} /></label>
           <label><span>Location</span><input required value={profile.location} onChange={e => setProfile({...profile, location:e.target.value})} placeholder="Bengaluru" /></label>
           <label><span>Password</span><input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} /></label>
