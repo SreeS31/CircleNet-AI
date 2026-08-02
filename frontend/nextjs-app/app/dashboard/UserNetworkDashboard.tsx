@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { addMemberToMyCircle, addMyRelationship, addPersonToMyNetwork, ApiError, createMyCircle, fetchMyCircles,
   fetchMyRelationships, fetchRelationshipTypes, fetchUserProfile, logout, NetworkCircle, NetworkPerson, NetworkRelationship,
@@ -41,6 +41,52 @@ function genderClass(person: NetworkPerson, relationshipType = '') {
 
 const relationKey = (relationship: NetworkRelationship) => relationship.type.trim().toLowerCase().replace(/[\s_-]+/g, '');
 
+function FamilyConnectors({ rootRef, version }: { rootRef: RefObject<HTMLDivElement | null>; version: string }) {
+  const [drawing, setDrawing] = useState({ width:0, height:0, paths:[] as string[] });
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    let timer = 0;
+    const draw = () => {
+      const rootBox = root.getBoundingClientRect();
+      const point = (element: Element, edge: 'top' | 'bottom') => { const box = element.getBoundingClientRect(); return { x:box.left - rootBox.left + root.scrollLeft + box.width / 2, y:(edge === 'top' ? box.top : box.bottom) - rootBox.top + root.scrollTop }; };
+      const paths: string[] = [];
+      const connect = (sourceSelector: string, targetSelector: string) => {
+        const sources = Array.from(root.querySelectorAll(sourceSelector)).map(node => point(node,'bottom'));
+        const targets = Array.from(root.querySelectorAll(targetSelector)).map(node => point(node,'top'));
+        if (!sources.length || !targets.length) return;
+        const sourceBottom = Math.max(...sources.map(item => item.y));
+        const targetTop = Math.min(...targets.map(item => item.y));
+        if (targetTop <= sourceBottom) return;
+        const centerX = sources.reduce((sum,item) => sum + item.x,0) / sources.length;
+        const joinY = sourceBottom + Math.max(18,(targetTop - sourceBottom) * .32);
+        const branchY = targetTop - Math.max(18,(targetTop - sourceBottom) * .28);
+        sources.forEach(source => paths.push(`M ${source.x} ${source.y} V ${joinY} H ${centerX}`));
+        paths.push(`M ${centerX} ${joinY} V ${branchY}`);
+        if (targets.length > 1) paths.push(`M ${Math.min(...targets.map(item => item.x))} ${branchY} H ${Math.max(...targets.map(item => item.x))}`);
+        targets.forEach(target => paths.push(`M ${target.x} ${branchY} V ${target.y}`));
+      };
+      connect('[data-tree-role="grandparent"]','[data-tree-role="parent"]');
+      connect('[data-tree-role="parent"]','[data-tree-role="current"],[data-tree-role="sibling"]');
+      connect('[data-tree-role="current"],[data-tree-role="current-spouse"]','[data-tree-role="child"]');
+      connect('[data-tree-role="child"]','[data-tree-role="grandchild"]');
+      setDrawing({width:root.scrollWidth,height:root.scrollHeight,paths});
+    };
+    const schedule = () => { window.clearTimeout(timer); timer = window.setTimeout(draw,40); };
+    const observer = new ResizeObserver(schedule);
+    observer.observe(root);
+    root.querySelectorAll('[data-tree-role]').forEach(node => observer.observe(node));
+    root.addEventListener('transitionend',schedule);
+    root.addEventListener('click',schedule);
+    root.addEventListener('pointerover',schedule);
+    root.addEventListener('pointerout',schedule);
+    window.addEventListener('resize',schedule);
+    draw();
+    return () => { window.clearTimeout(timer); observer.disconnect(); root.removeEventListener('transitionend',schedule); root.removeEventListener('click',schedule); root.removeEventListener('pointerover',schedule); root.removeEventListener('pointerout',schedule); window.removeEventListener('resize',schedule); };
+  }, [rootRef,version]);
+  return <svg className="family-connector-layer" width={drawing.width} height={drawing.height} aria-hidden="true"><g>{drawing.paths.map((path,index) => <path d={path} key={`${index}-${path}`}/>)}</g></svg>;
+}
+
 function SearchableSelect({ value, placeholder, options, onChange, className = '' }: { value: string; placeholder: string; options: string[]; onChange: (value: string) => void; className?: string }) {
   const [query, setQuery] = useState('');
   const filtered = options.filter(option => option.toLowerCase().includes(query.trim().toLowerCase()));
@@ -55,6 +101,7 @@ function SearchableSelect({ value, placeholder, options, onChange, className = '
 
 export default function UserNetworkDashboard({ username }: { username: string }) {
   const router = useRouter();
+  const familyTreeRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<NetworkPerson[]>([]);
   const [relationships, setRelationships] = useState<NetworkRelationship[]>([]);
@@ -239,14 +286,14 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const ownedCircles = circles.filter(circle => circle.ownedByCurrentUser);
   const administeredCircles = circles.filter(circle => circle.currentUserAdmin);
 
-  const relationshipNode = (item: NetworkRelationship, paired = false) => {
+  const relationshipNode = (item: NetworkRelationship, paired = false, treeRole = '') => {
     const availableCircles = administeredCircles.filter(circle => !circle.members.some(member => member.person.id === item.person.id));
     const allCirclesContainPerson = administeredCircles.length > 0 && availableCircles.length === 0;
     const circleQuery = (circleSearch[item.id] || '').trim().toLowerCase();
     const filteredCircles = administeredCircles.filter(circle => !circleQuery || circle.name.toLowerCase().includes(circleQuery));
     const expanded = Boolean(expandedRelationships[item.id]) || editingRelationship?.id === item.id;
     const toggleExpanded = () => setExpandedRelationships(current => ({...current,[item.id]:!current[item.id]}));
-    return <article className={`relationship-node relationship-node-compact ${expanded ? 'is-expanded' : ''} ${paired ? 'spouse-node' : ''} ${genderClass(item.person, item.type)}`} key={item.id} tabIndex={0} aria-label={`${item.person.displayName}, ${item.type}. Click to ${expanded ? 'collapse' : 'show details'}.`} onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,select,textarea,summary')) toggleExpanded(); }} onKeyDown={event => { if (!(event.target as HTMLElement).closest('button,a,input,select,textarea,summary') && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleExpanded(); } }}>
+    return <article className={`relationship-node relationship-node-compact ${expanded ? 'is-expanded' : ''} ${paired ? 'spouse-node' : ''} ${genderClass(item.person, item.type)}`} key={item.id} data-tree-role={treeRole || undefined} tabIndex={0} aria-label={`${item.person.displayName}, ${item.type}. Click to ${expanded ? 'collapse' : 'show details'}.`} onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,select,textarea,summary')) toggleExpanded(); }} onKeyDown={event => { if (!(event.target as HTMLElement).closest('button,a,input,select,textarea,summary') && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleExpanded(); } }}>
     <span className="compact-relationship-label">{item.type}</span><div className="relationship-node-main"><PersonAvatar name={item.person.displayName} photo={item.person.profilePhoto}/><div className="relationship-identity"><strong>{item.person.displayName}</strong><div className="private-contact-display">{item.contactPhone && <span><i aria-hidden="true">☎</i>{item.contactPhone}</span>}{item.contactEmail && <span><i aria-hidden="true">✉</i>{item.contactEmail}</span>}</div><div><span className="relationship-badge">{item.type}</span><span className="status-tag status-view">{visibilityOptions.find(option => option.value === item.visibilityScope)?.label || 'Friends'}{item.visibilityCompany ? ` · ${item.visibilityCompany}` : ''}</span><PersonStatus person={item.person}/></div></div><div className="relationship-actions"><button className="action-tag action-tag-admin" onClick={() => setEditingRelationship({ id:item.id, contactName:item.person.displayName, contactPhone:item.contactPhone || '', contactEmail:item.contactEmail || '', type:item.type, visibilityScope:item.visibilityScope || 'FRIENDS', visibilityCompany:item.visibilityCompany || '' })}>Edit</button><button className="action-tag action-tag-danger" onClick={async () => { await removeMyRelationship(item.id); await refresh(); }}>Remove</button></div></div>
     {editingRelationship?.id === item.id && <div className="relationship-edit-panel"><label><span>Person name</span><input required value={editingRelationship.contactName} onChange={e => setEditingRelationship({...editingRelationship,contactName:e.target.value})}/></label><label><span>Mobile number</span><input type="tel" value={editingRelationship.contactPhone} onChange={e => setEditingRelationship({...editingRelationship,contactPhone:e.target.value})} placeholder="Private contact mobile"/></label><label><span>Email address</span><input type="email" value={editingRelationship.contactEmail} onChange={e => setEditingRelationship({...editingRelationship,contactEmail:e.target.value})} placeholder="Private contact email"/></label><label><span>Relationship</span><SearchableSelect value={editingRelationship.type} placeholder="Relation" options={relationshipTypes} onChange={type => setEditingRelationship({...editingRelationship,type})}/></label><label><span>View</span><SearchableSelect value={visibilityLabel(editingRelationship.visibilityScope)} placeholder="View" options={visibilityLabels} onChange={label => setEditingRelationship({...editingRelationship,visibilityScope:visibilityValue(label) as VisibilityScope})}/></label>{editingRelationship.visibilityScope === 'COLLEAGUES' && <label><span>Company</span><SearchableSelect value={editingRelationship.visibilityCompany} placeholder="Company" options={employmentCompanies} onChange={visibilityCompany => setEditingRelationship({...editingRelationship,visibilityCompany})}/></label>}<p className="private-contact-note">Mobile and email are private to your relationship record and are never shown to other users.</p><div className="relationship-edit-actions"><button type="button" className="action-tag action-tag-admin" disabled={busy || !editingRelationship.contactName.trim()} onClick={saveRelationshipEdit}>Save</button><button type="button" className="action-tag action-tag-danger" disabled={busy} onClick={() => setEditingRelationship(null)}>Cancel</button></div></div>}
     <details className="circle-picker"><summary className={`action-tag action-tag-admin ${!administeredCircles.length || allCirclesContainPerson ? 'disabled' : ''}`}>{allCirclesContainPerson ? '✓ In all circles' : 'Add to circle'}</summary><div className="circle-picker-menu"><input className="circle-picker-search" type="search" value={circleSearch[item.id] || ''} onChange={e => setCircleSearch({...circleSearch,[item.id]:e.target.value})} placeholder="Search circles…" aria-label="Search circles"/>{filteredCircles.map(circle => { const alreadyAdded = circle.members.some(member => member.person.id === item.person.id); return <button type="button" className={alreadyAdded ? 'circle-already-added' : ''} key={circle.id} disabled={busy || alreadyAdded} onClick={event => { void addToCircle(item.person, circle.id); event.currentTarget.closest('details')?.removeAttribute('open'); }}><span>{circle.name}</span>{alreadyAdded && <strong aria-label="Already in this circle">✓ Added</strong>}</button>; })}{!administeredCircles.length && <span>No circles you administer</span>}{administeredCircles.length > 0 && filteredCircles.length === 0 && <span>No matching circles</span>}</div></details>
@@ -304,12 +351,12 @@ export default function UserNetworkDashboard({ username }: { username: string })
       <aside className="card create-circle-card"><p className="eyebrow">ORGANIZE</p><h2>Create a circle</h2><form onSubmit={createCircle}><input required value={circleName} onChange={e => setCircleName(e.target.value)} placeholder="Family, Close friends…" /><textarea value={circleDescription} onChange={e => setCircleDescription(e.target.value)} placeholder="Optional description" /><button className="btn btn-primary" disabled={busy}>Create circle</button></form></aside>
     </section>
 
-    <section className="network-section relationship-tree-section"><div className="section-heading"><div><p className="eyebrow">MY FAMILY TREE</p><h2>My relationships</h2><p className="family-tree-help">Generations are arranged automatically as relationships are added.</p></div><span>{relationships.length}</span></div>{relationships.length ? <div className="family-tree">
-      {grandparentRelationships.length > 0 && <section className="family-generation family-generation-ancestors"><p className="family-level-label">Grandparents · 2 levels above</p><div className="family-generation-row family-couple-row">{grandparentRelationships.map((item,index) => <div className="family-couple-member" key={item.id}>{index > 0 && <span className="family-heart-connector" aria-label="Couple">♥</span>}{relationshipNode(item)}</div>)}</div></section>}
-      {parentRelationships.length > 0 && <section className={`family-generation family-generation-parents ${grandparentRelationships.length ? 'connected-from-above' : ''}`}><p className="family-level-label">Parents · 1 level above</p><div className="family-generation-row family-couple-row">{parentRelationships.map((item,index) => <div className="family-couple-member" key={item.id}>{index > 0 && <span className="family-heart-connector" aria-label="Couple">♥</span>}{relationshipNode(item)}</div>)}</div></section>}
-      <section className={`family-generation family-generation-current ${parentRelationships.length || grandparentRelationships.length ? 'connected-from-above' : ''}`}><p className="family-level-label">Your generation</p><div className="family-generation-row family-peer-row">{siblingRelationships.slice(0,Math.ceil(siblingRelationships.length / 2)).map(item => <div className="family-peer" key={item.id}>{relationshipNode(item)}</div>)}<div className="family-self-family"><div className={`partnership-row ${spouseRelationships.length ? 'has-spouse' : ''}`}><article className={`self-node ${genderClass({gender:selfGender} as NetworkPerson)}`}><PersonAvatar name={username} photo={selfPhoto} self/><div><strong>{username}</strong><small>You</small></div></article>{spouseRelationships.map(item => <div className="spouse-pair" key={item.id}><span className="partner-connector"><i>♥</i></span>{relationshipNode(item, true)}</div>)}</div></div>{siblingRelationships.slice(Math.ceil(siblingRelationships.length / 2)).map(item => <div className="family-peer" key={item.id}>{relationshipNode(item)}</div>)}</div></section>
-      {childRelationships.length > 0 && <section className="family-generation family-generation-descendants connected-from-above"><p className="family-level-label">Children · 1 level below</p><div className="family-generation-row">{childRelationships.map(item => <div className="family-descendant" key={item.id}>{relationshipNode(item)}</div>)}</div></section>}
-      {grandchildRelationships.length > 0 && <section className="family-generation family-generation-descendants connected-from-above"><p className="family-level-label">Grandchildren · 2 levels below</p><div className="family-generation-row">{grandchildRelationships.map(item => <div className="family-descendant" key={item.id}>{relationshipNode(item)}</div>)}</div></section>}
+    <section className="network-section relationship-tree-section"><div className="section-heading"><div><p className="eyebrow">MY FAMILY TREE</p><h2>My relationships</h2><p className="family-tree-help">Generations are arranged automatically as relationships are added.</p></div><span>{relationships.length}</span></div>{relationships.length ? <div className="family-tree" ref={familyTreeRef}><FamilyConnectors rootRef={familyTreeRef} version={`${relationships.map(item => `${item.id}:${item.type}`).join('|')}:${Object.keys(expandedRelationships).filter(id => expandedRelationships[Number(id)]).join(',')}`}/>
+      {grandparentRelationships.length > 0 && <section className="family-generation family-generation-ancestors"><p className="family-level-label">Grandparents · 2 levels above</p><div className="family-generation-row family-couple-row">{grandparentRelationships.map((item,index) => <div className="family-couple-member" key={item.id}>{index > 0 && <span className="family-heart-connector" aria-label="Couple">♥</span>}{relationshipNode(item,false,'grandparent')}</div>)}</div></section>}
+      {parentRelationships.length > 0 && <section className={`family-generation family-generation-parents ${grandparentRelationships.length ? 'connected-from-above' : ''}`}><p className="family-level-label">Parents · 1 level above</p><div className="family-generation-row family-couple-row">{parentRelationships.map((item,index) => <div className="family-couple-member" key={item.id}>{index > 0 && <span className="family-heart-connector" aria-label="Couple">♥</span>}{relationshipNode(item,false,'parent')}</div>)}</div></section>}
+      <section className={`family-generation family-generation-current ${parentRelationships.length || grandparentRelationships.length ? 'connected-from-above' : ''}`}><p className="family-level-label">Your generation</p><div className="family-generation-row family-peer-row">{siblingRelationships.slice(0,Math.ceil(siblingRelationships.length / 2)).map(item => <div className="family-peer" key={item.id}>{relationshipNode(item,false,'sibling')}</div>)}<div className="family-self-family"><div className={`partnership-row ${spouseRelationships.length ? 'has-spouse' : ''}`}><article className={`self-node ${genderClass({gender:selfGender} as NetworkPerson)}`} data-tree-role="current"><PersonAvatar name={username} photo={selfPhoto} self/><div><strong>{username}</strong><small>You</small></div></article>{spouseRelationships.map(item => <div className="spouse-pair" key={item.id}><span className="partner-connector"><i>♥</i></span>{relationshipNode(item,true,'current-spouse')}</div>)}</div></div>{siblingRelationships.slice(Math.ceil(siblingRelationships.length / 2)).map(item => <div className="family-peer" key={item.id}>{relationshipNode(item,false,'sibling')}</div>)}</div></section>
+      {childRelationships.length > 0 && <section className="family-generation family-generation-descendants connected-from-above"><p className="family-level-label">Children · 1 level below</p><div className="family-generation-row">{childRelationships.map(item => <div className="family-descendant" key={item.id}>{relationshipNode(item,false,'child')}</div>)}</div></section>}
+      {grandchildRelationships.length > 0 && <section className="family-generation family-generation-descendants connected-from-above"><p className="family-level-label">Grandchildren · 2 levels below</p><div className="family-generation-row">{grandchildRelationships.map(item => <div className="family-descendant" key={item.id}>{relationshipNode(item,false,'grandchild')}</div>)}</div></section>}
       {otherRelationships.length > 0 && <section className="family-other-connections"><p className="family-level-label">Other connections</p><div className="family-generation-row">{otherRelationships.map(item => <div className="family-peer" key={item.id}>{relationshipNode(item)}</div>)}</div></section>}
     </div> : <p className="circle-empty-state">Add someone above to start your family tree.</p>}</section>
 
