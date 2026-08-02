@@ -278,7 +278,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
   grid-template-columns: minmax(135px, 170px) minmax(110px, 1fr);
   align-items: stretch;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid #d8d4e7;
   border-radius: .7rem;
   background: #fff;
@@ -297,6 +297,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
   font: inherit;
 }
 
+.country-phone-input > input {
+  border-radius: 0 .7rem .7rem 0 !important;
+}
+
 .country-phone-input input:focus,
 .country-code-select:focus-within {
   position: relative;
@@ -309,16 +313,21 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
   position: relative;
   min-width: 0;
   border-right: 1px solid #e2deed;
+  font-family: var(--font-app);
 }
 
 .country-code-select > summary {
   display: flex;
   align-items: center;
   min-height: 48px;
-  padding: .65rem 1.9rem .65rem .75rem;
+  position: relative;
+  padding: .68rem 2.1rem .68rem .75rem;
   overflow: hidden;
   color: #182d52;
-  font: inherit;
+  font-family: var(--font-app);
+  font-size: .9rem;
+  font-weight: 500;
+  line-height: 1.35;
   white-space: nowrap;
   text-overflow: ellipsis;
   cursor: pointer;
@@ -326,31 +335,36 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 }
 
 .country-code-select > summary::-webkit-details-marker { display: none; }
-.country-code-select > summary::after { content: '⌄'; position: absolute; right: .7rem; color: #66569c; }
+.country-code-select > summary::after { content: ''; position: absolute; right: .85rem; top: 50%; width: .42rem; height: .42rem; border-right: 1.5px solid #594a78; border-bottom: 1.5px solid #594a78; transform: translateY(-70%) rotate(45deg); }
+.country-code-select[open] > summary::after { transform: translateY(-30%) rotate(225deg); }
+.country-code-select[open] > summary { box-shadow: 0 0 0 3px rgba(112,91,208,.12); }
 
 .country-code-menu {
   position: absolute;
   top: calc(100% + .35rem);
   left: 0;
-  z-index: 30;
+  z-index: 60;
   width: min(300px, 80vw);
-  padding: .45rem;
-  border: 1px solid #d8d0ee;
-  border-radius: .85rem;
-  background: #fff;
-  box-shadow: 0 14px 34px rgba(42, 30, 79, .16);
+  padding: .3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 14px 30px rgba(50,37,78,.16);
 }
 
 .country-code-menu > input {
-  min-height: 38px;
-  padding: .5rem .65rem;
-  border: 1px solid #ddd7ec !important;
-  border-radius: .6rem !important;
+  min-height: 34px;
+  padding: .38rem .55rem;
+  border: 1px solid var(--border) !important;
+  border-radius: .55rem !important;
+  font-size: .78rem;
 }
 
 .country-code-options {
-  max-height: 220px;
-  margin-top: .35rem;
+  max-height: 190px;
+  margin-top: .25rem;
+  display: grid;
+  gap: .1rem;
   overflow-y: auto;
 }
 
@@ -360,20 +374,24 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
   align-items: center;
   justify-content: space-between;
   gap: .75rem;
-  padding: .42rem .55rem;
+  min-height: 32px;
+  padding: .38rem .55rem;
   border: 0;
-  border-radius: .5rem;
+  border-radius: .45rem;
   background: transparent;
   color: #182d52;
   font: inherit;
-  font-size: .86rem;
+  font-family: var(--font-app);
+  font-size: .79rem;
+  font-weight: 500;
+  line-height: 1.3;
   text-align: left;
   cursor: pointer;
 }
 
 .country-code-options button:hover,
-.country-code-options button.selected { background: #eee9ff; color: #513ea2; }
-.country-code-options strong { font-size: .8rem; white-space: nowrap; }
+.country-code-options button.selected { color: var(--brand-dark); background: var(--brand-soft); }
+.country-code-options strong { color: var(--verified); font-size: .78rem; white-space: nowrap; }
 
 .quick-add-form .country-phone-input input {
   min-height: 48px;
