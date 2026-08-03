@@ -895,6 +895,11 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 .circle-composer .btn { margin-left:auto; padding:.55rem 1.2rem; }
 .circle-file-button input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
 .circle-selected-file { max-width:260px; overflow:hidden; color:var(--text-muted); font-size:.75rem; text-overflow:ellipsis; white-space:nowrap; }
+.circle-file-limit { color:#887f96; font-size:.68rem; white-space:nowrap; }
+.circle-upload-progress { position:relative; display:grid; place-items:center; width:42px; height:42px; flex:0 0 42px; border-radius:50%; box-shadow:0 3px 10px rgba(69,50,115,.14); }
+.circle-upload-progress::before { content:''; position:absolute; inset:5px; border-radius:50%; background:white; }
+.circle-upload-progress strong { position:relative; z-index:1; color:#5d479e; font-size:.62rem; font-weight:850; }
+.circle-composer-error { flex:1 0 100%; margin:.15rem 0 0; padding:.5rem .65rem; border:1px solid #f0a9b5; border-radius:.55rem; color:#b4233c; background:#fff0f3; font-size:.76rem; font-weight:750; line-height:1.35; }
 .circle-replying { display:flex; align-items:center; gap:.35rem; margin-bottom:.3rem; padding:.4rem .55rem; border-radius:.55rem; color:#66559a; background:#f0ecff; font-size:.76rem; }
 .circle-replying button { margin-left:auto; border:0; color:#8b3f5d; background:transparent; font-size:1rem; cursor:pointer; }
 .circle-post-list { display:grid; gap:.7rem; max-height:580px; margin-top:.8rem; padding-right:.25rem; overflow-y:auto; }
