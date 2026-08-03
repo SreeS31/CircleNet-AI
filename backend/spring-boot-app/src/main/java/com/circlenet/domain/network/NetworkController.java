@@ -13,6 +13,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
+import org.springframework.core.io.Resource;
+import com.circlenet.domain.circle.CircleConversationService;
+import com.circlenet.domain.network.dto.CirclePostDto;
 
 import com.circlenet.domain.network.dto.AddRelationshipRequest;
 import com.circlenet.domain.network.dto.AddPersonRequest;
@@ -28,7 +35,8 @@ import com.circlenet.domain.network.dto.UpdateNetworkCircleRequest;
 @RequestMapping("/api/network")
 public class NetworkController {
   private final NetworkService networkService;
-  public NetworkController(NetworkService networkService) { this.networkService = networkService; }
+  private final CircleConversationService circleConversationService;
+  public NetworkController(NetworkService networkService,CircleConversationService circleConversationService) { this.networkService = networkService; this.circleConversationService=circleConversationService; }
 
   @GetMapping("/search")
   public List<NetworkPersonDto> search(Principal principal, @RequestParam(defaultValue = "") String q) {
@@ -99,6 +107,17 @@ public class NetworkController {
   public NetworkCircleDto demoteAdmin(Principal principal, @PathVariable Long circleId, @PathVariable Long memberUserId) {
     return networkService.demoteCircleAdmin(userId(principal), circleId, memberUserId);
   }
+
+  @GetMapping("/circles/{circleId}/posts")
+  public List<CirclePostDto> circlePosts(Principal principal,@PathVariable Long circleId){return circleConversationService.posts(userId(principal),circleId);}
+
+  @PostMapping(value="/circles/{circleId}/posts",consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
+  public CirclePostDto createCirclePost(Principal principal,@PathVariable Long circleId,
+      @RequestParam(value="message",required=false) String message,@RequestParam(value="parentPostId",required=false) Long parentPostId,
+      @RequestPart(value="file",required=false) MultipartFile file){return circleConversationService.create(userId(principal),circleId,parentPostId,message,file);}
+
+  @GetMapping("/circles/{circleId}/posts/{postId}/attachment")
+  public ResponseEntity<Resource> circleAttachment(Principal principal,@PathVariable Long circleId,@PathVariable Long postId){var attachment=circleConversationService.attachment(userId(principal),circleId,postId);return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"inline; filename=\""+attachment.name().replace("\"","")+"\"").contentType(MediaType.parseMediaType(attachment.type())).body(attachment.resource());}
 
   private Long userId(Principal principal) { return Long.valueOf(principal.getName()); }
 }

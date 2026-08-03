@@ -233,6 +233,9 @@ public class NetworkService {
     CircleEntity circle = administeredCircle(currentUserId, circleId);
     circle.setName(requireText(request.name(), "Circle name"));
     circle.setDescription(request.description() == null ? "" : request.description().trim());
+    String postingPermission=request.postingPermission()==null?circle.getPostingPermission():request.postingPermission().trim().toUpperCase();
+    if (!Set.of("ALL_MEMBERS","ADMINS_ONLY").contains(postingPermission)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Choose who can post in this circle");
+    circle.setPostingPermission(postingPermission);
     return toCircle(circleRepository.save(circle), currentUserId);
   }
 
@@ -300,7 +303,8 @@ public class NetworkService {
     String ownerName = profileDisplayName(requireUser(circle.getOwnerUserId()));
     String ownerPhoto = profileRepository.findById(circle.getOwnerUserId()).map(profile -> profile.getProfilePhoto()).orElse(null);
     return new NetworkCircleDto(circle.getId(), circle.getName(), circle.getDescription(), members,
-        ownerName, ownerPhoto, currentUserId.equals(circle.getOwnerUserId()), circle.getAdminUserIds().contains(currentUserId));
+        ownerName, ownerPhoto, currentUserId.equals(circle.getOwnerUserId()), circle.getAdminUserIds().contains(currentUserId),
+        circle.getPostingPermission(), "ALL_MEMBERS".equals(circle.getPostingPermission()) || circle.getAdminUserIds().contains(currentUserId));
   }
 
   private NetworkPersonDto toPerson(UserEntity user) { return toPerson(user, null); }

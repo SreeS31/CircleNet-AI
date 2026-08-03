@@ -39,6 +39,7 @@ export async function removeGalleryPhoto(index: number) { return authenticatedRe
 
 type RequestOptions = RequestInit & {
   skipAuth?: boolean;
+  responseType?: 'blob';
 };
 
 export class ApiError extends Error {
@@ -168,6 +169,7 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   if (response.status === 204) {
     return undefined as T;
   }
+  if (init?.responseType === 'blob') return response.blob() as Promise<T>;
 
   const contentType = response.headers.get('content-type') || '';
   if (contentType.includes('application/json')) {
@@ -196,7 +198,7 @@ export async function refreshSession() {
   return refreshSessionOrThrow();
 }
 
-async function authenticatedRequest<T>(path: string, init?: RequestInit): Promise<T> {
+async function authenticatedRequest<T>(path: string, init?: RequestOptions): Promise<T> {
   try {
     return await request<T>(path, init);
   } catch (error) {
@@ -291,7 +293,9 @@ export type NetworkPerson = { id: number; firstName?: string; surname?: string; 
 export type VisibilityScope = 'PUBLIC' | 'FRIENDS' | 'RELATIVES' | 'COLLEAGUES';
 export type NetworkRelationship = { id: number; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string | null; contactPhone?: string | null; contactEmail?: string | null; relativeToUserId?: number | null; person: NetworkPerson };
 export type NetworkCircleMember = { person: NetworkPerson; admin: boolean; creator: boolean };
-export type NetworkCircle = { id: number; name: string; description: string; members: NetworkCircleMember[]; ownerName: string; ownerPhoto?: string | null; ownedByCurrentUser: boolean; currentUserAdmin: boolean };
+export type CirclePostingPermission = 'ALL_MEMBERS' | 'ADMINS_ONLY';
+export type NetworkCircle = { id: number; name: string; description: string; members: NetworkCircleMember[]; ownerName: string; ownerPhoto?: string | null; ownedByCurrentUser: boolean; currentUserAdmin: boolean; postingPermission: CirclePostingPermission; currentUserCanPost: boolean };
+export type CirclePost = { id:number; circleId:number; parentPostId?:number|null; authorId:number; authorName:string; authorPhoto?:string|null; message:string; attachmentUrl?:string|null; attachmentName?:string|null; attachmentType?:string|null; attachmentSize?:number|null; createdAt:string; currentUserAuthor:boolean };
 
 export async function searchNetworkPeople(query: string) {
   return authenticatedRequest<NetworkPerson[]>(`/api/network/search?q=${encodeURIComponent(query)}`);
@@ -337,11 +341,15 @@ export async function createMyCircle(name: string, description: string) {
   });
 }
 
-export async function updateMyCircle(circleId: number, name: string, description: string) {
+export async function updateMyCircle(circleId: number, name: string, description: string, postingPermission: CirclePostingPermission) {
   return authenticatedRequest<NetworkCircle>(`/api/network/circles/${circleId}`, {
-    method: 'PUT', body: JSON.stringify({ name, description }),
+    method: 'PUT', body: JSON.stringify({ name, description, postingPermission }),
   });
 }
+
+export async function fetchCirclePosts(circleId:number){return authenticatedRequest<CirclePost[]>(`/api/network/circles/${circleId}/posts`);}
+export async function createCirclePost(circleId:number,message:string,file?:File,parentPostId?:number){const body=new FormData();if(message.trim())body.append('message',message.trim());if(file)body.append('file',file);if(parentPostId)body.append('parentPostId',String(parentPostId));return authenticatedRequest<CirclePost>(`/api/network/circles/${circleId}/posts`,{method:'POST',body});}
+export async function fetchCircleAttachment(circleId:number,postId:number){return authenticatedRequest<Blob>(`/api/network/circles/${circleId}/posts/${postId}/attachment`,{responseType:'blob'});}
 
 export async function addMemberToMyCircle(circleId: number, userId: number) {
   return authenticatedRequest<NetworkCircle>(`/api/network/circles/${circleId}/members`, {

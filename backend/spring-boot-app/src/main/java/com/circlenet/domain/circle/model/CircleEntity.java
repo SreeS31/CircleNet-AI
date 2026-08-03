@@ -29,6 +29,9 @@ public class CircleEntity {
   @Column(name = "owner_user_id")
   private Long ownerUserId;
 
+  @Column(name = "posting_permission", nullable = false)
+  private String postingPermission = "ALL_MEMBERS";
+
   @ElementCollection
   @CollectionTable(name = "circle_members", joinColumns = @JoinColumn(name = "circle_id"))
   @Column(name = "user_id")
@@ -61,6 +64,8 @@ public class CircleEntity {
 
   public Long getOwnerUserId() { return ownerUserId; }
   public void setOwnerUserId(Long ownerUserId) { this.ownerUserId = ownerUserId; }
+  public String getPostingPermission() { return postingPermission; }
+  public void setPostingPermission(String postingPermission) { this.postingPermission = postingPermission; }
   public Set<Long> getMemberUserIds() { return memberUserIds; }
   public Set<Long> getAdminUserIds() { return adminUserIds; }
 }
