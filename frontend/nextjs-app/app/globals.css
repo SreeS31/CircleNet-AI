@@ -913,6 +913,20 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 .circle-document strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .circle-attachment-loading,.circle-no-posts,.circle-post-restricted { display:block; padding:.8rem; color:var(--text-muted); font-size:.78rem; text-align:center; }
 .circle-members-compact>div { display:grid; gap:.55rem; max-height:620px; margin-top:.75rem; overflow-y:auto; }
+.circle-members-compact>.circle-members-heading { display:flex; align-items:center; justify-content:space-between; gap:.5rem; max-height:none; margin:0; overflow:visible; }
+.circle-members-heading>button:first-child { min-width:0; padding:.15rem 0; display:flex; align-items:center; justify-content:space-between; flex:1; border:0; color:var(--text-heading); background:transparent; font:800 1rem var(--font-app); text-align:left; cursor:pointer; }
+.circle-members-heading>button:first-child span { display:flex; align-items:baseline; gap:.3rem; }
+.circle-members-heading>button:first-child strong { color:var(--text-muted); font-size:.72rem; }
+.circle-members-heading>button:first-child i { color:#6753a3; font-style:normal; }
+.circle-members-compact>.circle-member-list { display:grid; gap:.55rem; max-height:540px; margin-top:.75rem; overflow-y:auto; }
+.circle-add-member-panel { max-height:none!important; margin:.65rem 0 0!important; padding:.6rem; overflow:visible!important; border:1px solid #ded6ef; border-radius:.75rem; background:#faf9ff; }
+.circle-add-member-panel>input { width:100%; padding:.55rem .65rem; border:1px solid #d8d1e7; border-radius:.6rem; color:var(--text-body); background:white; font:inherit; }
+.circle-add-member-panel>div { display:grid; gap:.35rem; max-height:220px; margin-top:.45rem; overflow-y:auto; }
+.circle-add-member-panel>div>button { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.5rem; width:100%; padding:.45rem .55rem; border:0; border-radius:.55rem; color:var(--text-body); background:white; text-align:left; cursor:pointer; }
+.circle-add-member-panel>div>button:hover { background:#f0ecfb; }
+.circle-add-member-panel .person-avatar { width:1.8rem!important; height:1.8rem!important; flex-basis:1.8rem!important; font-size:.65rem; }
+.circle-add-member-panel>div>button strong { color:#604ba3; font-size:.72rem; }
+.circle-add-member-panel p { margin:.45rem; color:var(--text-muted); font-size:.75rem; text-align:center; }
 .circle-members-compact .circle-member-node { min-height:62px; padding:.6rem; grid-template-columns:auto minmax(0,1fr); }
 .circle-members-compact .member-admin-actions { grid-column:1/-1; display:flex; justify-content:flex-end; gap:.4rem; padding-top:.45rem; border-top:1px solid #eee9f5; }
 @media(max-width:1100px){.circle-card-compact .circle-edit-panel{grid-template-columns:1fr 1.35fr}.circle-card-compact .circle-posting-setting{grid-column:1/2}.circle-card-compact .circle-edit-panel>div{grid-column:2/3;justify-content:flex-end}}
