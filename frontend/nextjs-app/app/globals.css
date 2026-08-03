@@ -869,15 +869,21 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 .circle-card-compact { padding:.75rem; border-radius:1rem; background:linear-gradient(145deg,#fff,#faf8ff); overflow:visible; }
 .circle-card-compact.is-expanded { grid-column:1/-1; padding:1rem; }
 .circle-card-compact .circle-root { width:100%; min-height:96px; margin:0; padding:.85rem 1rem; cursor:pointer; }
+.circle-card-compact .circle-edit-panel { width:100%; margin:.65rem 0 0; padding:.65rem .75rem; grid-template-columns:minmax(170px,.8fr) minmax(240px,1.35fr) minmax(270px,1fr) auto; align-items:center; gap:.6rem; border-radius:.8rem; }
+.circle-card-compact .circle-edit-panel label { gap:.22rem; font-size:.7rem; }
+.circle-card-compact .circle-edit-panel input:not([type="radio"]),
+.circle-card-compact .circle-edit-panel textarea { min-height:38px; height:38px; padding:.45rem .6rem; border-radius:.6rem; font-size:.78rem; line-height:1.25; }
+.circle-card-compact .circle-edit-panel textarea { resize:none; }
+.circle-card-compact .circle-edit-panel>div { align-self:end; padding:0 0 .05rem; white-space:nowrap; }
 .circle-root-copy { min-width:0; flex:1; }
 .circle-root-copy h3,.circle-root-copy p,.circle-root-copy small { overflow:hidden; text-overflow:ellipsis; }
 .circle-root-copy p { white-space:nowrap; }
 .circle-root-copy small { display:block; margin-top:.25rem; font-size:.72rem; line-height:1.35; }
 .circle-root-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:.45rem; }
-.circle-posting-setting { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:.75rem 1.25rem; padding:.75rem 1rem; border:1px solid var(--border); border-radius:.8rem; }
+.circle-posting-setting { grid-column:auto; display:flex; align-items:center; flex-wrap:wrap; gap:.35rem .8rem; min-height:50px; padding:.35rem .65rem; border:1px solid var(--border); border-radius:.65rem; }
 .circle-posting-setting legend { padding:0 .35rem; color:var(--text-body); font-size:.78rem; font-weight:800; }
-.circle-posting-setting label { display:flex; align-items:center; gap:.45rem; font-weight:700; }
-.circle-posting-setting input { accent-color:#705bd1; }
+.circle-posting-setting label { display:flex; grid-auto-flow:column; align-items:center; gap:.3rem; font-size:.72rem; font-weight:700; white-space:nowrap; }
+.circle-posting-setting input[type="radio"] { width:1rem!important; height:1rem!important; min-height:0!important; margin:0; padding:0!important; accent-color:#705bd1; }
 .circle-expanded-content { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(270px,.7fr); gap:1rem; margin-top:1rem; }
 .circle-conversation,.circle-members-compact { min-width:0; padding:1rem; border:1px solid #e4def0; border-radius:1rem; background:white; }
 .circle-conversation-heading,.circle-conversation-heading>div { display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
@@ -909,7 +915,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(117, 103, 216, .
 .circle-members-compact>div { display:grid; gap:.55rem; max-height:620px; margin-top:.75rem; overflow-y:auto; }
 .circle-members-compact .circle-member-node { min-height:62px; padding:.6rem; grid-template-columns:auto minmax(0,1fr); }
 .circle-members-compact .member-admin-actions { grid-column:1/-1; display:flex; justify-content:flex-end; gap:.4rem; padding-top:.45rem; border-top:1px solid #eee9f5; }
-@media(max-width:900px){.circle-expanded-content{grid-template-columns:1fr}.circle-root{align-items:flex-start}.circle-root-actions{flex-direction:column;align-items:flex-end}.circle-post{width:96%}}
+@media(max-width:1100px){.circle-card-compact .circle-edit-panel{grid-template-columns:1fr 1.35fr}.circle-card-compact .circle-posting-setting{grid-column:1/2}.circle-card-compact .circle-edit-panel>div{grid-column:2/3;justify-content:flex-end}}
+@media(max-width:900px){.circle-expanded-content{grid-template-columns:1fr}.circle-root{align-items:flex-start}.circle-root-actions{flex-direction:column;align-items:flex-end}.circle-post{width:96%}.circle-card-compact .circle-edit-panel{grid-template-columns:1fr}.circle-card-compact .circle-posting-setting,.circle-card-compact .circle-edit-panel>div{grid-column:auto}.circle-card-compact .circle-edit-panel>div{justify-content:flex-end}}
 .family-tree .relationship-node-compact:hover .relationship-identity>div:last-child,
 .family-tree .relationship-node-compact.is-expanded .relationship-identity>div:last-child {
   display:flex;
