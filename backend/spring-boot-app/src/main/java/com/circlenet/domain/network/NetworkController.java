@@ -20,6 +20,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.core.io.Resource;
 import com.circlenet.domain.circle.CircleConversationService;
 import com.circlenet.domain.network.dto.CirclePostDto;
+import com.circlenet.domain.message.DirectMessageService;
+import com.circlenet.domain.network.dto.DirectMessageDto;
 
 import com.circlenet.domain.network.dto.AddRelationshipRequest;
 import com.circlenet.domain.network.dto.AddPersonRequest;
@@ -36,7 +38,8 @@ import com.circlenet.domain.network.dto.UpdateNetworkCircleRequest;
 public class NetworkController {
   private final NetworkService networkService;
   private final CircleConversationService circleConversationService;
-  public NetworkController(NetworkService networkService,CircleConversationService circleConversationService) { this.networkService = networkService; this.circleConversationService=circleConversationService; }
+  private final DirectMessageService directMessageService;
+  public NetworkController(NetworkService networkService,CircleConversationService circleConversationService,DirectMessageService directMessageService) { this.networkService = networkService; this.circleConversationService=circleConversationService; this.directMessageService=directMessageService; }
 
   @GetMapping("/search")
   public List<NetworkPersonDto> search(Principal principal, @RequestParam(defaultValue = "") String q) {
@@ -118,6 +121,15 @@ public class NetworkController {
 
   @GetMapping("/circles/{circleId}/posts/{postId}/attachment")
   public ResponseEntity<Resource> circleAttachment(Principal principal,@PathVariable Long circleId,@PathVariable Long postId){var attachment=circleConversationService.attachment(userId(principal),circleId,postId);return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"inline; filename=\""+attachment.name().replace("\"","")+"\"").contentType(MediaType.parseMediaType(attachment.type())).body(attachment.resource());}
+
+  @GetMapping("/messages/with/{otherUserId}")
+  public List<DirectMessageDto> directMessages(Principal principal,@PathVariable Long otherUserId){return directMessageService.conversation(userId(principal),otherUserId);}
+
+  @PostMapping(value="/messages/with/{otherUserId}",consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
+  public DirectMessageDto sendDirectMessage(Principal principal,@PathVariable Long otherUserId,@RequestParam(value="message",required=false) String message,@RequestPart(value="file",required=false) MultipartFile file){return directMessageService.send(userId(principal),otherUserId,message,file);}
+
+  @GetMapping("/messages/with/{otherUserId}/{messageId}/attachment")
+  public ResponseEntity<Resource> directMessageAttachment(Principal principal,@PathVariable Long otherUserId,@PathVariable Long messageId){var attachment=directMessageService.attachment(userId(principal),otherUserId,messageId);return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"inline; filename=\""+attachment.name().replace("\"","")+"\"").contentType(MediaType.parseMediaType(attachment.type())).body(attachment.resource());}
 
   private Long userId(Principal principal) { return Long.valueOf(principal.getName()); }
 }
