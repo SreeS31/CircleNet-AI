@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 enum AuthMode { signIn, signUp }
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({super.key, required this.onAuthenticated});
+  final ValueChanged<AuthTokenBundle> onAuthenticated;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -75,15 +76,18 @@ class _AuthScreenState extends State<AuthScreen> {
       await _sessionStore.save(refreshed);
       _session = refreshed;
 
-      final summary = await _authApi.fetchDashboardSummary(refreshed.accessToken);
+      final summary =
+          await _authApi.fetchDashboardSummary(refreshed.accessToken);
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _statusMessage = 'Session restored | users=${summary.userCount} circles=${summary.circleCount}';
+        _statusMessage =
+            'Session restored | users=${summary.userCount} circles=${summary.circleCount}';
       });
+      widget.onAuthenticated(refreshed);
     } catch (_) {
       await _sessionStore.clear();
       _session = null;
@@ -164,7 +168,9 @@ class _AuthScreenState extends State<AuthScreen> {
           RegisterUserRequest(
             username: _usernameController.text.trim(),
             phoneNumber: _phoneController.text.trim(),
-            email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+            email: _emailController.text.trim().isEmpty
+                ? null
+                : _emailController.text.trim(),
             password: _passwordController.text,
           ),
         );
@@ -174,7 +180,8 @@ class _AuthScreenState extends State<AuthScreen> {
         }
 
         setState(() {
-          _statusMessage = 'Registration created for ${result.username} (#${result.id})';
+          _statusMessage =
+              'Registration created for ${result.username} (#${result.id})';
         });
       } else {
         final tokenBundle = await _authApi.login(
@@ -186,7 +193,8 @@ class _AuthScreenState extends State<AuthScreen> {
         await _sessionStore.save(tokenBundle);
         _session = tokenBundle;
 
-        final summary = await _authApi.fetchDashboardSummary(tokenBundle.accessToken);
+        final summary =
+            await _authApi.fetchDashboardSummary(tokenBundle.accessToken);
 
         if (!mounted) {
           return;
@@ -196,6 +204,7 @@ class _AuthScreenState extends State<AuthScreen> {
           _statusMessage =
               'Signed in successfully | users=${summary.userCount} circles=${summary.circleCount}';
         });
+        widget.onAuthenticated(tokenBundle);
       }
     } catch (error) {
       if (!mounted) {
@@ -280,14 +289,18 @@ class _AuthScreenState extends State<AuthScreen> {
               TextFormField(
                 controller: _emailController,
                 decoration: InputDecoration(
-                  labelText: isSignUp ? 'Email (optional)' : 'Email or mobile number',
+                  labelText:
+                      isSignUp ? 'Email (optional)' : 'Email or mobile number',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (!isSignUp && (value == null || value.trim().isEmpty)) {
                     return 'Email or mobile number is required';
                   }
-                  if (isSignUp && value != null && value.trim().isNotEmpty && !value.contains('@')) {
+                  if (isSignUp &&
+                      value != null &&
+                      value.trim().isNotEmpty &&
+                      !value.contains('@')) {
                     return 'Enter a valid email';
                   }
                   return null;
@@ -327,7 +340,9 @@ class _AuthScreenState extends State<AuthScreen> {
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: _loading ? null : _submit,
-                child: Text(_loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')),
+                child: Text(_loading
+                    ? 'Please wait...'
+                    : (isSignUp ? 'Create Account' : 'Sign In')),
               ),
               const SizedBox(height: 16),
               Text(

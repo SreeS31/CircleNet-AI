@@ -22,6 +22,10 @@ import com.circlenet.domain.circle.CircleConversationService;
 import com.circlenet.domain.network.dto.CirclePostDto;
 import com.circlenet.domain.message.DirectMessageService;
 import com.circlenet.domain.network.dto.DirectMessageDto;
+import com.circlenet.domain.message.DirectCallService;
+import com.circlenet.domain.network.dto.DirectCallDto;
+import com.circlenet.domain.network.dto.StartDirectCallRequest;
+import com.circlenet.domain.network.dto.AnswerDirectCallRequest;
 
 import com.circlenet.domain.network.dto.AddRelationshipRequest;
 import com.circlenet.domain.network.dto.AddPersonRequest;
@@ -39,7 +43,8 @@ public class NetworkController {
   private final NetworkService networkService;
   private final CircleConversationService circleConversationService;
   private final DirectMessageService directMessageService;
-  public NetworkController(NetworkService networkService,CircleConversationService circleConversationService,DirectMessageService directMessageService) { this.networkService = networkService; this.circleConversationService=circleConversationService; this.directMessageService=directMessageService; }
+  private final DirectCallService directCallService;
+  public NetworkController(NetworkService networkService,CircleConversationService circleConversationService,DirectMessageService directMessageService,DirectCallService directCallService) { this.networkService = networkService; this.circleConversationService=circleConversationService; this.directMessageService=directMessageService; this.directCallService=directCallService; }
 
   @GetMapping("/search")
   public List<NetworkPersonDto> search(Principal principal, @RequestParam(defaultValue = "") String q) {
@@ -130,6 +135,13 @@ public class NetworkController {
 
   @GetMapping("/messages/with/{otherUserId}/{messageId}/attachment")
   public ResponseEntity<Resource> directMessageAttachment(Principal principal,@PathVariable Long otherUserId,@PathVariable Long messageId){var attachment=directMessageService.attachment(userId(principal),otherUserId,messageId);return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"inline; filename=\""+attachment.name().replace("\"","")+"\"").contentType(MediaType.parseMediaType(attachment.type())).body(attachment.resource());}
+
+  @PostMapping("/calls") public DirectCallDto startCall(Principal principal,@RequestBody StartDirectCallRequest request){return directCallService.start(userId(principal),request);}
+  @GetMapping("/calls/incoming") public List<DirectCallDto> incomingCalls(Principal principal){return directCallService.incoming(userId(principal));}
+  @GetMapping("/calls/{callId}") public DirectCallDto call(Principal principal,@PathVariable Long callId){return directCallService.get(userId(principal),callId);}
+  @PostMapping("/calls/{callId}/accept") public DirectCallDto acceptCall(Principal principal,@PathVariable Long callId,@RequestBody AnswerDirectCallRequest request){return directCallService.accept(userId(principal),callId,request.answerSdp());}
+  @PostMapping("/calls/{callId}/reject") public DirectCallDto rejectCall(Principal principal,@PathVariable Long callId){return directCallService.reject(userId(principal),callId);}
+  @PostMapping("/calls/{callId}/end") public DirectCallDto endCall(Principal principal,@PathVariable Long callId){return directCallService.end(userId(principal),callId);}
 
   private Long userId(Principal principal) { return Long.valueOf(principal.getName()); }
 }

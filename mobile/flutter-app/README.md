@@ -1,62 +1,42 @@
-# CircleNet-AI Flutter App
+# CircleNet AI Mobile
 
-This is the Milestone 6 mobile foundation for CircleNet-AI.
+Flutter client for Android and iOS. The application shares CircleNet's Spring Boot API and privacy rules with the web client.
 
-## Included in this baseline
+## Available flows
 
-- Flutter app scaffold with Material 3 theme
-- Auth flow screen (Sign In / Sign Up)
-- API client integration for backend auth health and user registration contracts
-- Standard project metadata and lint settings
-- Starter widget test
+- Sign in, sign up, token refresh, secure session restore, sign out
+- Adaptive phone/tablet navigation using Material 3
+- Relationship list with verified/privacy tags and profile photos
+- People discovery and relationship creation
+- Circles list, circle creation, members and group conversations
+- Private one-to-one conversations with left/right message bubbles
+- Personal, address, communication, education and employment profile fields
+- Audio/video entry points and native camera/microphone permissions
+- Android and iOS native project scaffolding
 
-## Prerequisites
+## Run locally
 
-- Flutter SDK 3.24+
-- Dart SDK matching Flutter release
+```powershell
+flutter pub get
+flutter run --dart-define=API_BASE_URL=http://YOUR_API_HOST:8080
+```
 
-For this workspace, SDK is installed at:
+Android Emulator automatically defaults to `http://10.0.2.2:8080`; iOS Simulator defaults to `http://localhost:8080`. Always provide `API_BASE_URL` for physical devices and cloud environments.
 
-- C:/Users/vighn/.puro/envs/stable/flutter
+## Verification
 
-## Local run
+```powershell
+flutter analyze
+flutter test test
+flutter build apk --debug
+```
 
-1. Install dependencies:
-   - flutter pub get
-2. Run app:
-   - flutter run
+Building iOS requires macOS with Xcode. Android builds require `ANDROID_HOME` or an Android SDK configured through Android Studio.
 
-## Current backend contracts used
+## Release configuration
 
-- GET /api/auth/health
-   - Expected response: auth-service-ready
-- POST /api/auth/login
-   - Request fields: email, password
-   - Response fields: tokenType, accessToken, refreshToken, expiresIn
-- POST /api/auth/refresh
-   - Request fields: refreshToken
-   - Response fields: tokenType, accessToken, refreshToken, expiresIn
-- POST /api/auth/logout
-   - Request fields: refreshToken
-   - Revokes current refresh token
-- POST /api/auth/revoke
-   - Request fields: refreshToken
-   - Explicit refresh token revocation endpoint
-- POST /api/users
-   - Request fields: username, email, password
-   - Used for Sign Up flow in current milestone
-
-- GET /api/dashboard/summary
-   - Requires Authorization bearer access token
-   - Called after successful Sign In and session restore
-
-Sign In is now wired to real backend token endpoints with local session persistence and refresh on app start.
-The app bar now includes explicit `Revoke` and `Logout` actions when a session is active.
-
-## Test
-
-- flutter test
-
-Windows command example:
-
-- C:/Users/vighn/.puro/envs/stable/flutter/bin/flutter.bat test test
+- Use HTTPS for every non-local API endpoint.
+- Inject the production API endpoint through `--dart-define` or CI.
+- Configure Android signing in `android/key.properties` and the Gradle release block.
+- Configure the Apple team, bundle identifier, signing and capabilities in Xcode.
+- Keep user media in the backend's external/object storage; it is never packaged in the mobile app.

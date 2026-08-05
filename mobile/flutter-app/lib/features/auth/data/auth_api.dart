@@ -4,8 +4,7 @@ import 'package:circlenet_mobile/features/auth/models/auth_models.dart';
 
 class AuthApi {
   AuthApi({ApiClient? apiClient})
-      : _apiClient =
-            apiClient ?? ApiClient(baseUrl: AppConfig.apiBaseUrl);
+      : _apiClient = apiClient ?? ApiClient(baseUrl: AppConfig.apiBaseUrl);
 
   final ApiClient _apiClient;
 
@@ -21,7 +20,8 @@ class AuthApi {
   }
 
   Future<AuthTokenBundle> login(LoginRequest request) async {
-    final response = await _apiClient.post(AppConfig.authLoginPath, request.toJson());
+    final response =
+        await _apiClient.post(AppConfig.authLoginPath, request.toJson());
     if (!response.isSuccess) {
       throw AuthApiException(
         'Login failed with status ${response.statusCode}',
@@ -37,7 +37,8 @@ class AuthApi {
   }
 
   Future<AuthTokenBundle> refresh(RefreshRequest request) async {
-    final response = await _apiClient.post(AppConfig.authRefreshPath, request.toJson());
+    final response =
+        await _apiClient.post(AppConfig.authRefreshPath, request.toJson());
     if (!response.isSuccess) {
       throw AuthApiException(
         'Refresh failed with status ${response.statusCode}',
@@ -53,7 +54,8 @@ class AuthApi {
   }
 
   Future<void> logout(RefreshRequest request) async {
-    final response = await _apiClient.post(AppConfig.authLogoutPath, request.toJson());
+    final response =
+        await _apiClient.post(AppConfig.authLogoutPath, request.toJson());
     if (!response.isSuccess) {
       throw AuthApiException(
         'Logout failed with status ${response.statusCode}',
@@ -62,7 +64,8 @@ class AuthApi {
   }
 
   Future<void> revoke(RefreshRequest request) async {
-    final response = await _apiClient.post(AppConfig.authRevokePath, request.toJson());
+    final response =
+        await _apiClient.post(AppConfig.authRevokePath, request.toJson());
     if (!response.isSuccess) {
       throw AuthApiException(
         'Revoke failed with status ${response.statusCode}',
@@ -90,7 +93,8 @@ class AuthApi {
   }
 
   Future<RegisterUserResult> registerUser(RegisterUserRequest request) async {
-    final response = await _apiClient.post(AppConfig.usersPath, request.toJson());
+    final response =
+        await _apiClient.post(AppConfig.usersPath, request.toJson());
 
     if (!response.isSuccess) {
       throw AuthApiException(
