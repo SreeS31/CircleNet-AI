@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:convert';
@@ -11,8 +10,12 @@ import 'package:circlenet_mobile/features/auth/data/session_store.dart';
 import 'package:circlenet_mobile/features/auth/models/auth_models.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:fast_contacts/fast_contacts.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.session, required this.onSignedOut});
@@ -73,6 +76,7 @@ class _AppShellState extends State<AppShell> {
       }
     });
     Future<void>.delayed(Duration.zero, checkIncomingCalls);
+    WidgetsBinding.instance.addPostFrameCallback((_) => maybeSuggestContactOrganizer());
   }
 
   @override
@@ -123,6 +127,27 @@ class _AppShellState extends State<AppShell> {
       // Polling stays silent; the next cycle retries automatically.
     } finally {
       showingIncomingCall = false;
+    }
+  }
+
+  Future<void> maybeSuggestContactOrganizer() async {
+    if (!mounted || kIsWeb) return;
+    final preferences = await SharedPreferences.getInstance();
+    if (preferences.getBool('contact_organizer_prompted') == true || !mounted) return;
+    await preferences.setBool('contact_organizer_prompted', true);
+    if (!mounted) return;
+    final open = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      icon: const Icon(Icons.auto_awesome_rounded, color: AppTheme.primary, size: 38),
+      title: const Text('Organize your contacts?'),
+      content: const Text('This optional step can suggest family relationships and circles after you grant contact permission. You review everything before it is added.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Later')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Review contacts')),
+      ],
+    ));
+    if (open == true && mounted) {
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => ContactOrganizerScreen(api: api)));
+      if (mounted) setState(() => syncVersion++);
     }
   }
 
@@ -1893,6 +1918,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
               sliver: SliverList.list(children: [
                 Card(
+                    child: ListTile(
+                        leading: const CircleAvatar(
+                            child: Icon(Icons.auto_awesome_rounded)),
+                        title: const Text('AI Contact Organizer',
+                            style: TextStyle(fontWeight: FontWeight.w800)),
+                        subtitle: const Text(
+                            'Optional: review AI suggestions for relationships and circles. Nothing is added without confirmation.'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => ContactOrganizerScreen(
+                                    api: widget.api))))),
+                const SizedBox(height: 12),
+                Card(
                     child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(children: [
@@ -1956,6 +1996,112 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => saving = false);
     }
+  }
+}
+
+class ContactOrganizerScreen extends StatefulWidget {
+  const ContactOrganizerScreen({super.key, required this.api});
+  final CircleNetApi api;
+  @override
+  State<ContactOrganizerScreen> createState() => _ContactOrganizerScreenState();
+}
+
+class _ContactOrganizerScreenState extends State<ContactOrganizerScreen> {
+  bool loading = false;
+  String? error;
+  List<Map<String, dynamic>> suggestions = [];
+  static const relationshipTypes = [
+    'Friend', 'Mother', 'Father', 'Sister', 'Brother', 'Spouse',
+    'Son', 'Daughter', 'Relative', 'Colleague', 'Other'
+  ];
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(title: const Text('AI Contact Organizer')),
+      body: SafeArea(
+          child: loading
+              ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  CircularProgressIndicator(), SizedBox(height: 12),
+                  Text('Analyzing contact names and organizations…')]))
+              : suggestions.isEmpty ? consentView() : reviewView()));
+
+  Widget consentView() => ListView(padding: const EdgeInsets.all(16), children: [
+        const Icon(Icons.contact_phone_rounded, size: 60, color: AppTheme.primary),
+        const SizedBox(height: 16),
+        Text('Organize contacts with AI', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900), textAlign: TextAlign.center),
+        const SizedBox(height: 12),
+        const Text('CircleNet reads your phonebook only after permission. Raw contacts are not retained during analysis. You review every relationship and circle before anything is added.', textAlign: TextAlign.center),
+        const SizedBox(height: 16),
+        const Card(child: Padding(padding: EdgeInsets.all(14), child: Column(children: [
+          ListTile(leading: Icon(Icons.lock_outline_rounded), title: Text('Explicit permission'), subtitle: Text('You can deny or revoke contact access at any time.')),
+          ListTile(leading: Icon(Icons.rule_rounded), title: Text('Review required'), subtitle: Text('AI suggestions never modify your tree automatically.')),
+          ListTile(leading: Icon(Icons.skip_next_rounded), title: Text('Completely optional'), subtitle: Text('Skip now and use it later from Profile.')),
+        ]))),
+        if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w800))),
+        const SizedBox(height: 16),
+        FilledButton.icon(onPressed: readAndAnalyze, icon: const Icon(Icons.auto_awesome_rounded), label: const Text('Allow and analyze contacts')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Skip for now')),
+      ]);
+
+  Widget reviewView() => Column(children: [
+        Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 4), child: Row(children: [
+          Expanded(child: Text('${suggestions.where((item) => item['selected'] == true).length} of ${suggestions.length} selected', style: const TextStyle(fontWeight: FontWeight.w800))),
+          TextButton(onPressed: () => setState(() { for (final item in suggestions) { item['selected'] = true; } }), child: const Text('Select all')),
+          TextButton(onPressed: () => setState(() { for (final item in suggestions) { item['selected'] = false; } }), child: const Text('Clear')),
+        ])),
+        if (error != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Text(error!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w800))),
+        Expanded(child: ListView.builder(padding: const EdgeInsets.fromLTRB(12, 4, 12, 100), itemCount: suggestions.length, itemBuilder: (_, index) {
+          final item = suggestions[index];
+          final circles = List<String>.from(item['suggested_circles'] as List? ?? const []);
+          return Card(child: Padding(padding: const EdgeInsets.all(10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            CheckboxListTile(contentPadding: EdgeInsets.zero, value: item['selected'] == true, onChanged: (value) => setState(() => item['selected'] = value ?? false), title: Text(item['display_name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text(item['phone']?.toString() ?? 'No mobile number — will be skipped')),
+            DropdownButtonFormField<String>(initialValue: item['suggested_relationship']?.toString(), decoration: const InputDecoration(labelText: 'Relationship'), items: relationshipTypes.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(), onChanged: (value) => setState(() => item['suggested_relationship'] = value)),
+            const SizedBox(height: 8),
+            TextFormField(initialValue: circles.join(', '), decoration: const InputDecoration(labelText: 'Suggested circles', helperText: 'Separate circle names with commas'), onChanged: (value) => item['suggested_circles'] = value.split(',').map((part) => part.trim()).where((part) => part.isNotEmpty).toList()),
+            const SizedBox(height: 6),
+            Text('${((item['confidence'] as num?)?.toDouble() ?? 0) * 100 ~/ 1}% confidence • ${(item['reasons'] as List? ?? const []).join(' • ')}', style: const TextStyle(fontSize: 12, color: Color(0xFF718096))),
+          ])));
+        })),
+        Padding(padding: const EdgeInsets.all(12), child: SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: accept, icon: const Icon(Icons.check_circle_outline_rounded), label: const Text('Confirm selected suggestions'))))
+      ]);
+
+  Future<void> readAndAnalyze() async {
+    if (kIsWeb) { setState(() => error = 'Contact import is available in the Android and iOS apps.'); return; }
+    final status = await Permission.contacts.request();
+    if (!status.isGranted) { setState(() => error = status.isPermanentlyDenied ? 'Contact access is disabled. Enable it in device settings, or skip this step.' : 'Contact permission was not granted. Nothing was uploaded.'); return; }
+    setState(() { loading = true; error = null; });
+    try {
+      final contacts = await FastContacts.getAllContacts();
+      final payload = contacts.where((contact) => contact.displayName.trim().isNotEmpty).map((contact) => {
+        'contact_key': contact.id,
+        'display_name': contact.displayName.trim(),
+        'phones': contact.phones.map((phone) => phone.number).where((value) => value.trim().isNotEmpty).toList(),
+        'emails': contact.emails.map((email) => email.address).where((value) => value.trim().isNotEmpty).toList(),
+        'organization': contact.organization?.company ?? '',
+        'job_title': contact.organization?.jobDescription ?? '',
+        'labels': [...contact.phones.map((phone) => phone.label), ...contact.emails.map((email) => email.label), if ((contact.organization?.department ?? '').isNotEmpty) contact.organization!.department]
+      }).toList();
+      final result = await widget.api.analyzeContacts(payload);
+      for (final item in result) { item['selected'] = item['phone'] != null; }
+      if (mounted) setState(() => suggestions = result);
+    } catch (exception) { if (mounted) setState(() => error = exception.toString()); }
+    finally { if (mounted) setState(() => loading = false); }
+  }
+
+  Future<void> accept() async {
+    setState(() { loading = true; error = null; });
+    try {
+      final payload = suggestions.map((item) => {
+        'displayName': item['display_name'], 'phone': item['phone'], 'email': item['email'],
+        'relationship': item['suggested_relationship'], 'circles': item['suggested_circles'],
+        'selected': item['selected'] == true
+      }).toList();
+      final result = await widget.api.acceptContactSuggestions(payload);
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (_) => AlertDialog(title: const Text('Contacts organized'), content: Text('${result['peopleAdded']} people added and ${result['circleMembershipsAdded']} circle memberships created.${(result['skipped'] as List? ?? const []).isEmpty ? '' : '\n\nSkipped:\n${(result['skipped'] as List).join('\n')}'}'), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Done'))]));
+      if (mounted) Navigator.pop(context);
+    } catch (exception) { if (mounted) setState(() => error = exception.toString()); }
+    finally { if (mounted) setState(() => loading = false); }
   }
 }
 

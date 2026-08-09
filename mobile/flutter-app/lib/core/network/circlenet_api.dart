@@ -219,6 +219,21 @@ class CircleNetApi {
       UserProfileModel.fromJson(
           await _json(_client.put('/api/profile/me', data, bearerToken: _token))
               as Map<String, dynamic>);
+
+  Future<List<Map<String, dynamic>>> analyzeContacts(
+          List<Map<String, dynamic>> contacts) async =>
+      (await _json(_client.post(
+              '/api/contact-organizer/analyze',
+              {'consent': true, 'contacts': contacts},
+              bearerToken: _token)) as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+
+  Future<Map<String, dynamic>> acceptContactSuggestions(
+          List<Map<String, dynamic>> suggestions) async =>
+      Map<String, dynamic>.from(await _json(_client.post(
+              '/api/contact-organizer/accept', {'suggestions': suggestions},
+              bearerToken: _token)) as Map);
 }
 
 class CircleNetApiException implements Exception {

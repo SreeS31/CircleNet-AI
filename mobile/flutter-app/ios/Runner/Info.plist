@@ -16,6 +16,8 @@
 	<string>CircleNet lets you choose photos and videos to share with people and circles.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>CircleNet can save media you choose to download.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>CircleNet reads contacts only when you choose AI Contact Organizer, so it can suggest relationships and circles for your review.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

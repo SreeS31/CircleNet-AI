@@ -38,9 +38,11 @@ import com.circlenet.domain.notification.NotificationService;
 @Transactional
 public class NetworkService {
   private static final Set<String> RELATIONSHIP_TYPES = Set.of(
-      "Friend", "Spouse", "Parent", "Child", "Sibling", "Colleague", "Relative", "Other");
+      "Friend", "Spouse", "Parent", "Mother", "Father", "Child", "Son", "Daughter",
+      "Sibling", "Sister", "Brother", "Colleague", "Relative", "Other");
   private static final Set<String> VISIBILITY_SCOPES = Set.of("PUBLIC", "FRIENDS", "RELATIVES", "COLLEAGUES");
-  private static final Set<String> RELATIVE_TYPES = Set.of("spouse", "parent", "child", "sibling", "relative");
+  private static final Set<String> RELATIVE_TYPES = Set.of("spouse", "parent", "mother", "father",
+      "child", "son", "daughter", "sibling", "sister", "brother", "relative");
 
   private final UserRepository userRepository;
   private final RelationshipRepository relationshipRepository;

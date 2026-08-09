@@ -63,3 +63,27 @@ class EnrichmentSuggestion(BaseModel):
     confidence: float
     source: str
     requires_review: bool = True
+
+class ImportedContact(BaseModel):
+    contact_key: str = Field(min_length=1, max_length=160)
+    display_name: str = Field(min_length=1, max_length=240)
+    phones: list[str] = Field(default_factory=list, max_length=10)
+    emails: list[str] = Field(default_factory=list, max_length=10)
+    organization: str = Field(default="", max_length=240)
+    job_title: str = Field(default="", max_length=160)
+    labels: list[str] = Field(default_factory=list, max_length=20)
+
+class ContactOrganizeRequest(BaseModel):
+    consent: bool
+    contacts: list[ImportedContact] = Field(min_length=1, max_length=5000)
+
+class ContactSuggestion(BaseModel):
+    contact_key: str
+    display_name: str
+    phone: str | None = None
+    email: str | None = None
+    suggested_relationship: str
+    suggested_circles: list[str]
+    confidence: float
+    reasons: list[str]
+    requires_review: bool = True

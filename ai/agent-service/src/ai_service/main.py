@@ -7,7 +7,7 @@ from ai_service.config import settings
 from ai_service.models import (
     DuplicatePair, DuplicateRequest, EnrichmentRequest, EnrichmentSuggestion,
     FamilyInsight, FamilyInsightRequest, HealthResponse, RankedPerson,
-    SearchRankRequest,
+    SearchRankRequest, ContactOrganizeRequest, ContactSuggestion,
 )
 
 app = FastAPI(title="CircleNet AI Agent Service", version="1.0.0", description="Privacy-aware ranking, duplicate detection, and family graph assistance.")
@@ -75,6 +75,54 @@ def enrichment(request: EnrichmentRequest) -> list[EnrichmentSuggestion]:
         suggestions.append(EnrichmentSuggestion(field="company", suggested_value=request.person.company.strip(), confidence=.75, source="existing relationship context"))
     if request.person.location and not request.known_fields.get("location"):
         suggestions.append(EnrichmentSuggestion(field="location", suggested_value=request.person.location.strip(), confidence=.7, source="existing relationship context"))
+    return suggestions
+
+FAMILY_ALIASES = {
+    "Mother": {"mother", "mom", "mummy", "amma", "maa"},
+    "Father": {"father", "dad", "daddy", "nanna", "papa"},
+    "Sister": {"sister", "sis", "akka", "chelli", "didi"},
+    "Brother": {"brother", "bro", "anna", "thammudu", "bhai"},
+    "Spouse": {"wife", "husband", "spouse", "partner"},
+    "Son": {"son", "boy"},
+    "Daughter": {"daughter", "girl"},
+    "Relative": {"uncle", "aunt", "aunty", "cousin", "grandfather", "grandmother", "grandpa", "grandma", "mama", "mami", "chacha", "chachi"},
+}
+EDUCATION_WORDS = {"school", "college", "university", "ssc", "inter", "intermediate", "degree", "btech", "mba", "class", "batch"}
+
+@router.post("/contacts/organize", response_model=list[ContactSuggestion])
+def organize_contacts(request: ContactOrganizeRequest) -> list[ContactSuggestion]:
+    if not request.consent:
+        raise HTTPException(status_code=403, detail="Explicit consent is required before contacts are analyzed")
+    suggestions: list[ContactSuggestion] = []
+    for contact in request.contacts:
+        searchable = " ".join([contact.display_name, contact.organization, contact.job_title, *contact.labels]).casefold()
+        tokens = set(re.findall(r"[a-z0-9]+", searchable))
+        relationship, confidence, reasons = "Friend", .48, ["No strong relationship keyword; review as friend"]
+        for candidate, aliases in FAMILY_ALIASES.items():
+            matches = sorted(tokens.intersection(aliases))
+            if matches:
+                relationship, confidence, reasons = candidate, .9, [f"Name or label contains '{matches[0]}'"]
+                break
+        circles: list[str] = []
+        if relationship in {"Mother", "Father", "Sister", "Brother", "Spouse", "Son", "Daughter", "Relative"}:
+            circles.append("Family")
+        organization = contact.organization.strip()
+        if organization:
+            circles.append(organization)
+            reasons.append("Organization is saved in the contact")
+            if relationship == "Friend": relationship, confidence = "Colleague", .72
+        education_matches = sorted(tokens.intersection(EDUCATION_WORDS))
+        if education_matches:
+            label = next((item.strip() for item in contact.labels if item.strip()), "Education friends")
+            circles.append(label if any(word in label.casefold() for word in EDUCATION_WORDS) else "Education friends")
+            reasons.append(f"Education keyword '{education_matches[0]}' was detected")
+        if relationship == "Friend" and not circles: circles.append("Friends")
+        suggestions.append(ContactSuggestion(
+            contact_key=contact.contact_key, display_name=contact.display_name.strip(),
+            phone=contact.phones[0] if contact.phones else None,
+            email=contact.emails[0] if contact.emails else None,
+            suggested_relationship=relationship, suggested_circles=list(dict.fromkeys(circles)),
+            confidence=confidence, reasons=reasons, requires_review=True))
     return suggestions
 
 app.include_router(router)

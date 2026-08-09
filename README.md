@@ -16,7 +16,7 @@ CircleNet-AI is an enterprise-grade platform architecture for AI-native collabor
 
 ## Delivery status
 
-As of 8 August 2026, all 10 originally documented milestones are implemented and verified. Six production milestones remain in the forward roadmap. See [Milestone Status](docs/milestone-status.md) for verification evidence, scope boundaries, and the pending work.
+As of 9 August 2026, all 17 engineering milestones are implemented and verified. Production activation still requires deployment-owner cloud/provider credentials and operational validation. See [Milestone Status](docs/milestone-status.md) for evidence and the external launch checklist.
 
 ## Milestone 1: Foundation Repository
 
@@ -176,6 +176,10 @@ Current capabilities:
 - Manual access token refresh workflow using `POST /api/auth/refresh`
 - Explicit session revocation workflow using `POST /api/auth/revoke`
 - Unified navigation entry points to session controls from landing and dashboard pages
+
+## AI Contact Organizer
+
+After sign-in on Android or iOS, CircleNet can optionally request contact access and suggest relationships and circles from saved names, labels, organizations, and education keywords. Suggestions include confidence and reasons and must be reviewed and confirmed by the user. Skipping is always supported, permission can be revoked, and the stateless AI analysis does not retain raw phonebook contacts.
 
 ## Quality Standards
 

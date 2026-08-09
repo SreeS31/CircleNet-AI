@@ -28,3 +28,19 @@ def test_enrichment_never_changes_profile_automatically() -> None:
     response = client.post("/api/v1/profiles/enrichment", json={"consent": True, "person": {"id": 1, "name": "One", "company": "INCOIS"}, "known_fields": {}})
     assert response.status_code == 200
     assert response.json()[0]["requires_review"] is True
+
+def test_contact_organizer_suggests_family_and_company_circles() -> None:
+    response = client.post("/api/v1/contacts/organize", json={
+        "consent": True,
+        "contacts": [
+            {"contact_key": "1", "display_name": "Lakshmi Akka", "phones": ["+919999999999"]},
+            {"contact_key": "2", "display_name": "Ravi Office", "phones": ["+918888888888"], "organization": "INCOIS"}
+        ]
+    })
+    assert response.status_code == 200
+    result = response.json()
+    assert result[0]["suggested_relationship"] == "Sister"
+    assert "Family" in result[0]["suggested_circles"]
+    assert result[1]["suggested_relationship"] == "Colleague"
+    assert "INCOIS" in result[1]["suggested_circles"]
+    assert all(item["requires_review"] for item in result)

@@ -19,6 +19,8 @@ dependencies:
   flutter_webrtc: ^1.6.0
   connectivity_plus: ^7.3.1
   workmanager: ^0.10.7
+  fast_contacts: ^6.0.0
+  permission_handler: ^13.0.0
 
 dev_dependencies:
   flutter_test:
