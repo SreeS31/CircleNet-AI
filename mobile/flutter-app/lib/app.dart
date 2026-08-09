@@ -21,11 +21,12 @@ class _CircleNetMobileAppState extends State<CircleNetMobileApp> {
   void initState() {
     super.initState();
     _store.load().then((value) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _session = value;
           _restoring = false;
         });
+      }
     });
   }
 

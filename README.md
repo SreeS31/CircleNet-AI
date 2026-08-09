@@ -11,6 +11,10 @@ Profile photos and gallery files are never written into the application JAR/WAR 
 
 CircleNet-AI is an enterprise-grade platform architecture for AI-native collaboration, identity, and knowledge workflows. This repository establishes the initial foundation for the platform and is structured to support future frontend, backend, infrastructure, and AI modules.
 
+## Delivery status
+
+As of 8 August 2026, all 10 originally documented milestones are implemented and verified. Six production milestones remain in the forward roadmap. See [Milestone Status](docs/milestone-status.md) for verification evidence, scope boundaries, and the pending work.
+
 ## Milestone 1: Foundation Repository
 
 This milestone delivers the core repository scaffolding for a production-ready engineering workflow:
@@ -113,13 +117,15 @@ Milestone 6 starts with an initial Flutter module under `mobile/flutter-app`.
 
 Current capabilities:
 
-- Flutter app scaffold with Material 3 baseline theme
-- Auth flow screens for Sign In and Sign Up
-- API client integration with backend auth health and user registration contracts
-- JWT login and refresh integration with local mobile session persistence
-- Logout and token revocation integration
-- Authenticated mobile dashboard summary call using bearer access token
-- Baseline widget test for app rendering
+- Android, iOS, and browser-preview Flutter targets
+- Material 3 design system with adaptive phone/tablet navigation
+- Sign In, Sign Up, JWT refresh, persisted sessions, logout, and revocation
+- Relationship discovery, privacy/verification tags, and relationship creation
+- Circle creation and private/group conversation experiences
+- Profile, address, communication, education, and employment fields
+- Authenticated image, audio, video, PDF, and document attachment display
+- Native camera, microphone, and media permission declarations
+- Widget tests and clean Flutter static analysis
 
 ## Milestone 7: Web Authenticated Dashboard
 

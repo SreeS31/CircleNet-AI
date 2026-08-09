@@ -214,12 +214,11 @@ class _AuthScreenState extends State<AuthScreen> {
         _statusMessage = 'Request failed: $error';
       });
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
       }
-      setState(() {
-        _loading = false;
-      });
     }
   }
 
@@ -291,7 +290,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 decoration: InputDecoration(
                   labelText:
                       isSignUp ? 'Email (optional)' : 'Email or mobile number',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (!isSignUp && (value == null || value.trim().isEmpty)) {

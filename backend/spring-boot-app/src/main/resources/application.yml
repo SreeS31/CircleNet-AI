@@ -38,6 +38,12 @@ circlenet:
   storage:
     local-directory: ${CIRCLENET_UPLOAD_DIR:./var/circlenet/uploads}
     public-base-url: ${CIRCLENET_MEDIA_BASE_URL:http://localhost:8080}
+  notifications:
+    dispatch-delay-ms: ${CIRCLENET_NOTIFICATION_DISPATCH_MS:5000}
+    webhook:
+      channel: ${CIRCLENET_NOTIFICATION_WEBHOOK_CHANNEL:}
+      url: ${CIRCLENET_NOTIFICATION_WEBHOOK_URL:}
+      token: ${CIRCLENET_NOTIFICATION_WEBHOOK_TOKEN:}
 
 security:
   jwt:

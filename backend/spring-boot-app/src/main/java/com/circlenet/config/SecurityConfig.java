@@ -32,6 +32,7 @@ public class SecurityConfig {
         .requestMatchers("/api/auth/health", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout", "/api/auth/revoke").permitAll()
         .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
         .requestMatchers(HttpMethod.GET, "/api/profile/media/**").permitAll()
+        .requestMatchers(HttpMethod.GET, "/api/notifications/unsubscribe/**").permitAll()
         .requestMatchers(HttpMethod.PUT, "/api/profile/me").authenticated()
         .requestMatchers(HttpMethod.PUT, "/api/network/relationships/**").authenticated()
         .requestMatchers(HttpMethod.PUT, "/api/network/circles/**").authenticated()

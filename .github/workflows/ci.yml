@@ -104,4 +104,6 @@ jobs:
           cache: true
 
       - name: Run mobile tests
-        run: flutter test
+        run: |
+          flutter analyze
+          flutter test

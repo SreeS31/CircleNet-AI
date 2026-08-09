@@ -36,4 +36,4 @@ mobile-get:
 	flutter pub get --directory mobile/flutter-app
 
 mobile-test:
-	cd mobile/flutter-app && flutter test test
+	cd mobile/flutter-app && flutter analyze && flutter test test

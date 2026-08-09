@@ -1,4 +1,7 @@
 import 'dart:typed_data';
+import 'dart:math' as math;
+import 'dart:async';
+import 'dart:convert';
 
 import 'package:circlenet_mobile/core/models/network_models.dart';
 import 'package:circlenet_mobile/core/network/circlenet_api.dart';
@@ -6,7 +9,10 @@ import 'package:circlenet_mobile/core/platform/attachment_opener.dart';
 import 'package:circlenet_mobile/core/theme/app_theme.dart';
 import 'package:circlenet_mobile/features/auth/data/session_store.dart';
 import 'package:circlenet_mobile/features/auth/models/auth_models.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.session, required this.onSignedOut});
@@ -19,12 +25,18 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int index = 0;
   late final CircleNetApi api = CircleNetApi(widget.session);
-  late final pages = <Widget>[
-    NetworkHome(api: api),
-    CirclesScreen(api: api),
-    DiscoverScreen(api: api),
-    ProfileScreen(api: api)
-  ];
+  Timer? incomingTimer;
+  StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
+  bool showingIncomingCall = false;
+  int syncVersion = 0;
+  List<Widget> get pages => <Widget>[
+        NetworkHome(key: ValueKey('network-$syncVersion'), api: api),
+        CirclesScreen(key: ValueKey('circles-$syncVersion'), api: api),
+        NotificationsScreen(
+            key: ValueKey('notifications-$syncVersion'), api: api),
+        DiscoverScreen(api: api),
+        ProfileScreen(key: ValueKey('profile-$syncVersion'), api: api)
+      ];
   static const destinations = [
     NavigationDestination(
         icon: Icon(Icons.account_tree_outlined),
@@ -35,6 +47,10 @@ class _AppShellState extends State<AppShell> {
         selectedIcon: Icon(Icons.forum_rounded),
         label: 'Circles'),
     NavigationDestination(
+        icon: Icon(Icons.notifications_outlined),
+        selectedIcon: Icon(Icons.notifications_rounded),
+        label: 'Alerts'),
+    NavigationDestination(
         icon: Icon(Icons.person_search_outlined),
         selectedIcon: Icon(Icons.person_search_rounded),
         label: 'Discover'),
@@ -43,6 +59,73 @@ class _AppShellState extends State<AppShell> {
         selectedIcon: Icon(Icons.person_rounded),
         label: 'Profile')
   ];
+  @override
+  void initState() {
+    super.initState();
+    incomingTimer =
+        Timer.periodic(const Duration(seconds: 3), (_) => checkIncomingCalls());
+    connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((results) {
+      if (mounted &&
+          results.any((result) => result != ConnectivityResult.none)) {
+        setState(() => syncVersion++);
+        checkIncomingCalls();
+      }
+    });
+    Future<void>.delayed(Duration.zero, checkIncomingCalls);
+  }
+
+  @override
+  void dispose() {
+    incomingTimer?.cancel();
+    connectivitySubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> checkIncomingCalls() async {
+    if (!mounted || showingIncomingCall) return;
+    try {
+      final calls = await api.incomingCalls();
+      if (!mounted || calls.isEmpty) return;
+      showingIncomingCall = true;
+      final call = calls.first;
+      final accept = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+                  icon: Icon(
+                      call.callType == 'VIDEO'
+                          ? Icons.videocam_rounded
+                          : Icons.call_rounded,
+                      color: AppTheme.primary,
+                      size: 38),
+                  title: Text(call.callerName),
+                  content: Text('Incoming ${call.callType.toLowerCase()} call'),
+                  actionsAlignment: MainAxisAlignment.center,
+                  actions: [
+                    FilledButton.tonal(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Decline')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Accept'))
+                  ]));
+      if (accept == true && mounted) {
+        await Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) =>
+                    DirectCallScreen(api: api, incomingCall: call)));
+      } else if (accept == false) {
+        await api.rejectCall(call.id);
+      }
+    } catch (_) {
+      // Polling stays silent; the next cycle retries automatically.
+    } finally {
+      showingIncomingCall = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 760;
@@ -111,6 +194,288 @@ class _BrandMark extends StatelessWidget {
         Text('CircleNet',
             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12))
       ]);
+}
+
+class NotificationsScreen extends StatefulWidget {
+  const NotificationsScreen({super.key, required this.api});
+  final CircleNetApi api;
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  bool loading = true;
+  String? error;
+  List<Map<String, dynamic>> items = [];
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final data = await widget.api.notifications();
+      if (mounted) setState(() => items = data);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> read(Map<String, dynamic> item) async {
+    if (item['readAt'] != null) return;
+    await widget.api.readNotification((item['id'] as num).toInt());
+    await load();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        _PageHeader(
+            eyebrow: 'STAY UPDATED',
+            title: 'Notifications',
+            subtitle: 'Messages, calls, circles and invitations.',
+            action: Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(
+                  tooltip: 'Preferences',
+                  onPressed: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) =>
+                          NotificationPreferencesSheet(api: widget.api)),
+                  icon: const Icon(Icons.tune_rounded)),
+              IconButton(
+                  tooltip: 'Mark all read',
+                  onPressed: () async {
+                    await widget.api.readAllNotifications();
+                    await load();
+                  },
+                  icon: const Icon(Icons.done_all_rounded))
+            ])),
+        if (loading) const LinearProgressIndicator(minHeight: 2),
+        if (error != null)
+          Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(error!,
+                  style: const TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.w700))),
+        Expanded(
+            child:
+                RefreshIndicator(onRefresh: load, child: _notificationList())),
+      ]);
+  Widget _notificationList() {
+    if (items.isEmpty && !loading) {
+      return ListView(children: const [
+        SizedBox(height: 120),
+        Icon(Icons.notifications_none_rounded,
+            size: 52, color: Color(0xFF9A8CD6)),
+        Center(
+            child: Padding(
+                padding: EdgeInsets.all(12),
+                child: Text('You are all caught up.')))
+      ]);
+    }
+    return ListView.separated(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 6),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final unread = item['readAt'] == null;
+          return Material(
+              color: unread ? const Color(0xFFF1ECFF) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => read(item),
+                  child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CircleAvatar(
+                                radius: 19,
+                                backgroundColor: unread
+                                    ? AppTheme.primary
+                                    : const Color(0xFFEDEAF7),
+                                child: Icon(
+                                    _notificationIcon('${item['type']}'),
+                                    size: 19,
+                                    color: unread
+                                        ? Colors.white
+                                        : AppTheme.primary)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text('${item['title']}',
+                                      style: TextStyle(
+                                          fontWeight: unread
+                                              ? FontWeight.w900
+                                              : FontWeight.w700,
+                                          color: AppTheme.ink)),
+                                  const SizedBox(height: 2),
+                                  Text('${item['body']}',
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF596579))),
+                                  const SizedBox(height: 4),
+                                  Text(_notificationTime(item['createdAt']),
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF8992A3)))
+                                ])),
+                            if (unread)
+                              const Padding(
+                                  padding: EdgeInsets.only(top: 7, left: 6),
+                                  child: CircleAvatar(
+                                      radius: 4,
+                                      backgroundColor: AppTheme.primary))
+                          ]))));
+        });
+  }
+
+  IconData _notificationIcon(String type) => switch (type) {
+        'DIRECT_MESSAGE' => Icons.chat_bubble_rounded,
+        'CIRCLE_MESSAGE' => Icons.groups_rounded,
+        'CALL' => Icons.call_rounded,
+        'INVITATION' => Icons.person_add_rounded,
+        'RELATIONSHIP' => Icons.family_restroom_rounded,
+        _ => Icons.notifications_rounded
+      };
+  String _notificationTime(dynamic value) {
+    final text = '${value ?? ''}';
+    return text.length > 16
+        ? text.substring(0, 16).replaceFirst('T', ' ')
+        : text;
+  }
+}
+
+class NotificationPreferencesSheet extends StatefulWidget {
+  const NotificationPreferencesSheet({super.key, required this.api});
+  final CircleNetApi api;
+  @override
+  State<NotificationPreferencesSheet> createState() =>
+      _NotificationPreferencesSheetState();
+}
+
+class _NotificationPreferencesSheetState
+    extends State<NotificationPreferencesSheet> {
+  Map<String, dynamic>? values;
+  String? error;
+  bool saving = false;
+  @override
+  void initState() {
+    super.initState();
+    widget.api.notificationPreferences().then((v) {
+      if (mounted) setState(() => values = v);
+    }).catchError((e) {
+      if (mounted) setState(() => error = e.toString());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+      child: Padding(
+          padding: EdgeInsets.fromLTRB(
+              16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+          child: values == null
+              ? SizedBox(
+                  height: 180,
+                  child: Center(
+                      child: error == null
+                          ? const CircularProgressIndicator()
+                          : Text(error!,
+                              style: const TextStyle(color: Colors.red))))
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                      Row(children: [
+                        Expanded(
+                            child: Text('Notification preferences',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.w900))),
+                        IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close))
+                      ]),
+                      const Text('Delivery channels',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      Wrap(
+                          spacing: 8,
+                          children: [
+                            'emailEnabled',
+                            'smsEnabled',
+                            'pushEnabled'
+                          ]
+                              .map((key) => FilterChip(
+                                  label: Text(_label(key)),
+                                  selected: values![key] == true,
+                                  onSelected: (v) =>
+                                      setState(() => values![key] = v)))
+                              .toList()),
+                      const SizedBox(height: 12),
+                      const Text('Notify me about',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            'messagesEnabled',
+                            'circlesEnabled',
+                            'relationshipsEnabled',
+                            'callsEnabled',
+                            'invitationsEnabled'
+                          ]
+                              .map((key) => FilterChip(
+                                  label: Text(_label(key)),
+                                  selected: values![key] == true,
+                                  onSelected: (v) =>
+                                      setState(() => values![key] = v)))
+                              .toList()),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                              onPressed: saving ? null : save,
+                              child: Text(
+                                  saving ? 'Saving...' : 'Save preferences')))
+                    ])));
+  String _label(String key) =>
+      const {
+        'emailEnabled': 'Email',
+        'smsEnabled': 'SMS',
+        'pushEnabled': 'Push',
+        'messagesEnabled': 'Messages',
+        'circlesEnabled': 'Circles',
+        'relationshipsEnabled': 'Relationships',
+        'callsEnabled': 'Calls',
+        'invitationsEnabled': 'Invitations'
+      }[key] ??
+      key;
+  Future<void> save() async {
+    setState(() => saving = true);
+    try {
+      await widget.api.updateNotificationPreferences(values!);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
 }
 
 class _PageHeader extends StatelessWidget {
@@ -201,6 +566,8 @@ class NetworkHome extends StatefulWidget {
 
 class _NetworkHomeState extends State<NetworkHome> {
   List<Relationship>? items;
+  UserProfileModel? profile;
+  bool treeView = true;
   String? error;
   @override
   void initState() {
@@ -213,8 +580,16 @@ class _NetworkHomeState extends State<NetworkHome> {
       error = null;
     });
     try {
-      final value = await widget.api.relationships();
-      if (mounted) setState(() => items = value);
+      final values = await Future.wait([
+        widget.api.relationships(),
+        widget.api.profile(),
+      ]);
+      if (mounted) {
+        setState(() {
+          items = values[0] as List<Relationship>;
+          profile = values[1] as UserProfileModel;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     }
@@ -224,11 +599,28 @@ class _NetworkHomeState extends State<NetworkHome> {
   Widget build(BuildContext context) => RefreshIndicator(
       onRefresh: load,
       child: CustomScrollView(slivers: [
-        const SliverToBoxAdapter(
+        SliverToBoxAdapter(
             child: _PageHeader(
                 eyebrow: 'MY CIRCLENET',
                 title: 'Relationships',
-                subtitle: 'Your people, organized around you.')),
+                subtitle: 'Your connected family and social network.',
+                action: SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                          value: true,
+                          icon: Icon(Icons.account_tree_rounded),
+                          tooltip: 'Tree view'),
+                      ButtonSegment(
+                          value: false,
+                          icon: Icon(Icons.view_list_rounded),
+                          tooltip: 'List view')
+                    ],
+                    selected: {
+                      treeView
+                    },
+                    showSelectedIcon: false,
+                    onSelectionChanged: (value) =>
+                        setState(() => treeView = value.first)))),
         if (error != null)
           SliverFillRemaining(child: _ErrorState(error!, retry: load))
         else if (items == null)
@@ -238,6 +630,14 @@ class _NetworkHomeState extends State<NetworkHome> {
           const SliverFillRemaining(
               child: Center(
                   child: Text('Add your first relationship from Discover.')))
+        else if (treeView)
+          SliverFillRemaining(
+              hasScrollBody: true,
+              child: _FamilyTreeView(
+                  relationships: items!,
+                  profile: profile,
+                  api: widget.api,
+                  onChanged: load))
         else
           SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
@@ -249,6 +649,355 @@ class _NetworkHomeState extends State<NetworkHome> {
                       api: widget.api,
                       onRemoved: load)))
       ]));
+}
+
+class _FamilyTreeView extends StatelessWidget {
+  const _FamilyTreeView({
+    required this.relationships,
+    required this.profile,
+    required this.api,
+    required this.onChanged,
+  });
+
+  final List<Relationship> relationships;
+  final UserProfileModel? profile;
+  final CircleNetApi api;
+  final VoidCallback onChanged;
+
+  static const nodeWidth = 142.0;
+  static const nodeHeight = 108.0;
+  static const horizontalGap = 42.0;
+  static const verticalGap = 72.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = _layout(MediaQuery.sizeOf(context).width);
+    return Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 92),
+        decoration: BoxDecoration(
+            color: const Color(0xFFFBFAFF),
+            border: Border.all(color: const Color(0xFFE1DBF2)),
+            borderRadius: BorderRadius.circular(22)),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(children: [
+          InteractiveViewer(
+              constrained: false,
+              minScale: .35,
+              maxScale: 2.2,
+              boundaryMargin: const EdgeInsets.all(180),
+              child: SizedBox(
+                  width: layout.width,
+                  height: layout.height,
+                  child: Stack(children: [
+                    CustomPaint(
+                        size: Size(layout.width, layout.height),
+                        painter: _TreeConnectorPainter(
+                            relationships: relationships,
+                            positions: layout.positions)),
+                    ...relationships.map((relationship) {
+                      final position =
+                          layout.positions[relationship.person.id]!;
+                      return Positioned(
+                          left: position.dx,
+                          top: position.dy,
+                          child: _TreePersonNode(
+                              relationship: relationship,
+                              onTap: () => RelationshipTile(
+                                      relationship: relationship,
+                                      api: api,
+                                      onRemoved: onChanged)
+                                  .showConnect(context)));
+                    }),
+                    Positioned(
+                        left: layout.positions[-1]!.dx,
+                        top: layout.positions[-1]!.dy,
+                        child: _SelfTreeNode(profile: profile))
+                  ]))),
+          Positioned(
+              right: 12,
+              bottom: 12,
+              child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .92),
+                      borderRadius: BorderRadius.circular(999),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x16000000), blurRadius: 10)
+                      ]),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.pinch_rounded,
+                        size: 16, color: AppTheme.primary),
+                    SizedBox(width: 5),
+                    Text('Pinch and drag',
+                        style: TextStyle(
+                            fontSize: 10, fontWeight: FontWeight.w800))
+                  ])))
+        ]));
+  }
+
+  _TreeLayout _layout(double viewportWidth) {
+    final personIds = relationships.map((item) => item.person.id).toSet();
+    final levels = <int, int>{-1: 0};
+    for (var pass = 0; pass < relationships.length + 2; pass++) {
+      var changed = false;
+      for (final item in relationships) {
+        if (levels.containsKey(item.person.id)) continue;
+        final anchor = item.relativeToUserId;
+        final anchorId =
+            anchor != null && personIds.contains(anchor) ? anchor : -1;
+        final anchorLevel = levels[anchorId];
+        if (anchorLevel == null) continue;
+        levels[item.person.id] = anchorLevel + _levelDelta(item.type);
+        changed = true;
+      }
+      if (!changed) break;
+    }
+    for (final item in relationships) {
+      levels.putIfAbsent(item.person.id, () => 0);
+    }
+
+    final byLevel = <int, List<int>>{};
+    levels.forEach((id, level) => byLevel.putIfAbsent(level, () => []).add(id));
+    final minLevel = levels.values.reduce(math.min);
+    final maxLevel = levels.values.reduce(math.max);
+    final maxNodes =
+        byLevel.values.map((items) => items.length).reduce(math.max);
+    final width = math.max(viewportWidth - 24,
+        maxNodes * nodeWidth + math.max(0, maxNodes - 1) * horizontalGap + 80);
+    final height = (maxLevel - minLevel + 1) * (nodeHeight + verticalGap) + 80;
+    final positions = <int, Offset>{};
+    for (var level = maxLevel; level >= minLevel; level--) {
+      final ids = byLevel[level] ?? [];
+      ids.sort((a, b) => _order(a).compareTo(_order(b)));
+      final rowWidth =
+          ids.length * nodeWidth + math.max(0, ids.length - 1) * horizontalGap;
+      final start = (width - rowWidth) / 2;
+      for (var index = 0; index < ids.length; index++) {
+        positions[ids[index]] = Offset(
+            start + index * (nodeWidth + horizontalGap),
+            38 + (maxLevel - level) * (nodeHeight + verticalGap));
+      }
+    }
+    return _TreeLayout(width, height, positions);
+  }
+
+  int _order(int id) {
+    if (id == -1) return 50;
+    final item = relationships.firstWhere((value) => value.person.id == id);
+    final type = item.type.toLowerCase();
+    if (type.contains('brother') ||
+        type.contains('sister') ||
+        type.contains('sibling')) {
+      return 20;
+    }
+    if (_isPartner(type)) return 60;
+    return 40;
+  }
+
+  static int _levelDelta(String value) {
+    final type = value.toLowerCase();
+    if (type.contains('grandparent')) return 2;
+    if (type.contains('parent') || type == 'father' || type == 'mother') {
+      return 1;
+    }
+    if (type.contains('grandchild')) return -2;
+    if (type == 'child' || type == 'son' || type == 'daughter') return -1;
+    return 0;
+  }
+
+  static bool _isPartner(String value) =>
+      value.contains('spouse') ||
+      value.contains('wife') ||
+      value.contains('husband');
+}
+
+class _TreeLayout {
+  const _TreeLayout(this.width, this.height, this.positions);
+  final double width, height;
+  final Map<int, Offset> positions;
+}
+
+class _TreeConnectorPainter extends CustomPainter {
+  const _TreeConnectorPainter(
+      {required this.relationships, required this.positions});
+  final List<Relationship> relationships;
+  final Map<int, Offset> positions;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final line = Paint()
+      ..color = const Color(0xFF75639B)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    final fill = Paint()..color = const Color(0xFF75639B);
+    final ids = relationships.map((item) => item.person.id).toSet();
+    for (final item in relationships) {
+      final target = positions[item.person.id];
+      final anchorId =
+          item.relativeToUserId != null && ids.contains(item.relativeToUserId)
+              ? item.relativeToUserId!
+              : -1;
+      final source = positions[anchorId];
+      if (source == null || target == null) continue;
+      final partner = _FamilyTreeView._isPartner(item.type.toLowerCase());
+      final sourceCenter = Offset(source.dx + _FamilyTreeView.nodeWidth / 2,
+          source.dy + _FamilyTreeView.nodeHeight / 2);
+      final targetCenter = Offset(target.dx + _FamilyTreeView.nodeWidth / 2,
+          target.dy + _FamilyTreeView.nodeHeight / 2);
+      if (partner) {
+        canvas.drawLine(
+            sourceCenter,
+            targetCenter,
+            Paint()
+              ..color = const Color(0xFFE36A98)
+              ..strokeWidth = 2.4);
+        _label(
+            canvas,
+            '♥',
+            Offset((sourceCenter.dx + targetCenter.dx) / 2,
+                (sourceCenter.dy + targetCenter.dy) / 2 - 9),
+            color: const Color(0xFFD34F80));
+        continue;
+      }
+      final downward = targetCenter.dy > sourceCenter.dy;
+      final start = Offset(sourceCenter.dx,
+          downward ? source.dy + _FamilyTreeView.nodeHeight : source.dy);
+      final end = Offset(targetCenter.dx,
+          downward ? target.dy : target.dy + _FamilyTreeView.nodeHeight);
+      final midY = (start.dy + end.dy) / 2;
+      final path = Path()
+        ..moveTo(start.dx, start.dy)
+        ..lineTo(start.dx, midY)
+        ..lineTo(end.dx, midY)
+        ..lineTo(end.dx, end.dy);
+      canvas.drawPath(path, line);
+      final direction = downward ? 1.0 : -1.0;
+      canvas.drawPath(
+          Path()
+            ..moveTo(end.dx, end.dy)
+            ..lineTo(end.dx - 5, end.dy - 8 * direction)
+            ..lineTo(end.dx + 5, end.dy - 8 * direction)
+            ..close(),
+          fill);
+      _label(canvas, item.type, Offset(end.dx, midY - 8));
+    }
+  }
+
+  void _label(Canvas canvas, String text, Offset center,
+      {Color color = const Color(0xFF56437F)}) {
+    final painter = TextPainter(
+        text: TextSpan(
+            text: text,
+            style: TextStyle(
+                color: color, fontSize: 9, fontWeight: FontWeight.w900)),
+        textDirection: TextDirection.ltr)
+      ..layout();
+    painter.paint(canvas,
+        Offset(center.dx - painter.width / 2, center.dy - painter.height / 2));
+  }
+
+  @override
+  bool shouldRepaint(covariant _TreeConnectorPainter oldDelegate) =>
+      oldDelegate.relationships != relationships ||
+      oldDelegate.positions != positions;
+}
+
+class _TreePersonNode extends StatelessWidget {
+  const _TreePersonNode({required this.relationship, required this.onTap});
+  final Relationship relationship;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final gender = (relationship.person.gender ?? '').toUpperCase();
+    final border = gender == 'FEMALE'
+        ? const Color(0xFFF1A1C4)
+        : gender == 'MALE'
+            ? const Color(0xFF77C8F4)
+            : const Color(0xFFF2BC68);
+    return SizedBox(
+        width: _FamilyTreeView.nodeWidth,
+        height: _FamilyTreeView.nodeHeight,
+        child: Material(
+            color: Colors.white,
+            elevation: 3,
+            shadowColor: border.withValues(alpha: .25),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: BorderSide(color: border, width: 2)),
+            child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: onTap,
+                child: Padding(
+                    padding: const EdgeInsets.all(9),
+                    child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _Avatar(relationship.person, radius: 25),
+                          const SizedBox(height: 5),
+                          Text(relationship.person.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.w900)),
+                          Text(relationship.type,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                  color: AppTheme.primary,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800))
+                        ])))));
+  }
+}
+
+class _SelfTreeNode extends StatelessWidget {
+  const _SelfTreeNode({required this.profile});
+  final UserProfileModel? profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = [profile?.value('firstName'), profile?.value('surname')]
+        .where((value) => value?.trim().isNotEmpty == true)
+        .join(' ');
+    final photo = profile?.value('profilePhoto') ?? '';
+    return SizedBox(
+        width: _FamilyTreeView.nodeWidth,
+        height: _FamilyTreeView.nodeHeight,
+        child: DecoratedBox(
+            decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    colors: [Color(0xFF6957CF), Color(0xFF9670D8)]),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x33705CC6), blurRadius: 18)
+                ]),
+            child:
+                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              CircleAvatar(
+                  radius: 26,
+                  backgroundColor: Colors.white24,
+                  backgroundImage:
+                      photo.isNotEmpty ? NetworkImage(photo) : null,
+                  child: photo.isEmpty
+                      ? Text(name.isEmpty ? 'Y' : name.characters.first,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900))
+                      : null),
+              const SizedBox(height: 5),
+              Text(name.isEmpty ? 'You' : name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900)),
+              const Text('You',
+                  style: TextStyle(color: Colors.white70, fontSize: 9))
+            ])));
+  }
 }
 
 class RelationshipTile extends StatelessWidget {
@@ -342,19 +1091,427 @@ class RelationshipTile extends StatelessWidget {
                         icon: Icons.call_rounded,
                         label: 'Audio call',
                         color: const Color(0xFF16875C),
-                        onTap: () => _callNotice(context, 'Audio')),
+                        onTap: () => _startCall(context, 'AUDIO')),
                     _ConnectAction(
                         icon: Icons.videocam_rounded,
                         label: 'Video call',
                         color: const Color(0xFFD15C87),
-                        onTap: () => _callNotice(context, 'Video'))
+                        onTap: () => _startCall(context, 'VIDEO')),
+                    const Divider(height: 22),
+                    _ConnectAction(
+                        icon: Icons.edit_rounded,
+                        label: 'Edit relationship',
+                        color: AppTheme.primary,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _edit(context);
+                        }),
+                    _ConnectAction(
+                        icon: Icons.person_remove_rounded,
+                        label: 'Remove relationship',
+                        color: const Color(0xFFB4233C),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _remove(context);
+                        })
                   ]))));
-  void _callNotice(BuildContext context, String type) {
+  void _startCall(BuildContext context, String type) {
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-            '$type call is ready to connect when the other person is online.')));
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => DirectCallScreen(
+                api: api, person: relationship.person, callType: type)));
   }
+
+  Future<void> _edit(BuildContext context) async {
+    var type = relationship.type;
+    var visibility = relationship.visibilityScope;
+    final saved = await showModalBottomSheet<bool>(
+        context: context,
+        showDragHandle: true,
+        builder: (context) => StatefulBuilder(
+            builder: (context, setModal) => SafeArea(
+                child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Text('Edit ${relationship.person.displayName}',
+                          style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                          initialValue: type,
+                          decoration:
+                              const InputDecoration(labelText: 'Relationship'),
+                          items: const [
+                            'Friend',
+                            'Spouse',
+                            'Father',
+                            'Mother',
+                            'Parent',
+                            'Child',
+                            'Son',
+                            'Daughter',
+                            'Sibling',
+                            'Brother',
+                            'Sister',
+                            'Colleague',
+                            'Relative'
+                          ]
+                              .map((value) => DropdownMenuItem(
+                                  value: value, child: Text(value)))
+                              .toList(),
+                          onChanged: (value) => setModal(() => type = value!)),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                          initialValue: visibility,
+                          decoration: const InputDecoration(labelText: 'View'),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'FRIENDS', child: Text('Friends')),
+                            DropdownMenuItem(
+                                value: 'RELATIVES', child: Text('Relatives')),
+                            DropdownMenuItem(
+                                value: 'COLLEAGUES', child: Text('Colleagues')),
+                            DropdownMenuItem(
+                                value: 'PUBLIC', child: Text('Public'))
+                          ],
+                          onChanged: (value) =>
+                              setModal(() => visibility = value!)),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Save changes')))
+                    ])))));
+    if (saved != true) return;
+    try {
+      await api.updateRelationship(relationship, type, visibility);
+      onRemoved();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: const Color(0xFFB4233C)));
+      }
+    }
+  }
+
+  Future<void> _remove(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('Remove relationship?'),
+                content: Text(
+                    '${relationship.person.displayName} will be removed from your relationship tree.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Remove'))
+                ]));
+    if (confirmed != true) return;
+    try {
+      await api.removeRelationship(relationship.id);
+      onRemoved();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: const Color(0xFFB4233C)));
+      }
+    }
+  }
+}
+
+class DirectCallScreen extends StatefulWidget {
+  const DirectCallScreen(
+      {super.key,
+      required this.api,
+      this.person,
+      this.callType = 'AUDIO',
+      this.incomingCall});
+  final CircleNetApi api;
+  final Person? person;
+  final String callType;
+  final DirectCallModel? incomingCall;
+
+  @override
+  State<DirectCallScreen> createState() => _DirectCallScreenState();
+}
+
+class _DirectCallScreenState extends State<DirectCallScreen> {
+  final localRenderer = RTCVideoRenderer();
+  final remoteRenderer = RTCVideoRenderer();
+  RTCPeerConnection? peer;
+  MediaStream? localStream;
+  DirectCallModel? call;
+  Timer? poller;
+  String phase = 'Preparing devices...';
+  String? error;
+  bool muted = false;
+  bool cameraEnabled = true;
+
+  bool get video => (call?.callType ?? widget.callType) == 'VIDEO';
+  String get personName =>
+      widget.incomingCall?.callerName ??
+      widget.person?.displayName ??
+      'CircleNet member';
+
+  @override
+  void initState() {
+    super.initState();
+    initialize();
+  }
+
+  Future<void> initialize() async {
+    try {
+      await Future.wait(
+          [localRenderer.initialize(), remoteRenderer.initialize()]);
+      localStream = await navigator.mediaDevices
+          .getUserMedia({'audio': true, 'video': video});
+      localRenderer.srcObject = localStream;
+      peer = await createPeerConnection({
+        'iceServers': [
+          {'urls': 'stun:stun.l.google.com:19302'}
+        ]
+      });
+      for (final track in localStream!.getTracks()) {
+        await peer!.addTrack(track, localStream!);
+      }
+      peer!.onTrack = (event) {
+        if (event.streams.isNotEmpty) {
+          remoteRenderer.srcObject = event.streams.first;
+          if (mounted) setState(() => phase = 'Connected');
+        }
+      };
+      peer!.onConnectionState = (state) {
+        if (!mounted) return;
+        if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+          setState(() => phase = 'Connected');
+        } else if (state ==
+                RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+            state ==
+                RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+          setState(() => error = 'Call connection was interrupted.');
+        }
+      };
+      if (widget.incomingCall != null) {
+        await answer(widget.incomingCall!);
+      } else {
+        await start();
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = _friendlyError(e));
+    }
+  }
+
+  Future<void> start() async {
+    final offer = await peer!.createOffer();
+    await peer!.setLocalDescription(offer);
+    await _waitForIce();
+    final description = await peer!.getLocalDescription();
+    call = await widget.api.startCall(
+        widget.person!.id, widget.callType, jsonEncode(description!.toMap()));
+    if (mounted) setState(() => phase = 'Ringing...');
+    poller = Timer.periodic(const Duration(seconds: 2), (_) => pollCall());
+  }
+
+  Future<void> answer(DirectCallModel incoming) async {
+    call = incoming;
+    final offer = jsonDecode(incoming.offerSdp) as Map<String, dynamic>;
+    await peer!.setRemoteDescription(RTCSessionDescription(
+        offer['sdp'] as String?, offer['type'] as String?));
+    final answer = await peer!.createAnswer();
+    await peer!.setLocalDescription(answer);
+    await _waitForIce();
+    final description = await peer!.getLocalDescription();
+    call = await widget.api
+        .acceptCall(incoming.id, jsonEncode(description!.toMap()));
+    if (mounted) setState(() => phase = 'Connecting...');
+  }
+
+  Future<void> pollCall() async {
+    if (call == null) return;
+    try {
+      final current = await widget.api.call(call!.id);
+      call = current;
+      if (current.status == 'ACCEPTED' && current.answerSdp != null) {
+        poller?.cancel();
+        final answer = jsonDecode(current.answerSdp!) as Map<String, dynamic>;
+        await peer!.setRemoteDescription(RTCSessionDescription(
+            answer['sdp'] as String?, answer['type'] as String?));
+        if (mounted) setState(() => phase = 'Connected');
+      } else if (current.status == 'REJECTED' || current.status == 'ENDED') {
+        poller?.cancel();
+        if (mounted) {
+          setState(() => error =
+              current.status == 'REJECTED' ? 'Call declined.' : 'Call ended.');
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = _friendlyError(e));
+    }
+  }
+
+  Future<void> _waitForIce() async {
+    for (var attempt = 0; attempt < 40; attempt++) {
+      if (peer?.iceGatheringState ==
+          RTCIceGatheringState.RTCIceGatheringStateComplete) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+  }
+
+  Future<void> end() async {
+    if (call != null) {
+      try {
+        await widget.api.endCall(call!.id);
+      } catch (_) {}
+    }
+    if (mounted) Navigator.pop(context);
+  }
+
+  void toggleMute() {
+    muted = !muted;
+    for (final track in localStream?.getAudioTracks() ?? <MediaStreamTrack>[]) {
+      track.enabled = !muted;
+    }
+    setState(() {});
+  }
+
+  void toggleCamera() {
+    cameraEnabled = !cameraEnabled;
+    for (final track in localStream?.getVideoTracks() ?? <MediaStreamTrack>[]) {
+      track.enabled = cameraEnabled;
+    }
+    setState(() {});
+  }
+
+  String _friendlyError(Object value) {
+    final text = value.toString();
+    if (text.toLowerCase().contains('permission')) {
+      return 'Microphone or camera permission was denied. Enable it in device settings and try again.';
+    }
+    return text;
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (_, __) => end(),
+      child: Scaffold(
+          backgroundColor: const Color(0xFF17132A),
+          body: SafeArea(
+              child: Stack(fit: StackFit.expand, children: [
+            if (video && remoteRenderer.srcObject != null)
+              RTCVideoView(remoteRenderer,
+                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
+            Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+              if (!video || remoteRenderer.srcObject == null)
+                CircleAvatar(
+                    radius: 56,
+                    backgroundColor: const Color(0xFF6F5BD3),
+                    backgroundImage: (widget.incomingCall?.callerPhoto ??
+                                    widget.person?.profilePhoto)
+                                ?.isNotEmpty ==
+                            true
+                        ? NetworkImage(widget.incomingCall?.callerPhoto ??
+                            widget.person!.profilePhoto!)
+                        : null,
+                    child: (widget.incomingCall?.callerPhoto ??
+                                    widget.person?.profilePhoto)
+                                ?.isNotEmpty ==
+                            true
+                        ? null
+                        : Text(personName.characters.first,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 38,
+                                fontWeight: FontWeight.w900))),
+              const SizedBox(height: 16),
+              Text(personName,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text(error ?? phase,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: error == null
+                          ? Colors.white70
+                          : const Color(0xFFFF9BAE),
+                      fontWeight: FontWeight.w700))
+            ])),
+            if (video && localRenderer.srcObject != null)
+              Positioned(
+                  right: 16,
+                  top: 18,
+                  width: 112,
+                  height: 158,
+                  child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: RTCVideoView(localRenderer, mirror: true))),
+            Positioned(
+                left: 0,
+                right: 0,
+                bottom: 28,
+                child:
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  _CallControl(
+                      icon: muted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                      onTap: toggleMute),
+                  if (video) ...[
+                    const SizedBox(width: 18),
+                    _CallControl(
+                        icon: cameraEnabled
+                            ? Icons.videocam_rounded
+                            : Icons.videocam_off_rounded,
+                        onTap: toggleCamera)
+                  ],
+                  const SizedBox(width: 18),
+                  _CallControl(
+                      icon: Icons.call_end_rounded,
+                      color: const Color(0xFFE54B64),
+                      onTap: end)
+                ]))
+          ]))));
+
+  @override
+  void dispose() {
+    poller?.cancel();
+    for (final track in localStream?.getTracks() ?? <MediaStreamTrack>[]) {
+      track.stop();
+    }
+    peer?.close();
+    localRenderer.dispose();
+    remoteRenderer.dispose();
+    super.dispose();
+  }
+}
+
+class _CallControl extends StatelessWidget {
+  const _CallControl(
+      {required this.icon, required this.onTap, this.color = Colors.white24});
+  final IconData icon;
+  final Color color;
+  final FutureOr<void> Function() onTap;
+  @override
+  Widget build(BuildContext context) => Material(
+      color: color,
+      shape: const CircleBorder(),
+      child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox.square(
+              dimension: 58,
+              child: Icon(icon, color: Colors.white, size: 27))));
 }
 
 class _Tag extends StatelessWidget {
@@ -411,11 +1568,12 @@ class _CirclesScreenState extends State<CirclesScreen> {
   Future<void> load() async {
     try {
       final data = await widget.api.circles();
-      if (mounted)
+      if (mounted) {
         setState(() {
           circles = data;
           error = null;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     }
@@ -607,7 +1765,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                           fontSize: 20, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 16),
                   DropdownButtonFormField(
-                      value: relation,
+                      initialValue: relation,
                       decoration:
                           const InputDecoration(labelText: 'Relationship'),
                       items: [
@@ -627,7 +1785,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       onChanged: (v) => setModal(() => relation = v!)),
                   const SizedBox(height: 10),
                   DropdownButtonFormField(
-                      value: visibility,
+                      initialValue: visibility,
                       decoration:
                           const InputDecoration(labelText: 'Who can view'),
                       items: const [
@@ -648,13 +1806,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (ok == true) {
       try {
         await widget.api.addRelationship(person, relation, visibility);
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text('${person.displayName} added to your network.')));
+        }
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context)
               .showSnackBar(SnackBar(content: Text(e.toString())));
+        }
       }
     }
   }
@@ -784,13 +1944,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         data[item.$1] = fields[item.$1]!.text.trim();
       }
       profile = await widget.api.saveProfile(data);
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Profile saved successfully.')));
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -806,22 +1968,223 @@ class DirectChatScreen extends StatelessWidget {
       title: person.displayName,
       subtitle: 'Private conversation',
       load: () => api.directMessages(person.id),
-      send: (text) => api.sendDirectMessage(person.id, text),
+      send: (text, _) => api.sendDirectMessage(person.id, text),
+      sendAttachment: (text, bytes, name, _, onProgress) =>
+          api.sendDirectAttachment(person.id, text, bytes, name,
+              onProgress: onProgress),
       fetchAttachment: api.attachment,
       person: person);
 }
 
-class CircleChatScreen extends StatelessWidget {
+class CircleChatScreen extends StatefulWidget {
   const CircleChatScreen({super.key, required this.api, required this.circle});
   final CircleNetApi api;
   final CircleModel circle;
   @override
+  State<CircleChatScreen> createState() => _CircleChatScreenState();
+}
+
+class _CircleChatScreenState extends State<CircleChatScreen> {
+  late CircleModel circle = widget.circle;
+
+  @override
   Widget build(BuildContext context) => ConversationScreen(
-      title: circle.name,
-      subtitle: '${circle.members.length} members',
-      load: () => api.circleMessages(circle.id),
-      send: (text) => api.postCircleMessage(circle.id, text),
-      fetchAttachment: api.attachment);
+          title: circle.name,
+          subtitle: '${circle.members.length} members',
+          load: () => widget.api.circleMessages(circle.id),
+          send: (text, parentId) => widget.api
+              .postCircleMessage(circle.id, text, parentMessageId: parentId),
+          sendAttachment: (text, bytes, name, parentId, onProgress) =>
+              widget.api.postCircleAttachment(circle.id, text, bytes, name,
+                  parentMessageId: parentId, onProgress: onProgress),
+          fetchAttachment: widget.api.attachment,
+          allowReplies: true,
+          actions: [
+            IconButton(
+                tooltip: 'Members',
+                onPressed: showMembers,
+                icon: const Icon(Icons.group_rounded)),
+            if (circle.currentUserAdmin)
+              IconButton(
+                  tooltip: 'Circle settings',
+                  onPressed: showSettings,
+                  icon: const Icon(Icons.settings_rounded))
+          ]);
+
+  Future<void> showSettings() async {
+    final name = TextEditingController(text: circle.name);
+    final description = TextEditingController(text: circle.description);
+    var permission = circle.postingPermission;
+    final save = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (context) => StatefulBuilder(
+            builder: (context, setModal) => Padding(
+                padding: EdgeInsets.fromLTRB(
+                    20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Text('Circle settings',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 14),
+                  TextField(
+                      controller: name,
+                      decoration: const InputDecoration(labelText: 'Name')),
+                  const SizedBox(height: 10),
+                  TextField(
+                      controller: description,
+                      maxLines: 2,
+                      decoration:
+                          const InputDecoration(labelText: 'Description')),
+                  RadioGroup<String>(
+                      groupValue: permission,
+                      onChanged: (value) => setModal(() => permission = value!),
+                      child: const Column(children: [
+                        RadioListTile(
+                            value: 'ALL_MEMBERS',
+                            title: Text('All members can post')),
+                        RadioListTile(
+                            value: 'ADMINS_ONLY',
+                            title: Text('Only admins can post'))
+                      ])),
+                  SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Save settings')))
+                ]))));
+    if (save != true || name.text.trim().isEmpty) return;
+    try {
+      final updated = await widget.api.updateCircle(
+          circle.id, name.text.trim(), description.text.trim(), permission);
+      if (mounted) setState(() => circle = updated);
+    } catch (e) {
+      if (mounted) _showError(e);
+    }
+  }
+
+  Future<void> showMembers() async {
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (sheetContext) => StatefulBuilder(
+            builder: (context, setModal) => FractionallySizedBox(
+                heightFactor: .78,
+                child: Column(children: [
+                  Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 12, 8),
+                      child: Row(children: [
+                        Expanded(
+                            child: Text('Members (${circle.members.length})',
+                                style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900))),
+                        if (circle.currentUserAdmin)
+                          FilledButton.tonalIcon(
+                              onPressed: () async {
+                                await addMember(sheetContext);
+                                setModal(() {});
+                              },
+                              icon: const Icon(Icons.person_add_rounded),
+                              label: const Text('Add'))
+                      ])),
+                  Expanded(
+                      child: ListView.builder(
+                          itemCount: circle.members.length,
+                          itemBuilder: (context, index) {
+                            final member = circle.members[index];
+                            return ListTile(
+                                leading: _Avatar(member.person),
+                                title: Text(member.person.displayName,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w800)),
+                                subtitle: Text(member.creator
+                                    ? 'Creator - Admin'
+                                    : member.admin
+                                        ? 'Admin'
+                                        : 'Member'),
+                                trailing: !circle.currentUserAdmin ||
+                                        member.creator
+                                    ? null
+                                    : PopupMenuButton<String>(
+                                        onSelected: (action) async {
+                                          try {
+                                            final updated = action == 'remove'
+                                                ? await widget.api
+                                                    .removeCircleMember(
+                                                        circle.id,
+                                                        member.person.id)
+                                                : member.admin
+                                                    ? await widget.api
+                                                        .demoteCircleAdmin(
+                                                            circle.id,
+                                                            member.person.id)
+                                                    : await widget.api
+                                                        .promoteCircleAdmin(
+                                                            circle.id,
+                                                            member.person.id);
+                                            if (mounted) {
+                                              setState(() => circle = updated);
+                                              setModal(() {});
+                                            }
+                                          } catch (e) {
+                                            if (mounted) _showError(e);
+                                          }
+                                        },
+                                        itemBuilder: (_) => [
+                                              PopupMenuItem(
+                                                  value: 'admin',
+                                                  child: Text(member.admin
+                                                      ? 'Remove admin'
+                                                      : 'Make admin')),
+                                              const PopupMenuItem(
+                                                  value: 'remove',
+                                                  child: Text('Remove member'))
+                                            ]));
+                          }))
+                ]))));
+  }
+
+  Future<void> addMember(BuildContext sheetContext) async {
+    final relationships = await widget.api.relationships();
+    final ids = circle.members.map((item) => item.person.id).toSet();
+    final available = relationships
+        .map((item) => item.person)
+        .where((person) => !ids.contains(person.id))
+        .toList();
+    if (!mounted) return;
+    final selected = await showDialog<Person>(
+        context: context,
+        builder: (context) => AlertDialog(
+            title: const Text('Add member'),
+            content: SizedBox(
+                width: 360,
+                child: available.isEmpty
+                    ? const Text('All your relationships are already members.')
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: available.length,
+                        itemBuilder: (_, index) => ListTile(
+                            leading: _Avatar(available[index]),
+                            title: Text(available[index].displayName),
+                            onTap: () =>
+                                Navigator.pop(context, available[index]))))));
+    if (selected == null) return;
+    try {
+      final updated = await widget.api.addCircleMember(circle.id, selected.id);
+      if (mounted) setState(() => circle = updated);
+    } catch (e) {
+      if (mounted) _showError(e);
+    }
+  }
+
+  void _showError(Object error) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(error.toString()),
+          backgroundColor: const Color(0xFFB4233C)));
 }
 
 class ConversationScreen extends StatefulWidget {
@@ -831,12 +2194,24 @@ class ConversationScreen extends StatefulWidget {
       required this.subtitle,
       required this.load,
       required this.send,
+      required this.sendAttachment,
       required this.fetchAttachment,
+      this.actions = const [],
+      this.allowReplies = false,
       this.person});
   final String title, subtitle;
   final Future<List<ConversationMessage>> Function() load;
-  final Future<void> Function(String) send;
+  final Future<void> Function(String, int?) send;
+  final Future<void> Function(
+    String message,
+    Uint8List bytes,
+    String fileName,
+    int? parentMessageId,
+    void Function(double progress) onProgress,
+  ) sendAttachment;
   final Future<Uint8List> Function(String) fetchAttachment;
+  final List<Widget> actions;
+  final bool allowReplies;
   final Person? person;
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
@@ -847,6 +2222,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
   List<ConversationMessage>? messages;
   String? error;
   bool sending = false;
+  PlatformFile? selectedFile;
+  ConversationMessage? replyingTo;
+  double? uploadProgress;
   @override
   void initState() {
     super.initState();
@@ -856,28 +2234,93 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Future<void> load() async {
     try {
       final value = await widget.load();
-      if (mounted)
+      if (mounted) {
         setState(() {
           messages = value;
           error = null;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     }
   }
 
   Future<void> send() async {
-    if (text.text.trim().isEmpty) return;
+    if (text.text.trim().isEmpty && selectedFile == null) return;
     setState(() => sending = true);
     try {
-      await widget.send(text.text.trim());
+      if (selectedFile != null) {
+        final bytes = selectedFile!.bytes;
+        if (bytes == null) {
+          throw const CircleNetApiException(
+              'Could not read the selected file.');
+        }
+        await widget.sendAttachment(
+          text.text.trim(),
+          bytes,
+          selectedFile!.name,
+          replyingTo?.id,
+          (progress) {
+            if (mounted) setState(() => uploadProgress = progress);
+          },
+        );
+      } else {
+        await widget.send(text.text.trim(), replyingTo?.id);
+      }
       text.clear();
+      selectedFile = null;
+      replyingTo = null;
+      uploadProgress = null;
       await load();
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
       if (mounted) setState(() => sending = false);
     }
+  }
+
+  Future<void> chooseAttachment() async {
+    setState(() => error = null);
+    final result = await FilePicker.platform.pickFiles(
+      withData: true,
+      allowMultiple: false,
+      type: FileType.custom,
+      allowedExtensions: const [
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+        'mp4',
+        'webm',
+        'mp3',
+        'wav',
+        'm4a',
+        'pdf',
+        'doc',
+        'docx',
+        'xls',
+        'xlsx',
+        'ppt',
+        'pptx',
+        'txt'
+      ],
+    );
+    if (result == null) return;
+    final file = result.files.single;
+    if (file.size > 25 * 1024 * 1024) {
+      setState(() => error =
+          '“${file.name}” is ${_formatSize(file.size)}. Maximum attachment size is 25 MB.');
+      return;
+    }
+    if (file.bytes == null) {
+      setState(() =>
+          error = 'Could not read “${file.name}”. Please choose it again.');
+      return;
+    }
+    setState(() {
+      selectedFile = file;
+      uploadProgress = null;
+    });
   }
 
   @override
@@ -900,6 +2343,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ])
           ]),
           actions: [
+            ...widget.actions,
             IconButton(onPressed: load, icon: const Icon(Icons.refresh_rounded))
           ]),
       body: Column(children: [
@@ -923,6 +2367,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         itemCount: messages!.length,
                         itemBuilder: (context, index) {
                           final item = messages![messages!.length - 1 - index];
+                          final parent = _messageById(item.parentMessageId);
                           return Align(
                               alignment: item.mine
                                   ? Alignment.centerRight
@@ -950,36 +2395,121 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                               item.mine ? 16 : 4),
                                           bottomRight: Radius.circular(
                                               item.mine ? 4 : 16))),
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (!item.mine)
-                                          Text(item.authorName,
+                                  child:
+                                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    if (!item.mine)
+                                      Text(item.authorName,
+                                          style: const TextStyle(
+                                              color: AppTheme.primary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w900)),
+                                    if (parent != null) ...[
+                                      Container(
+                                          width: double.infinity,
+                                          margin: const EdgeInsets.only(
+                                              top: 3, bottom: 6),
+                                          padding: const EdgeInsets.all(7),
+                                          decoration: BoxDecoration(
+                                              color: Colors.white
+                                                  .withValues(alpha: .62),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: const Border(
+                                                  left: BorderSide(
+                                                      color: AppTheme.primary,
+                                                      width: 3))),
+                                          child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(parent.authorName,
+                                                    style: const TextStyle(
+                                                        color: AppTheme.primary,
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.w900)),
+                                                Text(
+                                                    parent.message
+                                                            .trim()
+                                                            .isNotEmpty
+                                                        ? parent.message
+                                                        : parent.attachmentName ??
+                                                            'Attachment',
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                        fontSize: 11))
+                                              ]))
+                                    ],
+                                    if (item.message.isNotEmpty)
+                                      Text(item.message,
+                                          style: const TextStyle(
+                                              color: AppTheme.ink,
+                                              fontSize: 14)),
+                                    if (item.hasAttachment) ...[
+                                      if (item.message.isNotEmpty)
+                                        const SizedBox(height: 8),
+                                      _MessageAttachment(
+                                        message: item,
+                                        fetch: widget.fetchAttachment,
+                                      ),
+                                    ],
+                                    const SizedBox(height: 3),
+                                    Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(_time(item.createdAt),
                                               style: const TextStyle(
-                                                  color: AppTheme.primary,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w900)),
-                                        if (item.message.isNotEmpty)
-                                          Text(item.message,
-                                              style: const TextStyle(
-                                                  color: AppTheme.ink,
-                                                  fontSize: 14)),
-                                        if (item.hasAttachment) ...[
-                                          if (item.message.isNotEmpty)
-                                            const SizedBox(height: 8),
-                                          _MessageAttachment(
-                                            message: item,
-                                            fetch: widget.fetchAttachment,
-                                          ),
-                                        ],
-                                        const SizedBox(height: 3),
-                                        Text(_time(item.createdAt),
-                                            style: const TextStyle(
-                                                color: Color(0xFF7F748D),
-                                                fontSize: 9))
-                                      ])));
+                                                  color: Color(0xFF7F748D),
+                                                  fontSize: 9)),
+                                          if (widget.allowReplies) ...[
+                                            const SizedBox(width: 7),
+                                            InkWell(
+                                                onTap: () => setState(
+                                                    () => replyingTo = item),
+                                                child: const Padding(
+                                                    padding: EdgeInsets.all(2),
+                                                    child: Icon(
+                                                        Icons.reply_rounded,
+                                                        size: 15,
+                                                        color:
+                                                            AppTheme.primary)))
+                                          ]
+                                        ])
+                                  ])));
                         })),
+        if (replyingTo != null)
+          Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 7, 8, 7),
+              color: const Color(0xFFF2EEFF),
+              child: Row(children: [
+                const Icon(Icons.reply_rounded,
+                    size: 18, color: AppTheme.primary),
+                const SizedBox(width: 7),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text('Replying to ${replyingTo!.authorName}',
+                          style: const TextStyle(
+                              color: AppTheme.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900)),
+                      Text(
+                          replyingTo!.message.isNotEmpty
+                              ? replyingTo!.message
+                              : replyingTo!.attachmentName ?? 'Attachment',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11))
+                    ])),
+                IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => setState(() => replyingTo = null),
+                    icon: const Icon(Icons.close_rounded, size: 18))
+              ])),
         SafeArea(
             top: false,
             child: Container(
@@ -989,10 +2519,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     border: Border(top: BorderSide(color: Color(0xFFE5E0EF)))),
                 child: Row(children: [
                   IconButton.filledTonal(
-                      onPressed: () => ScaffoldMessenger.of(context)
-                          .showSnackBar(const SnackBar(
-                              content: Text(
-                                  'Choose photos, videos and documents from your device.'))),
+                      tooltip: 'Attach photo, video, audio, or document',
+                      onPressed: sending ? null : chooseAttachment,
                       icon: const Icon(Icons.add_rounded)),
                   const SizedBox(width: 7),
                   Expanded(
@@ -1012,10 +2540,61 @@ class _ConversationScreenState extends State<ConversationScreen> {
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.send_rounded))
-                ])))
+                ]))),
+        if (selectedFile != null || uploadProgress != null)
+          SafeArea(
+            top: false,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 7, 14, 9),
+              color: Colors.white,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (selectedFile != null)
+                      Row(children: [
+                        const Icon(Icons.attach_file_rounded,
+                            size: 18, color: AppTheme.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                            child: Text(
+                          '${selectedFile!.name} · ${_formatSize(selectedFile!.size)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w700),
+                        )),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'Remove attachment',
+                          onPressed: sending
+                              ? null
+                              : () => setState(() => selectedFile = null),
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                        ),
+                      ]),
+                    if (uploadProgress != null)
+                      LinearProgressIndicator(value: uploadProgress),
+                  ]),
+            ),
+          )
       ]));
   String _time(DateTime value) =>
       '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
+  ConversationMessage? _messageById(int? id) {
+    if (id == null || messages == null) return null;
+    for (final message in messages!) {
+      if (message.id == id) return message;
+    }
+    return null;
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
 }
 
 class _MessageAttachment extends StatefulWidget {

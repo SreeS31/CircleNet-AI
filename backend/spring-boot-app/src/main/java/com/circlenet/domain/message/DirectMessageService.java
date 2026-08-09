@@ -7,6 +7,8 @@ import com.circlenet.domain.profile.UserProfileRepository;
 import com.circlenet.domain.relationship.RelationshipRepository;
 import com.circlenet.domain.user.UserRepository;
 import com.circlenet.domain.user.model.UserEntity;
+import com.circlenet.domain.notification.NotificationCommand;
+import com.circlenet.domain.notification.NotificationService;
 import java.util.List;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
@@ -20,7 +22,8 @@ public class DirectMessageService {
   private final DirectMessageRepository messages; private final UserRepository users;
   private final RelationshipRepository relationships; private final UserProfileRepository profiles;
   private final CircleMediaStorage storage;
-  public DirectMessageService(DirectMessageRepository messages,UserRepository users,RelationshipRepository relationships,UserProfileRepository profiles,CircleMediaStorage storage){this.messages=messages;this.users=users;this.relationships=relationships;this.profiles=profiles;this.storage=storage;}
+  private final NotificationService notificationService;
+  public DirectMessageService(DirectMessageRepository messages,UserRepository users,RelationshipRepository relationships,UserProfileRepository profiles,CircleMediaStorage storage,NotificationService notificationService){this.messages=messages;this.users=users;this.relationships=relationships;this.profiles=profiles;this.storage=storage;this.notificationService=notificationService;}
 
   @Transactional(readOnly=true)
   public List<DirectMessageDto> conversation(Long currentUserId,Long otherUserId){assertConversationParticipant(currentUserId,otherUserId);return messages.conversation(currentUserId,otherUserId).stream().map(message->dto(message,currentUserId)).toList();}
@@ -34,7 +37,9 @@ public class DirectMessageService {
     if(clean.isBlank()&&(file==null||file.isEmpty()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Write a message or choose a file");
     DirectMessageEntity directMessage=new DirectMessageEntity();directMessage.setSenderUserId(senderId);directMessage.setRecipientUserId(recipientId);directMessage.setMessage(clean);
     if(file!=null&&!file.isEmpty()){var media=storage.store(file);directMessage.setAttachmentKey(media.key());directMessage.setAttachmentName(media.name());directMessage.setAttachmentType(media.type());directMessage.setAttachmentSize(media.size());}
-    return dto(messages.save(directMessage),senderId);
+    DirectMessageEntity saved=messages.save(directMessage); UserEntity sender=users.findById(senderId).orElseThrow();
+    notificationService.notify(new NotificationCommand(recipientId,"DIRECT_MESSAGE","New message from "+name(sender),clean.isBlank()?"Sent an attachment":clean,"/dashboard?messageUserId="+senderId,"DIRECT_MESSAGE",saved.getId()));
+    return dto(saved,senderId);
   }
 
   @Transactional(readOnly=true)
@@ -43,4 +48,5 @@ public class DirectMessageService {
   private UserEntity assertConversationParticipant(Long currentUserId,Long otherUserId){if(currentUserId.equals(otherUserId))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Choose another person to message");users.findById(currentUserId).orElseThrow(()->new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Current user not found"));return users.findById(otherUserId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Person not found"));}
   private DirectMessageDto dto(DirectMessageEntity message,Long currentUserId){UserEntity sender=users.findById(message.getSenderUserId()).orElseThrow();String name=((sender.getFirstName()==null?"":sender.getFirstName())+" "+(sender.getSurname()==null?"":sender.getSurname())).trim();if(name.isBlank())name=sender.getUsername();String photo=profiles.findById(sender.getId()).map(profile->profile.getProfilePhoto()).orElse(null);String attachmentUrl=message.getAttachmentKey()==null?null:"/api/network/messages/with/"+(currentUserId.equals(message.getSenderUserId())?message.getRecipientUserId():message.getSenderUserId())+"/"+message.getId()+"/attachment";return new DirectMessageDto(message.getId(),message.getSenderUserId(),message.getRecipientUserId(),name,photo,message.getMessage(),attachmentUrl,message.getAttachmentName(),message.getAttachmentType(),message.getAttachmentSize(),message.getCreatedAt(),currentUserId.equals(message.getSenderUserId()));}
   public record Attachment(Resource resource,String name,String type){}
+  private String name(UserEntity user){String value=((user.getFirstName()==null?"":user.getFirstName())+" "+(user.getSurname()==null?"":user.getSurname())).trim();return value.isBlank()?user.getUsername():value;}
 }

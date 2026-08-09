@@ -31,6 +31,8 @@ import com.circlenet.domain.user.UserRepository;
 import com.circlenet.domain.user.model.UserEntity;
 import com.circlenet.domain.profile.UserProfileRepository;
 import com.circlenet.domain.profile.model.UserProfileEntity;
+import com.circlenet.domain.notification.NotificationCommand;
+import com.circlenet.domain.notification.NotificationService;
 
 @Service
 @Transactional
@@ -45,14 +47,17 @@ public class NetworkService {
   private final CircleRepository circleRepository;
   private final PasswordEncoder passwordEncoder;
   private final UserProfileRepository profileRepository;
+  private final NotificationService notificationService;
 
   public NetworkService(UserRepository userRepository, RelationshipRepository relationshipRepository,
-      CircleRepository circleRepository, PasswordEncoder passwordEncoder, UserProfileRepository profileRepository) {
+      CircleRepository circleRepository, PasswordEncoder passwordEncoder, UserProfileRepository profileRepository,
+      NotificationService notificationService) {
     this.userRepository = userRepository;
     this.relationshipRepository = relationshipRepository;
     this.circleRepository = circleRepository;
     this.passwordEncoder = passwordEncoder;
     this.profileRepository = profileRepository;
+    this.notificationService = notificationService;
   }
 
   @Transactional(readOnly = true)
@@ -106,6 +111,8 @@ public class NetworkService {
     if (relationship.getContactEmail() == null) relationship.setContactEmail(related.getEmail());
     applyVisibility(currentUserId, relationship, request.visibilityScope(), request.visibilityCompany());
     relationship = relationshipRepository.save(relationship);
+    UserEntity owner=requireUser(currentUserId);
+    notificationService.notify(new NotificationCommand(related.getId(),"RELATIONSHIP","New relationship",profileDisplayName(owner)+" added you as "+type,"/dashboard","RELATIONSHIP",relationship.getId()));
     return relationshipDto(relationship, related);
   }
 
@@ -181,6 +188,12 @@ public class NetworkService {
     relationship.setContactEmail(cleanEmail(request.email()));
     applyVisibility(currentUserId, relationship, request.visibilityScope(), request.visibilityCompany());
     relationship = relationshipRepository.save(relationship);
+    if("ACCOUNT".equals(identityType)){
+      UserEntity owner=requireUser(currentUserId);
+      String notificationType="INVITED".equals(person.getAccountStatus())?"INVITATION":"RELATIONSHIP";
+      String title="INVITATION".equals(notificationType)?"Join CircleNet":"New relationship";
+      notificationService.notify(new NotificationCommand(person.getId(),notificationType,title,profileDisplayName(owner)+" added you as "+type,"/dashboard","RELATIONSHIP",relationship.getId()));
+    }
     return relationshipDto(relationship, person);
   }
 
@@ -246,7 +259,9 @@ public class NetworkService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Add this person as a relationship before adding them to a circle");
     }
     circle.getMemberUserIds().add(userId);
-    return toCircle(circleRepository.save(circle), currentUserId);
+    circle=circleRepository.save(circle);
+    notificationService.notify(new NotificationCommand(userId,"INVITATION","Added to "+circle.getName(),profileDisplayName(requireUser(currentUserId))+" added you to this circle","/dashboard?circleId="+circleId,"CIRCLE",circleId));
+    return toCircle(circle, currentUserId);
   }
 
   public NetworkCircleDto removeCircleMember(Long currentUserId, Long circleId, Long userId) {
