@@ -36,7 +36,7 @@ public class DirectMessageService {
     if(clean.length()>4000)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Message must be 4000 characters or less");
     if(clean.isBlank()&&(file==null||file.isEmpty()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Write a message or choose a file");
     DirectMessageEntity directMessage=new DirectMessageEntity();directMessage.setSenderUserId(senderId);directMessage.setRecipientUserId(recipientId);directMessage.setMessage(clean);
-    if(file!=null&&!file.isEmpty()){var media=storage.store(file);directMessage.setAttachmentKey(media.key());directMessage.setAttachmentName(media.name());directMessage.setAttachmentType(media.type());directMessage.setAttachmentSize(media.size());}
+    if(file!=null&&!file.isEmpty()){var media=storage.store(senderId,file);directMessage.setAttachmentKey(media.key());directMessage.setAttachmentName(media.name());directMessage.setAttachmentType(media.type());directMessage.setAttachmentSize(media.size());}
     DirectMessageEntity saved=messages.save(directMessage); UserEntity sender=users.findById(senderId).orElseThrow();
     notificationService.notify(new NotificationCommand(recipientId,"DIRECT_MESSAGE","New message from "+name(sender),clean.isBlank()?"Sent an attachment":clean,"/dashboard?messageUserId="+senderId,"DIRECT_MESSAGE",saved.getId()));
     return dto(saved,senderId);

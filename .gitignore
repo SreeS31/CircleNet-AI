@@ -38,6 +38,8 @@ pnpm-debug.log*
 
 # Test and coverage
 coverage/
+playwright-report/
+test-results/
 .pytest_cache/
 __pycache__/
 *.pyc

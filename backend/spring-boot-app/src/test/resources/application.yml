@@ -20,7 +20,10 @@ spring:
   h2:
     console:
       enabled: false
-
+circlenet:
+  rate-limit:
+    auth-per-minute: 10000
+    api-per-minute: 10000
 security:
   jwt:
     secret: circlenet-automated-test-jwt-secret-2026-strong

@@ -2,12 +2,15 @@
 
 ## User-uploaded media storage
 
-Profile photos and gallery files are never written into the application JAR/WAR and are not stored as database blobs. The backend stores files through `ProfileMediaStorage`; PostgreSQL stores only their URLs.
+Profile photos, gallery files, and conversation attachments are never written into the application JAR/WAR and are not stored as database blobs. The backend uses a shared media platform; PostgreSQL stores object metadata and application references.
 
 - `CIRCLENET_UPLOAD_DIR` sets the external/persistent upload directory. The local default is `./var/circlenet/uploads` relative to the backend process.
 - `CIRCLENET_MEDIA_BASE_URL` sets the externally reachable backend origin used in stored media URLs. The local default is `http://localhost:8080`.
-- In Docker/Kubernetes, mount `CIRCLENET_UPLOAD_DIR` as a persistent volume.
-- For AWS or GCP production, replace the storage implementation with an S3 or Google Cloud Storage provider while retaining the existing upload API and database URL fields.
+- In Docker/Kubernetes local-storage deployments, mount `CIRCLENET_UPLOAD_DIR` as a persistent volume.
+- Set `CIRCLENET_STORAGE_PROVIDER=s3`, `CIRCLENET_S3_BUCKET`, and `CIRCLENET_S3_REGION` to use private AWS S3 or an S3-compatible cloud. `CIRCLENET_S3_ENDPOINT` supports services such as MinIO.
+- AWS credentials use the standard SDK credential chain (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, workload identity, instance role, or container role).
+- Objects are encrypted with S3 AES-256, signed download URLs are supported, and uploads receive checksum, file-signature, scanner, thumbnail, quota, retention, and deletion handling.
+- `CIRCLENET_MEDIA_USER_QUOTA_BYTES` changes the default 1 GiB per-user quota.
 
 CircleNet-AI is an enterprise-grade platform architecture for AI-native collaboration, identity, and knowledge workflows. This repository establishes the initial foundation for the platform and is structured to support future frontend, backend, infrastructure, and AI modules.
 

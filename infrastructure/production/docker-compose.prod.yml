@@ -1,0 +1,79 @@
+services:
+  gateway:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      CIRCLENET_DOMAIN: ${CIRCLENET_DOMAIN:?Set CIRCLENET_DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      backend: { condition: service_healthy }
+      frontend: { condition: service_started }
+
+  frontend:
+    image: ${CIRCLENET_FRONTEND_IMAGE:?Set frontend image}
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+
+  backend:
+    image: ${CIRCLENET_BACKEND_IMAGE:?Set backend image}
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-circlenet_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-circlenet}
+      SPRING_CONFIG_IMPORT: optional:configtree:/run/secrets/
+      CIRCLENET_STORAGE_PROVIDER: ${CIRCLENET_STORAGE_PROVIDER:-s3}
+      CIRCLENET_S3_BUCKET: ${CIRCLENET_S3_BUCKET:-circlenet-media}
+      CIRCLENET_S3_REGION: ${CIRCLENET_S3_REGION:-ap-south-1}
+      CIRCLENET_S3_ENDPOINT: ${CIRCLENET_S3_ENDPOINT:-http://minio:9000}
+      CIRCLENET_AI_BASE_URL: http://ai-agent:8081/api/v1
+    secrets: [postgres_password, jwt_secret]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/actuator/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  ai-agent:
+    image: ${CIRCLENET_AI_IMAGE:?Set AI image}
+    restart: unless-stopped
+    environment:
+      AI_ENV: production
+      AI_LOG_LEVEL: INFO
+    read_only: true
+    tmpfs: [/tmp]
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-circlenet_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-circlenet}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-circlenet} -d ${POSTGRES_DB:-circlenet_ai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes: [redis-data:/data]
+
+secrets:
+  postgres_password: { file: ./secrets/postgres_password }
+  jwt_secret: { file: ./secrets/jwt_secret }
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:

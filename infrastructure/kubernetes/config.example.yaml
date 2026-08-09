@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: circlenet-config, namespace: circlenet }
+data:
+  SPRING_PROFILES_ACTIVE: prod
+  POSTGRES_HOST: managed-postgres.example.internal
+  POSTGRES_DB: circlenet_ai
+  POSTGRES_USER: circlenet
+  CIRCLENET_STORAGE_PROVIDER: s3
+  CIRCLENET_S3_BUCKET: circlenet-media
+  CIRCLENET_S3_REGION: ap-south-1
+---
+# Create this object through your cloud secret manager/external-secrets operator.
+apiVersion: v1
+kind: Secret
+metadata: { name: circlenet-secrets, namespace: circlenet }
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: replace-through-secret-manager
+  JWT_SECRET: replace-through-secret-manager

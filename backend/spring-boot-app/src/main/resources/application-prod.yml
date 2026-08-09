@@ -2,7 +2,7 @@ spring:
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:circlenet_ai}
     username: ${POSTGRES_USER:circlenet}
-    password: ${POSTGRES_PASSWORD:circlenet123}
+    password: ${POSTGRES_PASSWORD:${postgres_password}}
     driver-class-name: org.postgresql.Driver
   sql:
     init:
@@ -20,4 +20,22 @@ spring:
 
 security:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:${jwt_secret}}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      application: circlenet-backend
+
+circlenet:
+  ai:
+    base-url: ${CIRCLENET_AI_BASE_URL:http://ai-agent:8081/api/v1}

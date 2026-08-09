@@ -29,7 +29,7 @@ public class CircleConversationService {
     CirclePostEntity parent=null; if(parentPostId!=null){parent=posts.findById(parentPostId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Message not found"));if(!circleId.equals(parent.getCircleId()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Reply must belong to this circle");}
     if(clean.isBlank()&&(file==null||file.isEmpty()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Write a message or choose a file");
     CirclePostEntity post=new CirclePostEntity();post.setCircleId(circleId);post.setAuthorUserId(userId);post.setParentPostId(parent==null?null:parent.getId());post.setMessage(clean);
-    if(file!=null&&!file.isEmpty()){var media=storage.store(file);post.setAttachmentKey(media.key());post.setAttachmentName(media.name());post.setAttachmentType(media.type());post.setAttachmentSize(media.size());}
+    if(file!=null&&!file.isEmpty()){var media=storage.store(userId,file);post.setAttachmentKey(media.key());post.setAttachmentName(media.name());post.setAttachmentType(media.type());post.setAttachmentSize(media.size());}
     post=posts.save(post); UserEntity author=users.findById(userId).orElseThrow(); String authorName=name(author);
     for(Long memberId:circle.getMemberUserIds()) if(!memberId.equals(userId)) notificationService.notify(new NotificationCommand(memberId,"CIRCLE_MESSAGE",circle.getName(),authorName+": "+(clean.isBlank()?"Sent an attachment":clean),"/dashboard?circleId="+circleId,"CIRCLE_POST",post.getId()));
     return dto(post,userId);
