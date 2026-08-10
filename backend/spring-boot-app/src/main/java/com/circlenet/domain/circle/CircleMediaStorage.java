@@ -12,7 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class CircleMediaStorage {
-  private static final Set<String> TYPES=Set.of("image/jpeg","image/png","image/webp","video/mp4","video/webm","application/pdf","text/plain","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation");
+  private static final Set<String> TYPES=Set.of("image/jpeg","image/png","image/webp","video/mp4","video/webm","audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a","audio/wav","audio/x-wav","audio/webm","audio/ogg","application/pdf","text/plain","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation");
   private final MediaObjectStorage storage; private final MediaAssetService assets;
   public CircleMediaStorage(MediaObjectStorage storage,MediaAssetService assets){this.storage=storage;this.assets=assets;}
   public StoredMedia store(Long ownerUserId,MultipartFile file){

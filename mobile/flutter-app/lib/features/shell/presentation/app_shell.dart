@@ -76,7 +76,8 @@ class _AppShellState extends State<AppShell> {
       }
     });
     Future<void>.delayed(Duration.zero, checkIncomingCalls);
-    WidgetsBinding.instance.addPostFrameCallback((_) => maybeSuggestContactOrganizer());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => maybeSuggestContactOrganizer());
   }
 
   @override
@@ -133,20 +134,31 @@ class _AppShellState extends State<AppShell> {
   Future<void> maybeSuggestContactOrganizer() async {
     if (!mounted || kIsWeb) return;
     final preferences = await SharedPreferences.getInstance();
-    if (preferences.getBool('contact_organizer_prompted') == true || !mounted) return;
+    if (preferences.getBool('contact_organizer_prompted') == true || !mounted) {
+      return;
+    }
     await preferences.setBool('contact_organizer_prompted', true);
     if (!mounted) return;
-    final open = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      icon: const Icon(Icons.auto_awesome_rounded, color: AppTheme.primary, size: 38),
-      title: const Text('Organize your contacts?'),
-      content: const Text('This optional step can suggest family relationships and circles after you grant contact permission. You review everything before it is added.'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Later')),
-        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Review contacts')),
-      ],
-    ));
+    final open = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+              icon: const Icon(Icons.auto_awesome_rounded,
+                  color: AppTheme.primary, size: 38),
+              title: const Text('Organize your contacts?'),
+              content: const Text(
+                  'This optional step can suggest family relationships and circles after you grant contact permission. You review everything before it is added.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Later')),
+                FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Review contacts')),
+              ],
+            ));
     if (open == true && mounted) {
-      await Navigator.push(context, MaterialPageRoute(builder: (_) => ContactOrganizerScreen(api: api)));
+      await Navigator.push(context,
+          MaterialPageRoute(builder: (_) => ContactOrganizerScreen(api: api)));
       if (mounted) setState(() => syncVersion++);
     }
   }
@@ -629,23 +641,36 @@ class _NetworkHomeState extends State<NetworkHome> {
                 eyebrow: 'MY CIRCLENET',
                 title: 'Relationships',
                 subtitle: 'Your connected family and social network.',
-                action: SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(
-                          value: true,
-                          icon: Icon(Icons.account_tree_rounded),
-                          tooltip: 'Tree view'),
-                      ButtonSegment(
-                          value: false,
-                          icon: Icon(Icons.view_list_rounded),
-                          tooltip: 'List view')
-                    ],
-                    selected: {
-                      treeView
-                    },
-                    showSelectedIcon: false,
-                    onSelectionChanged: (value) =>
-                        setState(() => treeView = value.first)))),
+                action: Row(mainAxisSize: MainAxisSize.min, children: [
+                  IconButton.filledTonal(
+                      tooltip: 'Message a relationship audience',
+                      onPressed: items == null
+                          ? null
+                          : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => RelationshipBroadcastScreen(
+                                      api: widget.api, relationships: items!))),
+                      icon: const Icon(Icons.campaign_rounded)),
+                  const SizedBox(width: 6),
+                  SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                            value: true,
+                            icon: Icon(Icons.account_tree_rounded),
+                            tooltip: 'Tree view'),
+                        ButtonSegment(
+                            value: false,
+                            icon: Icon(Icons.view_list_rounded),
+                            tooltip: 'List view')
+                      ],
+                      selected: {
+                        treeView
+                      },
+                      showSelectedIcon: false,
+                      onSelectionChanged: (value) =>
+                          setState(() => treeView = value.first)),
+                ]))),
         if (error != null)
           SliverFillRemaining(child: _ErrorState(error!, retry: load))
         else if (items == null)
@@ -676,7 +701,240 @@ class _NetworkHomeState extends State<NetworkHome> {
       ]));
 }
 
-class _FamilyTreeView extends StatelessWidget {
+class RelationshipBroadcastScreen extends StatefulWidget {
+  const RelationshipBroadcastScreen(
+      {super.key, required this.api, required this.relationships});
+  final CircleNetApi api;
+  final List<Relationship> relationships;
+  @override
+  State<RelationshipBroadcastScreen> createState() =>
+      _RelationshipBroadcastScreenState();
+}
+
+class _RelationshipBroadcastScreenState
+    extends State<RelationshipBroadcastScreen> {
+  String audienceType = 'HORIZONTAL';
+  int? anchorUserId;
+  final locationController = TextEditingController();
+  final messageController = TextEditingController();
+  Map<String, dynamic>? preview;
+  PlatformFile? attachment;
+  bool loading = false;
+  double progress = 0;
+  String? error;
+
+  @override
+  void dispose() {
+    locationController.dispose();
+    messageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(title: const Text('Relationship broadcast')),
+      body: SafeArea(
+          child: ListView(padding: const EdgeInsets.all(14), children: [
+        const Text(
+            'Send one private copy to everyone in the selected audience. Recipients cannot see one another.',
+            style: TextStyle(color: Color(0xFF667085))),
+        const SizedBox(height: 12),
+        SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                  value: 'HORIZONTAL',
+                  label: Text('Children'),
+                  icon: Icon(Icons.account_tree_rounded)),
+              ButtonSegment(
+                  value: 'VERTICAL',
+                  label: Text('Chain'),
+                  icon: Icon(Icons.vertical_align_bottom_rounded)),
+              ButtonSegment(
+                  value: 'LOCATION',
+                  label: Text('Area'),
+                  icon: Icon(Icons.location_on_outlined)),
+            ],
+            selected: {
+              audienceType
+            },
+            onSelectionChanged: (values) => setState(() {
+                  audienceType = values.first;
+                  preview = null;
+                  error = null;
+                })),
+        const SizedBox(height: 12),
+        if (audienceType != 'LOCATION')
+          DropdownButtonFormField<int>(
+              initialValue: anchorUserId,
+              decoration: InputDecoration(
+                  labelText: audienceType == 'HORIZONTAL'
+                      ? 'Parent node'
+                      : 'Start person'),
+              items: widget.relationships
+                  .map((item) => DropdownMenuItem(
+                      value: item.person.id,
+                      child: Text(item.person.displayName,
+                          overflow: TextOverflow.ellipsis)))
+                  .toList(),
+              onChanged: (value) => setState(() {
+                    anchorUserId = value;
+                    preview = null;
+                  })),
+        if (audienceType == 'LOCATION')
+          TextField(
+              controller: locationController,
+              decoration: const InputDecoration(
+                  labelText: 'City, town, area, state or country',
+                  prefixIcon: Icon(Icons.search_rounded)),
+              onChanged: (_) => setState(() => preview = null)),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+            onPressed: loading ? null : loadPreview,
+            icon: const Icon(Icons.people_alt_outlined),
+            label: const Text('Preview recipients')),
+        if (error != null)
+          Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(error!,
+                  style: const TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.w800))),
+        if (preview != null) ...[
+          const SizedBox(height: 10),
+          Card(
+              child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                            '${(preview!['recipients'] as List).length} recipients',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w900)),
+                        if ((preview!['excludedCount'] as num).toInt() > 0)
+                          Text(
+                              '${preview!['excludedCount']} managed, invited or inactive profiles excluded',
+                              style: const TextStyle(
+                                  color: Color(0xFF9A6A25), fontSize: 12)),
+                        const Divider(),
+                        Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children:
+                                (preview!['recipients'] as List).map((raw) {
+                              final item = raw as Map;
+                              return Chip(
+                                  avatar: const Icon(Icons.person_outline,
+                                      size: 16),
+                                  label: Text(item['displayName'].toString()));
+                            }).toList()),
+                      ]))),
+          const SizedBox(height: 10),
+          TextField(
+              controller: messageController,
+              minLines: 3,
+              maxLines: 6,
+              maxLength: 4000,
+              decoration: const InputDecoration(
+                  labelText: 'Message',
+                  hintText: 'Write one message for this audience…',
+                  alignLabelWithHint: true)),
+          Row(children: [
+            OutlinedButton.icon(
+                onPressed: chooseAttachment,
+                icon: const Icon(Icons.attach_file_rounded),
+                label: Text(attachment == null ? 'Attach' : attachment!.name,
+                    overflow: TextOverflow.ellipsis)),
+            if (attachment != null)
+              IconButton(
+                  tooltip: 'Remove attachment',
+                  onPressed: () => setState(() => attachment = null),
+                  icon: const Icon(Icons.close_rounded)),
+            const Spacer(),
+            FilledButton.icon(
+                onPressed: loading ? null : send,
+                icon: const Icon(Icons.send_rounded),
+                label: const Text('Send')),
+          ]),
+          if (loading)
+            Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: LinearProgressIndicator(
+                    value: progress > 0 ? progress : null)),
+        ],
+        if (loading && preview == null)
+          const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator())),
+      ])));
+
+  Future<void> loadPreview() async {
+    if (audienceType != 'LOCATION' && anchorUserId == null) {
+      setState(() => error = 'Choose a person first.');
+      return;
+    }
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final value = await widget.api.previewBroadcast(audienceType,
+          anchorUserId: anchorUserId, location: locationController.text);
+      if (mounted) setState(() => preview = value);
+    } catch (exception) {
+      if (mounted) setState(() => error = exception.toString());
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> chooseAttachment() async {
+    final result = await FilePicker.platform.pickFiles(withData: true);
+    if (result != null && mounted) {
+      setState(() => attachment = result.files.single);
+    }
+  }
+
+  Future<void> send() async {
+    if (messageController.text.trim().isEmpty && attachment == null) {
+      setState(() => error = 'Write a message or choose an attachment.');
+      return;
+    }
+    setState(() {
+      loading = true;
+      progress = 0;
+      error = null;
+    });
+    try {
+      final result = await widget.api.sendBroadcast(
+          audienceType, messageController.text.trim(),
+          anchorUserId: anchorUserId,
+          location: locationController.text,
+          bytes: attachment?.bytes,
+          fileName: attachment?.name, onProgress: (value) {
+        if (mounted) setState(() => progress = value);
+      });
+      if (!mounted) return;
+      await showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+                  title: const Text('Broadcast complete'),
+                  content: Text(
+                      '${result['deliveredCount']} delivered${(result['failedCount'] as num).toInt() == 0 ? '' : ', ${result['failedCount']} failed'}.'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Done'))
+                  ]));
+      if (mounted) Navigator.pop(context);
+    } catch (exception) {
+      if (mounted) setState(() => error = exception.toString());
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+}
+
+class _FamilyTreeView extends StatefulWidget {
   const _FamilyTreeView({
     required this.relationships,
     required this.profile,
@@ -689,136 +947,13 @@ class _FamilyTreeView extends StatelessWidget {
   final CircleNetApi api;
   final VoidCallback onChanged;
 
-  static const nodeWidth = 142.0;
-  static const nodeHeight = 108.0;
-  static const horizontalGap = 42.0;
-  static const verticalGap = 72.0;
+  static const nodeWidth = 132.0;
+  static const nodeHeight = 98.0;
+  static const horizontalGap = 30.0;
+  static const verticalGap = 58.0;
 
   @override
-  Widget build(BuildContext context) {
-    final layout = _layout(MediaQuery.sizeOf(context).width);
-    return Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 92),
-        decoration: BoxDecoration(
-            color: const Color(0xFFFBFAFF),
-            border: Border.all(color: const Color(0xFFE1DBF2)),
-            borderRadius: BorderRadius.circular(22)),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(children: [
-          InteractiveViewer(
-              constrained: false,
-              minScale: .35,
-              maxScale: 2.2,
-              boundaryMargin: const EdgeInsets.all(180),
-              child: SizedBox(
-                  width: layout.width,
-                  height: layout.height,
-                  child: Stack(children: [
-                    CustomPaint(
-                        size: Size(layout.width, layout.height),
-                        painter: _TreeConnectorPainter(
-                            relationships: relationships,
-                            positions: layout.positions)),
-                    ...relationships.map((relationship) {
-                      final position =
-                          layout.positions[relationship.person.id]!;
-                      return Positioned(
-                          left: position.dx,
-                          top: position.dy,
-                          child: _TreePersonNode(
-                              relationship: relationship,
-                              onTap: () => RelationshipTile(
-                                      relationship: relationship,
-                                      api: api,
-                                      onRemoved: onChanged)
-                                  .showConnect(context)));
-                    }),
-                    Positioned(
-                        left: layout.positions[-1]!.dx,
-                        top: layout.positions[-1]!.dy,
-                        child: _SelfTreeNode(profile: profile))
-                  ]))),
-          Positioned(
-              right: 12,
-              bottom: 12,
-              child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .92),
-                      borderRadius: BorderRadius.circular(999),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0x16000000), blurRadius: 10)
-                      ]),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.pinch_rounded,
-                        size: 16, color: AppTheme.primary),
-                    SizedBox(width: 5),
-                    Text('Pinch and drag',
-                        style: TextStyle(
-                            fontSize: 10, fontWeight: FontWeight.w800))
-                  ])))
-        ]));
-  }
-
-  _TreeLayout _layout(double viewportWidth) {
-    final personIds = relationships.map((item) => item.person.id).toSet();
-    final levels = <int, int>{-1: 0};
-    for (var pass = 0; pass < relationships.length + 2; pass++) {
-      var changed = false;
-      for (final item in relationships) {
-        if (levels.containsKey(item.person.id)) continue;
-        final anchor = item.relativeToUserId;
-        final anchorId =
-            anchor != null && personIds.contains(anchor) ? anchor : -1;
-        final anchorLevel = levels[anchorId];
-        if (anchorLevel == null) continue;
-        levels[item.person.id] = anchorLevel + _levelDelta(item.type);
-        changed = true;
-      }
-      if (!changed) break;
-    }
-    for (final item in relationships) {
-      levels.putIfAbsent(item.person.id, () => 0);
-    }
-
-    final byLevel = <int, List<int>>{};
-    levels.forEach((id, level) => byLevel.putIfAbsent(level, () => []).add(id));
-    final minLevel = levels.values.reduce(math.min);
-    final maxLevel = levels.values.reduce(math.max);
-    final maxNodes =
-        byLevel.values.map((items) => items.length).reduce(math.max);
-    final width = math.max(viewportWidth - 24,
-        maxNodes * nodeWidth + math.max(0, maxNodes - 1) * horizontalGap + 80);
-    final height = (maxLevel - minLevel + 1) * (nodeHeight + verticalGap) + 80;
-    final positions = <int, Offset>{};
-    for (var level = maxLevel; level >= minLevel; level--) {
-      final ids = byLevel[level] ?? [];
-      ids.sort((a, b) => _order(a).compareTo(_order(b)));
-      final rowWidth =
-          ids.length * nodeWidth + math.max(0, ids.length - 1) * horizontalGap;
-      final start = (width - rowWidth) / 2;
-      for (var index = 0; index < ids.length; index++) {
-        positions[ids[index]] = Offset(
-            start + index * (nodeWidth + horizontalGap),
-            38 + (maxLevel - level) * (nodeHeight + verticalGap));
-      }
-    }
-    return _TreeLayout(width, height, positions);
-  }
-
-  int _order(int id) {
-    if (id == -1) return 50;
-    final item = relationships.firstWhere((value) => value.person.id == id);
-    final type = item.type.toLowerCase();
-    if (type.contains('brother') ||
-        type.contains('sister') ||
-        type.contains('sibling')) {
-      return 20;
-    }
-    if (_isPartner(type)) return 60;
-    return 40;
-  }
+  State<_FamilyTreeView> createState() => _FamilyTreeViewState();
 
   static int _levelDelta(String value) {
     final type = value.toLowerCase();
@@ -835,6 +970,250 @@ class _FamilyTreeView extends StatelessWidget {
       value.contains('spouse') ||
       value.contains('wife') ||
       value.contains('husband');
+}
+
+class _FamilyTreeViewState extends State<_FamilyTreeView> {
+  final transformation = TransformationController();
+  Size? lastViewport;
+  Size? lastTreeSize;
+
+  @override
+  void dispose() {
+    transformation.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = _layout(MediaQuery.sizeOf(context).width);
+    return Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 92),
+        decoration: BoxDecoration(
+            color: const Color(0xFFFBFAFF),
+            border: Border.all(color: const Color(0xFFE1DBF2)),
+            borderRadius: BorderRadius.circular(22)),
+        clipBehavior: Clip.antiAlias,
+        child: LayoutBuilder(builder: (context, constraints) {
+          final viewport = Size(constraints.maxWidth, constraints.maxHeight);
+          final treeSize = Size(layout.width, layout.height);
+          if (lastViewport != viewport || lastTreeSize != treeSize) {
+            lastViewport = viewport;
+            lastTreeSize = treeSize;
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) => _fit(layout, viewport));
+          }
+          return Stack(children: [
+            InteractiveViewer(
+                transformationController: transformation,
+                constrained: false,
+                minScale: .22,
+                maxScale: 2.8,
+                boundaryMargin: const EdgeInsets.all(180),
+                child: SizedBox(
+                    width: layout.width,
+                    height: layout.height,
+                    child: Stack(children: [
+                      CustomPaint(
+                          size: Size(layout.width, layout.height),
+                          painter: _TreeConnectorPainter(
+                              relationships: widget.relationships,
+                              positions: layout.positions)),
+                      ...widget.relationships.map((relationship) {
+                        final position =
+                            layout.positions[relationship.person.id]!;
+                        return Positioned(
+                            left: position.dx,
+                            top: position.dy,
+                            child: _TreePersonNode(
+                                relationship: relationship,
+                                onTap: () => RelationshipTile(
+                                        relationship: relationship,
+                                        api: widget.api,
+                                        onRemoved: widget.onChanged)
+                                    .showConnect(context)));
+                      }),
+                      Positioned(
+                          left: layout.positions[-1]!.dx,
+                          top: layout.positions[-1]!.dy,
+                          child: _SelfTreeNode(profile: widget.profile))
+                    ]))),
+            Positioned(
+                right: 12,
+                bottom: 12,
+                child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .92),
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x16000000), blurRadius: 10)
+                        ]),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      _treeControl(
+                          Icons.remove_rounded, 'Zoom out', () => _zoom(.82)),
+                      _treeControl(Icons.center_focus_strong_rounded,
+                          'Fit tree', () => _fit(layout, viewport)),
+                      _treeControl(
+                          Icons.add_rounded, 'Zoom in', () => _zoom(1.2)),
+                    ]))),
+            Positioned(
+                left: 12,
+                bottom: 12,
+                child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .94),
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x16000000), blurRadius: 10)
+                        ]),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.touch_app_rounded,
+                          size: 15, color: AppTheme.primary),
+                      SizedBox(width: 4),
+                      Text('Tap a person',
+                          style: TextStyle(
+                              fontSize: 10, fontWeight: FontWeight.w800))
+                    ])))
+          ]);
+        }));
+  }
+
+  Widget _treeControl(IconData icon, String tooltip, VoidCallback action) =>
+      IconButton(
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+          padding: EdgeInsets.zero,
+          tooltip: tooltip,
+          onPressed: action,
+          icon: Icon(icon, size: 17, color: AppTheme.primary));
+
+  void _zoom(double factor) {
+    final current = transformation.value.getMaxScaleOnAxis();
+    final target = (current * factor).clamp(.22, 2.8);
+    final ratio = target / current;
+    transformation.value = transformation.value.clone()
+      ..scaleByDouble(ratio, ratio, ratio, 1);
+  }
+
+  void _fit(_TreeLayout layout, Size viewport) {
+    if (!mounted || viewport.width <= 0 || viewport.height <= 0) return;
+    final scale = math
+        .min((viewport.width - 24) / layout.width,
+            (viewport.height - 24) / layout.height)
+        .clamp(.22, 1.0);
+    final dx = (viewport.width - layout.width * scale) / 2;
+    final dy = math.max(12.0, (viewport.height - layout.height * scale) / 2);
+    transformation.value = Matrix4.identity()
+      ..translateByDouble(dx, dy, 0, 1)
+      ..scaleByDouble(scale, scale, scale, 1);
+  }
+
+  _TreeLayout _layout(double viewportWidth) {
+    final personIds =
+        widget.relationships.map((item) => item.person.id).toSet();
+    final levels = <int, int>{-1: 0};
+    for (var pass = 0; pass < widget.relationships.length + 2; pass++) {
+      var changed = false;
+      for (final item in widget.relationships) {
+        if (levels.containsKey(item.person.id)) continue;
+        final anchor = item.relativeToUserId;
+        final anchorId =
+            anchor != null && personIds.contains(anchor) ? anchor : -1;
+        final anchorLevel = levels[anchorId];
+        if (anchorLevel == null) continue;
+        levels[item.person.id] =
+            anchorLevel + _FamilyTreeView._levelDelta(item.type);
+        changed = true;
+      }
+      if (!changed) break;
+    }
+    for (final item in widget.relationships) {
+      levels.putIfAbsent(item.person.id, () => 0);
+    }
+
+    final byLevel = <int, List<int>>{};
+    levels.forEach((id, level) => byLevel.putIfAbsent(level, () => []).add(id));
+    final minLevel = levels.values.reduce(math.min);
+    final maxLevel = levels.values.reduce(math.max);
+    final maxNodes =
+        byLevel.values.map((items) => items.length).reduce(math.max);
+    final width = math.max(
+        viewportWidth - 24,
+        maxNodes * _FamilyTreeView.nodeWidth +
+            math.max(0, maxNodes - 1) * _FamilyTreeView.horizontalGap +
+            80);
+    final height = (maxLevel - minLevel + 1) *
+            (_FamilyTreeView.nodeHeight + _FamilyTreeView.verticalGap) +
+        80;
+    final positions = <int, Offset>{};
+    for (var level = maxLevel; level >= minLevel; level--) {
+      final ids = byLevel[level] ?? [];
+      final ordered = _orderedRow(ids);
+      final rowWidth = ordered.length * _FamilyTreeView.nodeWidth +
+          math.max(0, ordered.length - 1) * _FamilyTreeView.horizontalGap;
+      final start = (width - rowWidth) / 2;
+      for (var index = 0; index < ordered.length; index++) {
+        positions[ordered[index]] = Offset(
+            start +
+                index *
+                    (_FamilyTreeView.nodeWidth + _FamilyTreeView.horizontalGap),
+            38 +
+                (maxLevel - level) *
+                    (_FamilyTreeView.nodeHeight + _FamilyTreeView.verticalGap));
+      }
+    }
+    return _TreeLayout(width, height, positions);
+  }
+
+  int _order(int id) {
+    if (id == -1) return 50;
+    final item =
+        widget.relationships.firstWhere((value) => value.person.id == id);
+    final type = item.type.toLowerCase();
+    if (type.contains('brother') ||
+        type.contains('sister') ||
+        type.contains('sibling')) {
+      return 20;
+    }
+    if (_FamilyTreeView._isPartner(type)) return 60;
+    return 40;
+  }
+
+  List<int> _orderedRow(List<int> ids) {
+    final remaining = ids.toSet();
+    final result = <int>[];
+    final bases = ids
+        .where((id) =>
+            id == -1 ||
+            !_FamilyTreeView._isPartner(widget.relationships
+                .firstWhere((item) => item.person.id == id)
+                .type
+                .toLowerCase()))
+        .toList()
+      ..sort((a, b) => _order(a).compareTo(_order(b)));
+    for (final id in bases) {
+      if (!remaining.remove(id)) continue;
+      result.add(id);
+      final partners = widget.relationships
+          .where((item) =>
+              remaining.contains(item.person.id) &&
+              item.relativeToUserId == (id == -1 ? null : id) &&
+              _FamilyTreeView._isPartner(item.type.toLowerCase()))
+          .map((item) => item.person.id)
+          .toList();
+      for (final partner in partners) {
+        remaining.remove(partner);
+        result.add(partner);
+      }
+    }
+    final rest = remaining.toList()
+      ..sort((a, b) => _order(a).compareTo(_order(b)));
+    result.addAll(rest);
+    return result;
+  }
 }
 
 class _TreeLayout {
@@ -886,7 +1265,26 @@ class _TreeConnectorPainter extends CustomPainter {
         continue;
       }
       final downward = targetCenter.dy > sourceCenter.dy;
-      final start = Offset(sourceCenter.dx,
+      var sourceX = sourceCenter.dx;
+      if (downward) {
+        final partnerPositions = relationships
+            .where((candidate) {
+              final candidateAnchor = candidate.relativeToUserId ?? -1;
+              return candidateAnchor == anchorId &&
+                  _FamilyTreeView._isPartner(candidate.type.toLowerCase());
+            })
+            .map((candidate) => positions[candidate.person.id])
+            .whereType<Offset>()
+            .toList();
+        if (partnerPositions.isNotEmpty) {
+          sourceX = ([source, ...partnerPositions].fold<double>(
+                  0,
+                  (sum, value) =>
+                      sum + value.dx + _FamilyTreeView.nodeWidth / 2)) /
+              (partnerPositions.length + 1);
+        }
+      }
+      final start = Offset(sourceX,
           downward ? source.dy + _FamilyTreeView.nodeHeight : source.dy);
       final end = Offset(targetCenter.dx,
           downward ? target.dy : target.dy + _FamilyTreeView.nodeHeight);
@@ -911,9 +1309,11 @@ class _TreeConnectorPainter extends CustomPainter {
 
   void _label(Canvas canvas, String text, Offset center,
       {Color color = const Color(0xFF56437F)}) {
+    final displayText =
+        text.codeUnits.contains(226) ? String.fromCharCode(0x2665) : text;
     final painter = TextPainter(
         text: TextSpan(
-            text: text,
+            text: displayText,
             style: TextStyle(
                 color: color, fontSize: 9, fontWeight: FontWeight.w900)),
         textDirection: TextDirection.ltr)
@@ -1929,8 +2329,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => ContactOrganizerScreen(
-                                    api: widget.api))))),
+                                builder: (_) =>
+                                    ContactOrganizerScreen(api: widget.api))))),
                 const SizedBox(height: 12),
                 Card(
                     child: Padding(
@@ -2011,8 +2411,17 @@ class _ContactOrganizerScreenState extends State<ContactOrganizerScreen> {
   String? error;
   List<Map<String, dynamic>> suggestions = [];
   static const relationshipTypes = [
-    'Friend', 'Mother', 'Father', 'Sister', 'Brother', 'Spouse',
-    'Son', 'Daughter', 'Relative', 'Colleague', 'Other'
+    'Friend',
+    'Mother',
+    'Father',
+    'Sister',
+    'Brother',
+    'Spouse',
+    'Son',
+    'Daughter',
+    'Relative',
+    'Colleague',
+    'Other'
   ];
 
   @override
@@ -2020,88 +2429,255 @@ class _ContactOrganizerScreenState extends State<ContactOrganizerScreen> {
       appBar: AppBar(title: const Text('AI Contact Organizer')),
       body: SafeArea(
           child: loading
-              ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  CircularProgressIndicator(), SizedBox(height: 12),
-                  Text('Analyzing contact names and organizations…')]))
-              : suggestions.isEmpty ? consentView() : reviewView()));
+              ? const Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 12),
+                  Text('Analyzing contact names and organizations…')
+                ]))
+              : suggestions.isEmpty
+                  ? consentView()
+                  : reviewView()));
 
-  Widget consentView() => ListView(padding: const EdgeInsets.all(16), children: [
-        const Icon(Icons.contact_phone_rounded, size: 60, color: AppTheme.primary),
+  Widget consentView() =>
+      ListView(padding: const EdgeInsets.all(16), children: [
+        const Icon(Icons.contact_phone_rounded,
+            size: 60, color: AppTheme.primary),
         const SizedBox(height: 16),
-        Text('Organize contacts with AI', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900), textAlign: TextAlign.center),
+        Text('Organize contacts with AI',
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w900),
+            textAlign: TextAlign.center),
         const SizedBox(height: 12),
-        const Text('CircleNet reads your phonebook only after permission. Raw contacts are not retained during analysis. You review every relationship and circle before anything is added.', textAlign: TextAlign.center),
+        const Text(
+            'CircleNet reads your phonebook only after permission. Raw contacts are not retained during analysis. You review every relationship and circle before anything is added.',
+            textAlign: TextAlign.center),
         const SizedBox(height: 16),
-        const Card(child: Padding(padding: EdgeInsets.all(14), child: Column(children: [
-          ListTile(leading: Icon(Icons.lock_outline_rounded), title: Text('Explicit permission'), subtitle: Text('You can deny or revoke contact access at any time.')),
-          ListTile(leading: Icon(Icons.rule_rounded), title: Text('Review required'), subtitle: Text('AI suggestions never modify your tree automatically.')),
-          ListTile(leading: Icon(Icons.skip_next_rounded), title: Text('Completely optional'), subtitle: Text('Skip now and use it later from Profile.')),
-        ]))),
-        if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w800))),
+        const Card(
+            child: Padding(
+                padding: EdgeInsets.all(14),
+                child: Column(children: [
+                  ListTile(
+                      leading: Icon(Icons.lock_outline_rounded),
+                      title: Text('Explicit permission'),
+                      subtitle: Text(
+                          'You can deny or revoke contact access at any time.')),
+                  ListTile(
+                      leading: Icon(Icons.rule_rounded),
+                      title: Text('Review required'),
+                      subtitle: Text(
+                          'AI suggestions never modify your tree automatically.')),
+                  ListTile(
+                      leading: Icon(Icons.skip_next_rounded),
+                      title: Text('Completely optional'),
+                      subtitle:
+                          Text('Skip now and use it later from Profile.')),
+                ]))),
+        if (error != null)
+          Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(error!,
+                  style: const TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.w800))),
         const SizedBox(height: 16),
-        FilledButton.icon(onPressed: readAndAnalyze, icon: const Icon(Icons.auto_awesome_rounded), label: const Text('Allow and analyze contacts')),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Skip for now')),
+        FilledButton.icon(
+            onPressed: readAndAnalyze,
+            icon: const Icon(Icons.auto_awesome_rounded),
+            label: const Text('Allow and analyze contacts')),
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Skip for now')),
       ]);
 
   Widget reviewView() => Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 4), child: Row(children: [
-          Expanded(child: Text('${suggestions.where((item) => item['selected'] == true).length} of ${suggestions.length} selected', style: const TextStyle(fontWeight: FontWeight.w800))),
-          TextButton(onPressed: () => setState(() { for (final item in suggestions) { item['selected'] = true; } }), child: const Text('Select all')),
-          TextButton(onPressed: () => setState(() { for (final item in suggestions) { item['selected'] = false; } }), child: const Text('Clear')),
-        ])),
-        if (error != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Text(error!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w800))),
-        Expanded(child: ListView.builder(padding: const EdgeInsets.fromLTRB(12, 4, 12, 100), itemCount: suggestions.length, itemBuilder: (_, index) {
-          final item = suggestions[index];
-          final circles = List<String>.from(item['suggested_circles'] as List? ?? const []);
-          return Card(child: Padding(padding: const EdgeInsets.all(10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            CheckboxListTile(contentPadding: EdgeInsets.zero, value: item['selected'] == true, onChanged: (value) => setState(() => item['selected'] = value ?? false), title: Text(item['display_name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text(item['phone']?.toString() ?? 'No mobile number — will be skipped')),
-            DropdownButtonFormField<String>(initialValue: item['suggested_relationship']?.toString(), decoration: const InputDecoration(labelText: 'Relationship'), items: relationshipTypes.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(), onChanged: (value) => setState(() => item['suggested_relationship'] = value)),
-            const SizedBox(height: 8),
-            TextFormField(initialValue: circles.join(', '), decoration: const InputDecoration(labelText: 'Suggested circles', helperText: 'Separate circle names with commas'), onChanged: (value) => item['suggested_circles'] = value.split(',').map((part) => part.trim()).where((part) => part.isNotEmpty).toList()),
-            const SizedBox(height: 6),
-            Text('${((item['confidence'] as num?)?.toDouble() ?? 0) * 100 ~/ 1}% confidence • ${(item['reasons'] as List? ?? const []).join(' • ')}', style: const TextStyle(fontSize: 12, color: Color(0xFF718096))),
-          ])));
-        })),
-        Padding(padding: const EdgeInsets.all(12), child: SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: accept, icon: const Icon(Icons.check_circle_outline_rounded), label: const Text('Confirm selected suggestions'))))
+        Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+            child: Row(children: [
+              Expanded(
+                  child: Text(
+                      '${suggestions.where((item) => item['selected'] == true).length} of ${suggestions.length} selected',
+                      style: const TextStyle(fontWeight: FontWeight.w800))),
+              TextButton(
+                  onPressed: () => setState(() {
+                        for (final item in suggestions) {
+                          item['selected'] = true;
+                        }
+                      }),
+                  child: const Text('Select all')),
+              TextButton(
+                  onPressed: () => setState(() {
+                        for (final item in suggestions) {
+                          item['selected'] = false;
+                        }
+                      }),
+                  child: const Text('Clear')),
+            ])),
+        if (error != null)
+          Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(error!,
+                  style: const TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.w800))),
+        Expanded(
+            child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 100),
+                itemCount: suggestions.length,
+                itemBuilder: (_, index) {
+                  final item = suggestions[index];
+                  final circles = List<String>.from(
+                      item['suggested_circles'] as List? ?? const []);
+                  return Card(
+                      child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CheckboxListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    value: item['selected'] == true,
+                                    onChanged: (value) => setState(() =>
+                                        item['selected'] = value ?? false),
+                                    title: Text(
+                                        item['display_name']?.toString() ?? '',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w800)),
+                                    subtitle: Text(item['phone']?.toString() ??
+                                        'No mobile number — will be skipped')),
+                                DropdownButtonFormField<String>(
+                                    initialValue: item['suggested_relationship']
+                                        ?.toString(),
+                                    decoration: const InputDecoration(
+                                        labelText: 'Relationship'),
+                                    items: relationshipTypes
+                                        .map((value) => DropdownMenuItem(
+                                            value: value, child: Text(value)))
+                                        .toList(),
+                                    onChanged: (value) => setState(() =>
+                                        item['suggested_relationship'] =
+                                            value)),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                    initialValue: circles.join(', '),
+                                    decoration: const InputDecoration(
+                                        labelText: 'Suggested circles',
+                                        helperText:
+                                            'Separate circle names with commas'),
+                                    onChanged: (value) =>
+                                        item['suggested_circles'] = value
+                                            .split(',')
+                                            .map((part) => part.trim())
+                                            .where((part) => part.isNotEmpty)
+                                            .toList()),
+                                const SizedBox(height: 6),
+                                Text(
+                                    '${((item['confidence'] as num?)?.toDouble() ?? 0) * 100 ~/ 1}% confidence • ${(item['reasons'] as List? ?? const []).join(' • ')}',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF718096))),
+                              ])));
+                })),
+        Padding(
+            padding: const EdgeInsets.all(12),
+            child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                    onPressed: accept,
+                    icon: const Icon(Icons.check_circle_outline_rounded),
+                    label: const Text('Confirm selected suggestions'))))
       ]);
 
   Future<void> readAndAnalyze() async {
-    if (kIsWeb) { setState(() => error = 'Contact import is available in the Android and iOS apps.'); return; }
+    if (kIsWeb) {
+      setState(() =>
+          error = 'Contact import is available in the Android and iOS apps.');
+      return;
+    }
     final status = await Permission.contacts.request();
-    if (!status.isGranted) { setState(() => error = status.isPermanentlyDenied ? 'Contact access is disabled. Enable it in device settings, or skip this step.' : 'Contact permission was not granted. Nothing was uploaded.'); return; }
-    setState(() { loading = true; error = null; });
+    if (!status.isGranted) {
+      setState(() => error = status.isPermanentlyDenied
+          ? 'Contact access is disabled. Enable it in device settings, or skip this step.'
+          : 'Contact permission was not granted. Nothing was uploaded.');
+      return;
+    }
+    setState(() {
+      loading = true;
+      error = null;
+    });
     try {
       final contacts = await FastContacts.getAllContacts();
-      final payload = contacts.where((contact) => contact.displayName.trim().isNotEmpty).map((contact) => {
-        'contact_key': contact.id,
-        'display_name': contact.displayName.trim(),
-        'phones': contact.phones.map((phone) => phone.number).where((value) => value.trim().isNotEmpty).toList(),
-        'emails': contact.emails.map((email) => email.address).where((value) => value.trim().isNotEmpty).toList(),
-        'organization': contact.organization?.company ?? '',
-        'job_title': contact.organization?.jobDescription ?? '',
-        'labels': [...contact.phones.map((phone) => phone.label), ...contact.emails.map((email) => email.label), if ((contact.organization?.department ?? '').isNotEmpty) contact.organization!.department]
-      }).toList();
+      final payload = contacts
+          .where((contact) => contact.displayName.trim().isNotEmpty)
+          .map((contact) => {
+                'contact_key': contact.id,
+                'display_name': contact.displayName.trim(),
+                'phones': contact.phones
+                    .map((phone) => phone.number)
+                    .where((value) => value.trim().isNotEmpty)
+                    .toList(),
+                'emails': contact.emails
+                    .map((email) => email.address)
+                    .where((value) => value.trim().isNotEmpty)
+                    .toList(),
+                'organization': contact.organization?.company ?? '',
+                'job_title': contact.organization?.jobDescription ?? '',
+                'labels': [
+                  ...contact.phones.map((phone) => phone.label),
+                  ...contact.emails.map((email) => email.label),
+                  if ((contact.organization?.department ?? '').isNotEmpty)
+                    contact.organization!.department
+                ]
+              })
+          .take(2000)
+          .toList();
       final result = await widget.api.analyzeContacts(payload);
-      for (final item in result) { item['selected'] = item['phone'] != null; }
+      for (final item in result) {
+        item['selected'] = item['phone'] != null;
+      }
       if (mounted) setState(() => suggestions = result);
-    } catch (exception) { if (mounted) setState(() => error = exception.toString()); }
-    finally { if (mounted) setState(() => loading = false); }
+    } catch (exception) {
+      if (mounted) setState(() => error = exception.toString());
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   Future<void> accept() async {
-    setState(() { loading = true; error = null; });
+    setState(() {
+      loading = true;
+      error = null;
+    });
     try {
-      final payload = suggestions.map((item) => {
-        'displayName': item['display_name'], 'phone': item['phone'], 'email': item['email'],
-        'relationship': item['suggested_relationship'], 'circles': item['suggested_circles'],
-        'selected': item['selected'] == true
-      }).toList();
+      final payload = suggestions
+          .map((item) => {
+                'displayName': item['display_name'],
+                'phone': item['phone'],
+                'email': item['email'],
+                'relationship': item['suggested_relationship'],
+                'circles': item['suggested_circles'],
+                'selected': item['selected'] == true
+              })
+          .toList();
       final result = await widget.api.acceptContactSuggestions(payload);
       if (!mounted) return;
-      await showDialog<void>(context: context, builder: (_) => AlertDialog(title: const Text('Contacts organized'), content: Text('${result['peopleAdded']} people added and ${result['circleMembershipsAdded']} circle memberships created.${(result['skipped'] as List? ?? const []).isEmpty ? '' : '\n\nSkipped:\n${(result['skipped'] as List).join('\n')}'}'), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Done'))]));
+      await showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+                  title: const Text('Contacts organized'),
+                  content: Text(
+                      '${result['peopleAdded']} people added and ${result['circleMembershipsAdded']} circle memberships created.${(result['skipped'] as List? ?? const []).isEmpty ? '' : '\n\nSkipped:\n${(result['skipped'] as List).join('\n')}'}'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Done'))
+                  ]));
       if (mounted) Navigator.pop(context);
-    } catch (exception) { if (mounted) setState(() => error = exception.toString()); }
-    finally { if (mounted) setState(() => loading = false); }
+    } catch (exception) {
+      if (mounted) setState(() => error = exception.toString());
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 }
 

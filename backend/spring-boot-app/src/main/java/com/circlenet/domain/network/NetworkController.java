@@ -23,6 +23,9 @@ import com.circlenet.domain.network.dto.CirclePostDto;
 import com.circlenet.domain.message.DirectMessageService;
 import com.circlenet.domain.network.dto.DirectMessageDto;
 import com.circlenet.domain.message.DirectCallService;
+import com.circlenet.domain.message.RelationshipBroadcastService;
+import com.circlenet.domain.network.dto.BroadcastAudienceDto;
+import com.circlenet.domain.network.dto.BroadcastResultDto;
 import com.circlenet.domain.network.dto.DirectCallDto;
 import com.circlenet.domain.network.dto.StartDirectCallRequest;
 import com.circlenet.domain.network.dto.AnswerDirectCallRequest;
@@ -44,7 +47,8 @@ public class NetworkController {
   private final CircleConversationService circleConversationService;
   private final DirectMessageService directMessageService;
   private final DirectCallService directCallService;
-  public NetworkController(NetworkService networkService,CircleConversationService circleConversationService,DirectMessageService directMessageService,DirectCallService directCallService) { this.networkService = networkService; this.circleConversationService=circleConversationService; this.directMessageService=directMessageService; this.directCallService=directCallService; }
+  private final RelationshipBroadcastService broadcastService;
+  public NetworkController(NetworkService networkService,CircleConversationService circleConversationService,DirectMessageService directMessageService,DirectCallService directCallService,RelationshipBroadcastService broadcastService) { this.networkService = networkService; this.circleConversationService=circleConversationService; this.directMessageService=directMessageService; this.directCallService=directCallService; this.broadcastService=broadcastService; }
 
   @GetMapping("/search")
   public List<NetworkPersonDto> search(Principal principal, @RequestParam(defaultValue = "") String q) {
@@ -142,6 +146,24 @@ public class NetworkController {
   @PostMapping("/calls/{callId}/accept") public DirectCallDto acceptCall(Principal principal,@PathVariable Long callId,@RequestBody AnswerDirectCallRequest request){return directCallService.accept(userId(principal),callId,request.answerSdp());}
   @PostMapping("/calls/{callId}/reject") public DirectCallDto rejectCall(Principal principal,@PathVariable Long callId){return directCallService.reject(userId(principal),callId);}
   @PostMapping("/calls/{callId}/end") public DirectCallDto endCall(Principal principal,@PathVariable Long callId){return directCallService.end(userId(principal),callId);}
+
+  @GetMapping("/broadcasts/preview")
+  public BroadcastAudienceDto previewBroadcast(Principal principal,
+      @RequestParam String audienceType,
+      @RequestParam(required=false) Long anchorUserId,
+      @RequestParam(required=false) String location) {
+    return broadcastService.preview(userId(principal), audienceType, anchorUserId, location);
+  }
+
+  @PostMapping(value="/broadcasts", consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
+  public BroadcastResultDto sendBroadcast(Principal principal,
+      @RequestParam String audienceType,
+      @RequestParam(required=false) Long anchorUserId,
+      @RequestParam(required=false) String location,
+      @RequestParam(value="message",required=false) String message,
+      @RequestPart(value="file",required=false) MultipartFile file) {
+    return broadcastService.send(userId(principal), audienceType, anchorUserId, location, message, file);
+  }
 
   private Long userId(Principal principal) { return Long.valueOf(principal.getName()); }
 }

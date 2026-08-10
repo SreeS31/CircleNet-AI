@@ -75,7 +75,7 @@ class ImportedContact(BaseModel):
 
 class ContactOrganizeRequest(BaseModel):
     consent: bool
-    contacts: list[ImportedContact] = Field(min_length=1, max_length=5000)
+    contacts: list[ImportedContact] = Field(min_length=1, max_length=2000)
 
 class ContactSuggestion(BaseModel):
     contact_key: str

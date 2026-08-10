@@ -56,11 +56,39 @@ class CircleNetApi {
               as List)
           .map((item) => CircleModel.fromJson(item as Map<String, dynamic>))
           .toList();
-  Future<List<Person>> search(String query) async => (await _json(_client.get(
-          '/api/network/search?q=${Uri.encodeQueryComponent(query)}',
-          bearerToken: _token)) as List)
-      .map((item) => Person.fromJson(item as Map<String, dynamic>))
-      .toList();
+  Future<List<Person>> search(String query) async {
+    final people = (await _json(_client.get(
+            '/api/network/search?q=${Uri.encodeQueryComponent(query)}',
+            bearerToken: _token)) as List)
+        .map((item) => Person.fromJson(item as Map<String, dynamic>))
+        .toList();
+    if (people.length < 2) return people;
+    try {
+      final ranked = await _json(_client.post(
+          '/api/ai/search/rank',
+          {
+            'query': query,
+            'candidates': people
+                .map((person) => {
+                      'id': person.id,
+                      'name': person.displayName,
+                      'location': person.location ?? ''
+                    })
+                .toList()
+          },
+          bearerToken: _token)) as List;
+      final scores = <int, double>{
+        for (final item in ranked.cast<Map>())
+          int.parse(item['id'].toString()):
+              (item['score'] as num?)?.toDouble() ?? 0
+      };
+      people.sort((a, b) =>
+          (scores[b.id] ?? 0).compareTo(scores[a.id] ?? 0));
+    } catch (_) {
+      // Search remains available when the optional AI ranking service is down.
+    }
+    return people;
+  }
   Future<Relationship> addRelationship(
           Person person, String type, String visibility) async =>
       Relationship.fromJson(await _json(_client.post(
@@ -177,6 +205,41 @@ class CircleNetApi {
         fileName: fileName,
         onProgress: onProgress,
       ));
+  Future<Map<String, dynamic>> previewBroadcast(String audienceType,
+      {int? anchorUserId, String? location}) async {
+    final query = <String, String>{'audienceType': audienceType};
+    if (anchorUserId != null) query['anchorUserId'] = '$anchorUserId';
+    if (location != null && location.trim().isNotEmpty) {
+      query['location'] = location.trim();
+    }
+    return Map<String, dynamic>.from(await _json(_client.get(
+        '/api/network/broadcasts/preview?${Uri(queryParameters: query).query}',
+        bearerToken: _token)) as Map);
+  }
+
+  Future<Map<String, dynamic>> sendBroadcast(
+      String audienceType, String message,
+      {int? anchorUserId,
+      String? location,
+      Uint8List? bytes,
+      String? fileName,
+      void Function(double progress)? onProgress}) async {
+    final fields = <String, String>{
+      'audienceType': audienceType,
+      'message': message
+    };
+    if (anchorUserId != null) fields['anchorUserId'] = '$anchorUserId';
+    if (location != null && location.trim().isNotEmpty) {
+      fields['location'] = location.trim();
+    }
+    return Map<String, dynamic>.from(await _json(_client.postMultipart(
+        '/api/network/broadcasts', fields,
+        bearerToken: _token,
+        fileBytes: bytes,
+        fileName: fileName,
+        onProgress: onProgress)) as Map);
+  }
+
   Future<DirectCallModel> startCall(
           int recipientId, String callType, String offerSdp) async =>
       DirectCallModel.fromJson(await _json(_client.post(
@@ -222,18 +285,17 @@ class CircleNetApi {
 
   Future<List<Map<String, dynamic>>> analyzeContacts(
           List<Map<String, dynamic>> contacts) async =>
-      (await _json(_client.post(
-              '/api/contact-organizer/analyze',
-              {'consent': true, 'contacts': contacts},
-              bearerToken: _token)) as List)
+      (await _json(_client.post('/api/contact-organizer/analyze',
+                  {'consent': true, 'contacts': contacts}, bearerToken: _token))
+              as List)
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList();
 
   Future<Map<String, dynamic>> acceptContactSuggestions(
           List<Map<String, dynamic>> suggestions) async =>
       Map<String, dynamic>.from(await _json(_client.post(
-              '/api/contact-organizer/accept', {'suggestions': suggestions},
-              bearerToken: _token)) as Map);
+          '/api/contact-organizer/accept', {'consent': true, 'suggestions': suggestions},
+          bearerToken: _token)) as Map);
 }
 
 class CircleNetApiException implements Exception {

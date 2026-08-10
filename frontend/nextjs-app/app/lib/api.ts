@@ -1,4 +1,5 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ||
+  (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8080');
 const AUTH_SESSION_KEY = 'circlenet.auth.session';
 
 export type AuthSession = {
@@ -298,14 +299,35 @@ export type NetworkCircle = { id: number; name: string; description: string; mem
 export type CirclePost = { id:number; circleId:number; parentPostId?:number|null; authorId:number; authorName:string; authorPhoto?:string|null; message:string; attachmentUrl?:string|null; attachmentName?:string|null; attachmentType?:string|null; attachmentSize?:number|null; createdAt:string; currentUserAuthor:boolean };
 export type DirectMessage = { id:number; senderId:number; recipientId:number; senderName:string; senderPhoto?:string|null; message:string; attachmentUrl?:string|null; attachmentName?:string|null; attachmentType?:string|null; attachmentSize?:number|null; createdAt:string; currentUserAuthor:boolean };
 export type DirectCall = { id:number; callerId:number; recipientId:number; callerName:string; callerPhoto?:string|null; recipientName:string; recipientPhoto?:string|null; callType:'AUDIO'|'VIDEO'; status:'RINGING'|'ACCEPTED'|'REJECTED'|'ENDED'; offerSdp:string; answerSdp?:string|null; createdAt:string; updatedAt:string; currentUserCaller:boolean };
+export type BroadcastAudienceType = 'HORIZONTAL' | 'VERTICAL' | 'LOCATION';
+export type BroadcastRecipient = { userId:number; displayName:string; relationship:string; location?:string|null; profilePhoto?:string|null };
+export type BroadcastAudience = { audienceType:BroadcastAudienceType; anchorUserId?:number|null; locationQuery?:string|null; recipients:BroadcastRecipient[]; excludedCount:number };
+export type BroadcastResult = { broadcastId:number; audienceType:BroadcastAudienceType; deliveredCount:number; failedCount:number; failures:string[]; createdAt:string };
 
 export async function searchNetworkPeople(query: string) {
   return authenticatedRequest<NetworkPerson[]>(`/api/network/search?q=${encodeURIComponent(query)}`);
+}
+export async function rankNetworkPeople(query:string,candidates:NetworkPerson[]){
+  if(!query.trim()||candidates.length<2)return candidates;
+  try{
+    const ranked=await authenticatedRequest<{id:number|string;score:number}[]>('/api/ai/search/rank',{method:'POST',body:JSON.stringify({query:query.trim(),candidates:candidates.map(person=>({id:person.id,name:person.displayName,location:person.location||''}))})});
+    const scores=new Map(ranked.map(item=>[Number(item.id),item.score]));
+    return [...candidates].sort((a,b)=>(scores.get(b.id)||0)-(scores.get(a.id)||0));
+  }catch{return candidates;}
 }
 
 export async function fetchMyRelationships() {
   return authenticatedRequest<NetworkRelationship[]>('/api/network/relationships');
 }
+
+export async function previewRelationshipBroadcast(audienceType:BroadcastAudienceType,anchorUserId?:number,location?:string){
+  const params=new URLSearchParams({type:audienceType});
+  if(anchorUserId)params.set('anchorUserId',String(anchorUserId));
+  if(location?.trim())params.set('location',location.trim());
+  return authenticatedRequest<BroadcastAudience>(`/api/network/broadcasts/preview?${params}`);
+}
+function uploadRelationshipBroadcast(body:FormData,onProgress?:(percentage:number)=>void){return new Promise<BroadcastResult>((resolve,reject)=>{const session=getStoredAuthSession();const xhr=new XMLHttpRequest();xhr.open('POST',`${API_BASE_URL}/api/network/broadcasts`);if(session?.accessToken)xhr.setRequestHeader('Authorization',`${session.tokenType||'Bearer'} ${session.accessToken}`);xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress?.(Math.min(99,Math.round(event.loaded/event.total*100)));};xhr.onerror=()=>reject(new ApiError(0,'Broadcast could not reach the server. Check your connection and try again.'));xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300){onProgress?.(100);try{resolve(JSON.parse(xhr.responseText) as BroadcastResult);}catch{reject(new ApiError(xhr.status,'The server returned an invalid broadcast response.'));}return;}let message=`Broadcast failed (${xhr.status})`;try{const parsed=JSON.parse(xhr.responseText) as {message?:string;error?:string};message=parsed.message||parsed.error||message;}catch{if(xhr.responseText)message=xhr.responseText;}reject(new ApiError(xhr.status,message));};xhr.send(body);});}
+export async function sendRelationshipBroadcast(audienceType:BroadcastAudienceType,message:string,anchorUserId?:number,location?:string,file?:File,onProgress?:(percentage:number)=>void){const body=new FormData();body.append('type',audienceType);body.append('message',message.trim());if(anchorUserId)body.append('anchorUserId',String(anchorUserId));if(location?.trim())body.append('location',location.trim());if(file)body.append('file',file);try{return await uploadRelationshipBroadcast(body,onProgress);}catch(error){if(!isUnauthorizedError(error))throw error;await refreshSessionOrThrow();return uploadRelationshipBroadcast(body,onProgress);}}
 
 export async function fetchRelationshipTypes() {
   return authenticatedRequest<string[]>('/api/network/relationship-types');

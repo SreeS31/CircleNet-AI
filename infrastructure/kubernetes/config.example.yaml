@@ -9,6 +9,10 @@ data:
   CIRCLENET_STORAGE_PROVIDER: s3
   CIRCLENET_S3_BUCKET: circlenet-media
   CIRCLENET_S3_REGION: ap-south-1
+  CIRCLENET_AI_BASE_URL: http://ai-agent:8081/api/v1
+  CIRCLENET_CORS_ALLOWED_ORIGINS: https://app.example.com
+  CIRCLENET_NOTIFICATION_WEBHOOK_CHANNEL: ""
+  CIRCLENET_NOTIFICATION_WEBHOOK_URL: https://sms-provider.invalid/api/messages
 ---
 # Create this object through your cloud secret manager/external-secrets operator.
 apiVersion: v1
