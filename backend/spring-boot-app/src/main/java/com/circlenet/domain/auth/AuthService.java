@@ -61,7 +61,7 @@ public class AuthService {
     String normalizedIdentifier = identifier.trim();
     UserEntity user = userRepository.findByEmail(normalizedIdentifier.toLowerCase())
       .or(() -> userRepository.findByPhoneNumber(normalizePhoneNumber(normalizedIdentifier)))
-      .or(() -> userRepository.findByUsername(normalizedIdentifier))
+      .or(() -> userRepository.findByUsernameIgnoreCase(normalizedIdentifier))
       .orElseThrow(() -> new IllegalArgumentException("Invalid username, email, phone number, or password"));
 
     if (!"ACTIVE".equals(user.getAccountStatus())) {
@@ -156,6 +156,10 @@ public class AuthService {
   }
 
   private String normalizePhoneNumber(String value) {
-    return value.replaceAll("[\\s()-]", "");
+    String compact = value.replaceAll("[\\s()-]", "");
+    if (compact.matches("[0-9]{10}")) {
+      return "+91" + compact;
+    }
+    return compact;
   }
 }

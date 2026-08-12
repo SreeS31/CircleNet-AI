@@ -28,6 +28,20 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _loading = false;
   String _statusMessage = 'Ready';
 
+  String _normalizeSignInIdentifier(String value) {
+    final identifier = value.trim();
+    if (identifier.contains('@') ||
+        RegExp(r'[A-Za-z]').hasMatch(identifier)) {
+      return identifier;
+    }
+
+    final compact = identifier.replaceAll(RegExp(r'[\s()-]'), '');
+    if (RegExp(r'^\d{10}$').hasMatch(compact)) {
+      return '+91$compact';
+    }
+    return compact;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -186,7 +200,8 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         final tokenBundle = await _authApi.login(
           LoginRequest(
-            identifier: _emailController.text.trim(),
+            identifier:
+                _normalizeSignInIdentifier(_emailController.text),
             password: _passwordController.text,
           ),
         );
@@ -211,7 +226,10 @@ class _AuthScreenState extends State<AuthScreen> {
         return;
       }
       setState(() {
-        _statusMessage = 'Request failed: $error';
+        _statusMessage = error is AuthApiException &&
+                error.message.contains('status 401')
+            ? 'The mobile number/email or password is incorrect. Please check your details and try again.'
+            : 'Unable to sign in right now. Please try again.';
       });
     } finally {
       if (mounted) {

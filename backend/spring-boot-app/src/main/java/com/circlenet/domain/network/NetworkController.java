@@ -149,20 +149,22 @@ public class NetworkController {
 
   @GetMapping("/broadcasts/preview")
   public BroadcastAudienceDto previewBroadcast(Principal principal,
-      @RequestParam String audienceType,
+      @RequestParam(required=false) String audienceType,
+      @RequestParam(name="type",required=false) String legacyAudienceType,
       @RequestParam(required=false) Long anchorUserId,
       @RequestParam(required=false) String location) {
-    return broadcastService.preview(userId(principal), audienceType, anchorUserId, location);
+    return broadcastService.preview(userId(principal), audienceType == null ? legacyAudienceType : audienceType, anchorUserId, location);
   }
 
   @PostMapping(value="/broadcasts", consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
   public BroadcastResultDto sendBroadcast(Principal principal,
-      @RequestParam String audienceType,
+      @RequestParam(required=false) String audienceType,
+      @RequestParam(name="type",required=false) String legacyAudienceType,
       @RequestParam(required=false) Long anchorUserId,
       @RequestParam(required=false) String location,
       @RequestParam(value="message",required=false) String message,
       @RequestPart(value="file",required=false) MultipartFile file) {
-    return broadcastService.send(userId(principal), audienceType, anchorUserId, location, message, file);
+    return broadcastService.send(userId(principal), audienceType == null ? legacyAudienceType : audienceType, anchorUserId, location, message, file);
   }
 
   private Long userId(Principal principal) { return Long.valueOf(principal.getName()); }

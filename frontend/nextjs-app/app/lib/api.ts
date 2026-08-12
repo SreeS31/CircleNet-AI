@@ -321,13 +321,13 @@ export async function fetchMyRelationships() {
 }
 
 export async function previewRelationshipBroadcast(audienceType:BroadcastAudienceType,anchorUserId?:number,location?:string){
-  const params=new URLSearchParams({type:audienceType});
+  const params=new URLSearchParams({audienceType});
   if(anchorUserId)params.set('anchorUserId',String(anchorUserId));
   if(location?.trim())params.set('location',location.trim());
   return authenticatedRequest<BroadcastAudience>(`/api/network/broadcasts/preview?${params}`);
 }
 function uploadRelationshipBroadcast(body:FormData,onProgress?:(percentage:number)=>void){return new Promise<BroadcastResult>((resolve,reject)=>{const session=getStoredAuthSession();const xhr=new XMLHttpRequest();xhr.open('POST',`${API_BASE_URL}/api/network/broadcasts`);if(session?.accessToken)xhr.setRequestHeader('Authorization',`${session.tokenType||'Bearer'} ${session.accessToken}`);xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress?.(Math.min(99,Math.round(event.loaded/event.total*100)));};xhr.onerror=()=>reject(new ApiError(0,'Broadcast could not reach the server. Check your connection and try again.'));xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300){onProgress?.(100);try{resolve(JSON.parse(xhr.responseText) as BroadcastResult);}catch{reject(new ApiError(xhr.status,'The server returned an invalid broadcast response.'));}return;}let message=`Broadcast failed (${xhr.status})`;try{const parsed=JSON.parse(xhr.responseText) as {message?:string;error?:string};message=parsed.message||parsed.error||message;}catch{if(xhr.responseText)message=xhr.responseText;}reject(new ApiError(xhr.status,message));};xhr.send(body);});}
-export async function sendRelationshipBroadcast(audienceType:BroadcastAudienceType,message:string,anchorUserId?:number,location?:string,file?:File,onProgress?:(percentage:number)=>void){const body=new FormData();body.append('type',audienceType);body.append('message',message.trim());if(anchorUserId)body.append('anchorUserId',String(anchorUserId));if(location?.trim())body.append('location',location.trim());if(file)body.append('file',file);try{return await uploadRelationshipBroadcast(body,onProgress);}catch(error){if(!isUnauthorizedError(error))throw error;await refreshSessionOrThrow();return uploadRelationshipBroadcast(body,onProgress);}}
+export async function sendRelationshipBroadcast(audienceType:BroadcastAudienceType,message:string,anchorUserId?:number,location?:string,file?:File,onProgress?:(percentage:number)=>void){const body=new FormData();body.append('audienceType',audienceType);body.append('message',message.trim());if(anchorUserId)body.append('anchorUserId',String(anchorUserId));if(location?.trim())body.append('location',location.trim());if(file)body.append('file',file);try{return await uploadRelationshipBroadcast(body,onProgress);}catch(error){if(!isUnauthorizedError(error))throw error;await refreshSessionOrThrow();return uploadRelationshipBroadcast(body,onProgress);}}
 
 export async function fetchRelationshipTypes() {
   return authenticatedRequest<string[]>('/api/network/relationship-types');
