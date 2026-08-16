@@ -28,14 +28,16 @@ public class ContactOrganizerService {
     if (suggestions == null) return new AcceptResult(0, 0, skipped);
     for (AcceptedContactSuggestion suggestion : suggestions) {
       if (suggestion == null || !suggestion.selected()) continue;
-      if (suggestion.phone() == null || suggestion.phone().isBlank()) {
-        skipped.add(suggestion.displayName() + ": no mobile number");
+      boolean hasPhone = suggestion.phone() != null && !suggestion.phone().isBlank();
+      boolean hasEmail = suggestion.email() != null && !suggestion.email().isBlank();
+      if (!hasPhone && !hasEmail) {
+        skipped.add(suggestion.displayName() + ": no mobile number or email address");
         continue;
       }
       try {
         var relationship = network.addPerson(userId, new AddPersonRequest(
             suggestion.displayName(), suggestion.phone(), suggestion.email(), suggestion.relationship(),
-            "FRIENDS", null, "ACCOUNT", null, null, null,
+            "FRIENDS", null, hasPhone ? "ACCOUNT" : "MANAGED", hasPhone ? null : "OTHER", null, null,
             "Added from the optional AI contact organizer after user confirmation", null));
         peopleAdded++;
         if (suggestion.circles() == null) continue;

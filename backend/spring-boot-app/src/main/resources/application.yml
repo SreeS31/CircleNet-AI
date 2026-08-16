@@ -53,6 +53,13 @@ circlenet:
       token: ${CIRCLENET_NOTIFICATION_WEBHOOK_TOKEN:}
   ai:
     base-url: ${CIRCLENET_AI_BASE_URL:http://localhost:8081/api/v1}
+  contact-oauth:
+    public-api-base-url: ${CIRCLENET_PUBLIC_API_BASE_URL:http://localhost:8080}
+    web-origin: ${CIRCLENET_WEB_ORIGIN:http://localhost:3000}
+    google-client-id: ${GOOGLE_CONTACTS_CLIENT_ID:}
+    google-client-secret: ${GOOGLE_CONTACTS_CLIENT_SECRET:}
+    microsoft-client-id: ${MICROSOFT_CONTACTS_CLIENT_ID:}
+    microsoft-client-secret: ${MICROSOFT_CONTACTS_CLIENT_SECRET:}
 
 security:
   jwt:

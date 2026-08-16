@@ -48,6 +48,22 @@ To check database readiness:
 docker compose ps postgres
 ```
 
+### Google and Outlook contact import
+
+Direct address-book import uses server-side OAuth Authorization Code with PKCE and read-only scopes. Register these callback URLs with the providers:
+
+- `http://localhost:8080/api/contact-organizer/oauth/callback/google`
+- `http://localhost:8080/api/contact-organizer/oauth/callback/microsoft`
+
+Then set:
+
+- `GOOGLE_CONTACTS_CLIENT_ID` and `GOOGLE_CONTACTS_CLIENT_SECRET`
+- `MICROSOFT_CONTACTS_CLIENT_ID` and `MICROSOFT_CONTACTS_CLIENT_SECRET`
+- `CIRCLENET_PUBLIC_API_BASE_URL` for the externally reachable backend origin
+- `CIRCLENET_WEB_ORIGIN` for the web application origin
+
+Enable the Google People API with the `contacts.readonly` scope. For Microsoft Entra, add delegated Microsoft Graph `Contacts.Read` permission. Provider tokens are used only during the one-time import and are not persisted.
+
 ## Run in production profile (no dev seeds)
 
 ```bash

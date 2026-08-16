@@ -31,37 +31,79 @@ class _AppShellState extends State<AppShell> {
   Timer? incomingTimer;
   StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
   bool showingIncomingCall = false;
+  int unreadNotifications = 0;
+  int unreadMessages = 0;
+  int unreadCircleMessages = 0;
   int syncVersion = 0;
   List<Widget> get pages => <Widget>[
         NetworkHome(key: ValueKey('network-$syncVersion'), api: api),
+        SocialFeedScreen(key: ValueKey('feed-$syncVersion'), api: api),
+        MessagesScreen(key: ValueKey('messages-$syncVersion'), api: api),
         CirclesScreen(key: ValueKey('circles-$syncVersion'), api: api),
         NotificationsScreen(
             key: ValueKey('notifications-$syncVersion'), api: api),
         DiscoverScreen(api: api),
-        ProfileScreen(key: ValueKey('profile-$syncVersion'), api: api)
+        ProfileScreen(
+            key: ValueKey('profile-$syncVersion'),
+            api: api,
+            onDataChanged: () {
+              if (mounted) setState(() => syncVersion++);
+            })
       ];
-  static const destinations = [
-    NavigationDestination(
-        icon: Icon(Icons.account_tree_outlined),
-        selectedIcon: Icon(Icons.account_tree_rounded),
-        label: 'Network'),
-    NavigationDestination(
-        icon: Icon(Icons.forum_outlined),
-        selectedIcon: Icon(Icons.forum_rounded),
-        label: 'Circles'),
-    NavigationDestination(
-        icon: Icon(Icons.notifications_outlined),
-        selectedIcon: Icon(Icons.notifications_rounded),
-        label: 'Alerts'),
-    NavigationDestination(
-        icon: Icon(Icons.person_search_outlined),
-        selectedIcon: Icon(Icons.person_search_rounded),
-        label: 'Discover'),
-    NavigationDestination(
-        icon: Icon(Icons.person_outline),
-        selectedIcon: Icon(Icons.person_rounded),
-        label: 'Profile')
-  ];
+  List<NavigationDestination> get destinations => [
+        NavigationDestination(
+            icon: Icon(Icons.account_tree_outlined),
+            selectedIcon: Icon(Icons.account_tree_rounded),
+            label: 'Network'),
+        NavigationDestination(
+            icon: Icon(Icons.dynamic_feed_outlined),
+            selectedIcon: Icon(Icons.dynamic_feed_rounded),
+            label: 'Feed'),
+        NavigationDestination(
+            icon: Badge(
+                isLabelVisible: unreadMessages > 0,
+                label: Text(unreadMessages > 99 ? '99+' : '$unreadMessages'),
+                child: const Icon(Icons.chat_bubble_outline_rounded)),
+            selectedIcon: Badge(
+                isLabelVisible: unreadMessages > 0,
+                label: Text(unreadMessages > 99 ? '99+' : '$unreadMessages'),
+                child: const Icon(Icons.chat_bubble_rounded)),
+            label: 'Messages'),
+        NavigationDestination(
+            icon: Badge(
+                isLabelVisible: unreadCircleMessages > 0,
+                label: Text(unreadCircleMessages > 99
+                    ? '99+'
+                    : '$unreadCircleMessages'),
+                child: const Icon(Icons.forum_outlined)),
+            selectedIcon: Badge(
+                isLabelVisible: unreadCircleMessages > 0,
+                label: Text(unreadCircleMessages > 99
+                    ? '99+'
+                    : '$unreadCircleMessages'),
+                child: const Icon(Icons.forum_rounded)),
+            label: 'Circles'),
+        NavigationDestination(
+            icon: Badge(
+                isLabelVisible: unreadNotifications > 0,
+                label: Text(
+                    unreadNotifications > 99 ? '99+' : '$unreadNotifications'),
+                child: const Icon(Icons.notifications_outlined)),
+            selectedIcon: Badge(
+                isLabelVisible: unreadNotifications > 0,
+                label: Text(
+                    unreadNotifications > 99 ? '99+' : '$unreadNotifications'),
+                child: const Icon(Icons.notifications_rounded)),
+            label: 'Alerts'),
+        NavigationDestination(
+            icon: Icon(Icons.person_search_outlined),
+            selectedIcon: Icon(Icons.person_search_rounded),
+            label: 'Discover'),
+        NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'Profile')
+      ];
   @override
   void initState() {
     super.initState();
@@ -88,7 +130,29 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> checkIncomingCalls() async {
-    if (!mounted || showingIncomingCall) return;
+    if (!mounted) return;
+    try {
+      await api.heartbeatPresence();
+    } catch (_) {}
+    try {
+      final count = await api.unreadNotificationCount();
+      if (mounted && count != unreadNotifications)
+        setState(() => unreadNotifications = count);
+    } catch (_) {}
+    try {
+      final conversations = await api.directConversations();
+      final count =
+          conversations.fold<int>(0, (sum, item) => sum + item.unreadCount);
+      if (mounted && count != unreadMessages)
+        setState(() => unreadMessages = count);
+    } catch (_) {}
+    try {
+      final counts = await api.circleUnreadCounts();
+      final count = counts.values.fold<int>(0, (sum, value) => sum + value);
+      if (mounted && count != unreadCircleMessages)
+        setState(() => unreadCircleMessages = count);
+    } catch (_) {}
+    if (showingIncomingCall) return;
     try {
       final calls = await api.incomingCalls();
       if (!mounted || calls.isEmpty) return;
@@ -271,6 +335,59 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     await load();
   }
 
+  Future<void> openNotification(Map<String, dynamic> item) async {
+    if (item['readAt'] == null)
+      await widget.api.readNotification((item['id'] as num).toInt());
+    final uri = Uri.tryParse(item['actionUrl']?.toString() ?? '');
+    if (!mounted || uri == null) {
+      await load();
+      return;
+    }
+    if (uri.path == '/feed') {
+      await Navigator.push(context,
+          MaterialPageRoute(builder: (_) => SocialFeedScreen(api: widget.api)));
+    } else if (uri.queryParameters['messageUserId'] != null) {
+      final id = int.tryParse(uri.queryParameters['messageUserId']!);
+      final relations = await widget.api.relationships();
+      final matches = relations.where((r) => r.person.id == id);
+      Person? person = matches.isNotEmpty ? matches.first.person : null;
+      if (person == null) {
+        final conversations = await widget.api.directConversations();
+        final found =
+            conversations.where((conversation) => conversation.userId == id);
+        if (found.isNotEmpty) person = found.first.person;
+      }
+      if (person != null && mounted)
+        await Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) =>
+                    DirectChatScreen(api: widget.api, person: person!)));
+    } else if (uri.queryParameters['callId'] != null) {
+      final id = int.tryParse(uri.queryParameters['callId']!);
+      if (id != null) {
+        final call = await widget.api.call(id);
+        if (mounted)
+          await Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) =>
+                      DirectCallScreen(api: widget.api, incomingCall: call)));
+      }
+    } else if (uri.queryParameters['circleId'] != null) {
+      final id = int.tryParse(uri.queryParameters['circleId']!);
+      final circles = await widget.api.circles();
+      final matches = circles.where((c) => c.id == id);
+      if (matches.isNotEmpty && mounted)
+        await Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) =>
+                    CircleChatScreen(api: widget.api, circle: matches.first)));
+    }
+    await load();
+  }
+
   @override
   Widget build(BuildContext context) => Column(children: [
         _PageHeader(
@@ -329,7 +446,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               borderRadius: BorderRadius.circular(16),
               child: InkWell(
                   borderRadius: BorderRadius.circular(16),
-                  onTap: () => read(item),
+                  onTap: () => openNotification(item),
                   child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Row(
@@ -474,7 +591,8 @@ class _NotificationPreferencesSheetState
                             'circlesEnabled',
                             'relationshipsEnabled',
                             'callsEnabled',
-                            'invitationsEnabled'
+                            'invitationsEnabled',
+                            'socialEnabled'
                           ]
                               .map((key) => FilterChip(
                                   label: Text(_label(key)),
@@ -499,7 +617,8 @@ class _NotificationPreferencesSheetState
         'circlesEnabled': 'Circles',
         'relationshipsEnabled': 'Relationships',
         'callsEnabled': 'Calls',
-        'invitationsEnabled': 'Invitations'
+        'invitationsEnabled': 'Invitations',
+        'socialEnabled': 'Likes and comments'
       }[key] ??
       key;
   Future<void> save() async {
@@ -1974,6 +2093,777 @@ class _ConnectAction extends StatelessWidget {
       onTap: onTap);
 }
 
+String _time(DateTime value) =>
+    '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
+class MessagesScreen extends StatefulWidget {
+  const MessagesScreen({super.key, required this.api});
+  final CircleNetApi api;
+  @override
+  State<MessagesScreen> createState() => _MessagesScreenState();
+}
+
+class _MessagesScreenState extends State<MessagesScreen> {
+  List<DirectConversation>? items;
+  String? error;
+  Timer? poller;
+  @override
+  void initState() {
+    super.initState();
+    load();
+    poller = Timer.periodic(const Duration(seconds: 5), (_) => load());
+  }
+
+  @override
+  void dispose() {
+    poller?.cancel();
+    super.dispose();
+  }
+
+  Future<void> load() async {
+    try {
+      final value = await widget.api.directConversations();
+      if (mounted)
+        setState(() {
+          items = value;
+          error = null;
+        });
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
+      onRefresh: load,
+      child: CustomScrollView(slivers: [
+        SliverToBoxAdapter(
+            child: _PageHeader(
+                eyebrow: 'PRIVATE MESSAGES',
+                title: 'Conversations',
+                subtitle: 'Recent chats and unread messages.')),
+        if (error != null)
+          SliverToBoxAdapter(child: _ErrorState(error!, retry: load)),
+        if (items == null)
+          const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()))
+        else if (items!.isEmpty)
+          const SliverFillRemaining(
+              child: Center(
+                  child:
+                      Text('No conversations yet. Start from a relationship.')))
+        else
+          SliverList.builder(
+              itemCount: items!.length,
+              itemBuilder: (context, index) {
+                final item = items![index];
+                return ListTile(
+                    leading: CircleAvatar(
+                        backgroundImage: item.profilePhoto?.isNotEmpty == true
+                            ? NetworkImage(item.profilePhoto!)
+                            : null,
+                        child: item.profilePhoto?.isNotEmpty == true
+                            ? null
+                            : Text(item.displayName
+                                .substring(0, 1)
+                                .toUpperCase())),
+                    title: Text(item.displayName,
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                    subtitle: Text(item.lastMessage,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: item.unreadCount > 0
+                        ? Badge(
+                            label: Text(item.unreadCount > 99
+                                ? '99+'
+                                : '${item.unreadCount}'))
+                        : Text(_time(item.lastMessageAt),
+                            style: const TextStyle(fontSize: 10)),
+                    onTap: () async {
+                      await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => DirectChatScreen(
+                                  api: widget.api, person: item.person)));
+                      await load();
+                    });
+              })
+      ]));
+}
+
+class SocialFeedScreen extends StatefulWidget {
+  const SocialFeedScreen({super.key, required this.api});
+  final CircleNetApi api;
+  @override
+  State<SocialFeedScreen> createState() => _SocialFeedScreenState();
+}
+
+class _SocialFeedScreenState extends State<SocialFeedScreen> {
+  final caption = TextEditingController();
+  final comment = TextEditingController();
+  List<Map<String, dynamic>> posts = [];
+  List<Map<String, dynamic>> stories = [];
+  bool loading = true;
+  String error = '';
+  PlatformFile? selected;
+  bool savedOnly = false;
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  @override
+  void dispose() {
+    caption.dispose();
+    comment.dispose();
+    super.dispose();
+  }
+
+  Future<void> load() async {
+    try {
+      final values = await Future.wait([
+        savedOnly ? widget.api.savedSocialPosts() : widget.api.socialFeed(),
+        widget.api.socialStories()
+      ]);
+      if (mounted)
+        setState(() {
+          posts = values[0];
+          stories = values[1];
+          loading = false;
+          error = '';
+        });
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          loading = false;
+          error = '$e';
+        });
+    }
+  }
+
+  Future<void> pick() async {
+    final result = await FilePicker.platform
+        .pickFiles(type: FileType.media, withData: true);
+    if (result != null && mounted)
+      setState(() => selected = result.files.single);
+  }
+
+  Future<void> publish() async {
+    if (caption.text.trim().isEmpty && selected == null) return;
+    setState(() => loading = true);
+    try {
+      await widget.api.createSocialPost(caption.text.trim(), 'RELATIONSHIPS',
+          bytes: selected?.bytes, fileName: selected?.name);
+      caption.clear();
+      selected = null;
+      await load();
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          loading = false;
+          error = '$e';
+        });
+    }
+  }
+
+  Future<void> story() async {
+    final result = await FilePicker.platform
+        .pickFiles(type: FileType.media, withData: true);
+    final f = result?.files.single;
+    if (f?.bytes == null) return;
+    setState(() => loading = true);
+    try {
+      await widget.api.createSocialStory('', f!.bytes!, f.name);
+      await load();
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          loading = false;
+          error = '$e';
+        });
+    }
+  }
+
+  Future<void> viewStory(Map<String, dynamic> story) async {
+    final path = story['mediaUrl']?.toString();
+    if (path == null) return;
+    try {
+      if (story['mine'] != true) {
+        story.addAll(
+            await widget.api.viewSocialStory((story['id'] as num).toInt()));
+        if (mounted) setState(() {});
+      }
+      final bytes = await widget.api.socialMedia(path);
+      if (!mounted) return;
+      final type = story['mediaType']?.toString() ?? 'application/octet-stream';
+      if (!type.startsWith('image/')) {
+        final extension = type.startsWith('video/') ? 'mp4' : 'bin';
+        final opened = await openAttachmentBytes(
+            bytes, type, 'story-${story['id']}.$extension');
+        if (!opened && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('No app is available to open this story.')));
+        }
+        return;
+      }
+      await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => Dialog.fullscreen(
+              backgroundColor: Colors.black,
+              child: SafeArea(
+                  child: Stack(children: [
+                Center(
+                    child: InteractiveViewer(
+                        child: Image.memory(bytes,
+                            width: double.infinity, fit: BoxFit.contain))),
+                Positioned(
+                    left: 16,
+                    right: 8,
+                    top: 8,
+                    child: Row(children: [
+                      CircleAvatar(
+                          child: Text((story['authorName'] ?? '?')
+                              .toString()
+                              .substring(0, 1)
+                              .toUpperCase())),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Text(story['authorName']?.toString() ?? '',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900))),
+                      if (story['mine'] == true)
+                        IconButton(
+                            tooltip: 'Delete story',
+                            color: Colors.white,
+                            onPressed: () async {
+                              await widget.api.deleteSocialStory(
+                                  (story['id'] as num).toInt());
+                              if (dialogContext.mounted) {
+                                Navigator.pop(dialogContext);
+                              }
+                              await load();
+                            },
+                            icon: const Icon(Icons.delete_outline_rounded)),
+                      IconButton(
+                          tooltip: 'Close',
+                          color: Colors.white,
+                          onPressed: () => Navigator.pop(dialogContext),
+                          icon: const Icon(Icons.close_rounded))
+                    ])),
+                if ((story['caption'] ?? '').toString().isNotEmpty)
+                  Positioned(
+                      left: 20,
+                      right: 20,
+                      bottom: 24,
+                      child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(12)),
+                          child: Text(story['caption'].toString(),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white))))
+              ]))));
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
+      onRefresh: load,
+      child: ListView(padding: const EdgeInsets.all(16), children: [
+        Row(children: [
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(savedOnly ? 'Saved moments' : 'Social feed',
+                    style: Theme.of(context).textTheme.headlineMedium),
+                const Text('Moments shared by your relationships and circles.')
+              ])),
+          IconButton.filledTonal(
+              tooltip: savedOnly ? 'Show all posts' : 'Saved posts',
+              onPressed: loading
+                  ? null
+                  : () {
+                      setState(() => savedOnly = !savedOnly);
+                      load();
+                    },
+              icon: Icon(savedOnly
+                  ? Icons.dynamic_feed_outlined
+                  : Icons.bookmark_outline_rounded)),
+          const SizedBox(width: 8),
+          FilledButton.tonalIcon(
+              onPressed: loading ? null : story,
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('Story')),
+          IconButton(
+              tooltip: 'My reports',
+              onPressed: showMyReports,
+              icon: const Icon(Icons.flag_outlined))
+        ]),
+        const SizedBox(height: 14),
+        if (stories.isNotEmpty)
+          SizedBox(
+              height: 92,
+              child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: stories.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (_, i) {
+                    final s = stories[i];
+                    return SizedBox(
+                        width: 72,
+                        child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => viewStory(s),
+                            onLongPress: s['mine'] == true
+                                ? () async {
+                                    final remove = await showDialog<bool>(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                                title: const Text(
+                                                    'Delete this story?'),
+                                                content: const Text(
+                                                    'It will be removed immediately.'),
+                                                actions: [
+                                                  TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                              context, false),
+                                                      child:
+                                                          const Text('Cancel')),
+                                                  FilledButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                              context, true),
+                                                      child:
+                                                          const Text('Delete'))
+                                                ]));
+                                    if (remove == true) {
+                                      await widget.api.deleteSocialStory(
+                                          (s['id'] as num).toInt());
+                                      await load();
+                                    }
+                                  }
+                                : null,
+                            child: Column(children: [
+                              CircleAvatar(
+                                  radius: 27,
+                                  backgroundColor: s['viewedByMe'] == true
+                                      ? Colors.grey.shade400
+                                      : AppTheme.primary,
+                                  child: Text((s['authorName'] ?? '?')
+                                      .toString()
+                                      .substring(0, 1)
+                                      .toUpperCase())),
+                              Text(s['authorName']?.toString() ?? '',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style:
+                                      Theme.of(context).textTheme.labelSmall),
+                              if (s['mine'] == true)
+                                Text('${s['viewCount'] ?? 0} views',
+                                    style:
+                                        Theme.of(context).textTheme.labelSmall)
+                            ])));
+                  })),
+        Card(
+            child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(children: [
+                  TextField(
+                      controller: caption,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                          hintText: 'Share an update, photo or family moment…',
+                          border: InputBorder.none)),
+                  Row(children: [
+                    TextButton.icon(
+                        onPressed: loading ? null : pick,
+                        icon: const Icon(Icons.photo_library_outlined),
+                        label: Text(selected?.name ?? 'Media')),
+                    const Spacer(),
+                    FilledButton(
+                        onPressed: loading ? null : publish,
+                        child: const Text('Publish'))
+                  ])
+                ]))),
+        if (error.isNotEmpty)
+          Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(error,
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.error))),
+        if (loading)
+          const Center(
+              child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator())),
+        ...posts.map((p) => _post(p))
+      ]));
+  Future<void> editPost(Map<String, dynamic> post) async {
+    final controller =
+        TextEditingController(text: (post['caption'] ?? '').toString());
+    final value = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('Edit post'),
+                content: TextField(
+                    controller: controller,
+                    maxLines: 4,
+                    maxLength: 4000,
+                    autofocus: true),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () =>
+                          Navigator.pop(context, controller.text.trim()),
+                      child: const Text('Save'))
+                ]));
+    controller.dispose();
+    if (value == null) return;
+    try {
+      await widget.api.updateSocialPost((post['id'] as num).toInt(), value);
+      await load();
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+  }
+
+  Future<void> sharePost(Map<String, dynamic> post) async {
+    try {
+      final values =
+          await Future.wait([widget.api.relationships(), widget.api.circles()]);
+      final relationships = values[0] as List<Relationship>;
+      final circles = values[1] as List<CircleModel>;
+      if (!mounted) return;
+      String type = 'DIRECT', target = '';
+      final note = TextEditingController();
+      final send = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (context) => StatefulBuilder(
+              builder: (context, setModal) => Padding(
+                  padding: EdgeInsets.fromLTRB(
+                      20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Text('Share post',
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 14),
+                    SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment(value: 'DIRECT', label: Text('Person')),
+                          ButtonSegment(value: 'CIRCLE', label: Text('Circle'))
+                        ],
+                        selected: {
+                          type
+                        },
+                        onSelectionChanged: (value) => setModal(() {
+                              type = value.first;
+                              target = '';
+                            })),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                        initialValue: target.isEmpty ? null : target,
+                        decoration: InputDecoration(
+                            labelText: type == 'DIRECT' ? 'Person' : 'Circle'),
+                        items: type == 'DIRECT'
+                            ? relationships
+                                .where((item) =>
+                                    item.person.accountStatus == 'ACTIVE' &&
+                                    item.person.identityType != 'MANAGED')
+                                .map((item) => DropdownMenuItem(
+                                    value: '${item.person.id}',
+                                    child: Text(item.person.displayName)))
+                                .toList()
+                            : circles
+                                .map((item) => DropdownMenuItem(
+                                    value: '${item.id}',
+                                    child: Text(item.name)))
+                                .toList(),
+                        onChanged: (value) => setModal(() => target = value!)),
+                    const SizedBox(height: 12),
+                    TextField(
+                        controller: note,
+                        maxLength: 1000,
+                        decoration: const InputDecoration(
+                            labelText: 'Message (optional)')),
+                    SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                            onPressed: target.isEmpty
+                                ? null
+                                : () => Navigator.pop(context, true),
+                            child: const Text('Share post')))
+                  ]))));
+      if (send == true) {
+        await widget.api.shareSocialPost(
+            (post['id'] as num).toInt(), type, int.parse(target), note.text);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Post shared successfully.')));
+        }
+      }
+      note.dispose();
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+  }
+
+  Future<void> reportPost(Map<String, dynamic> post) async {
+    String reason = 'SPAM';
+    final details = TextEditingController();
+    final submit = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (context) => StatefulBuilder(
+            builder: (context, setModal) => Padding(
+                padding: EdgeInsets.fromLTRB(
+                    20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Text('Report post',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                      initialValue: reason,
+                      decoration: const InputDecoration(labelText: 'Reason'),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'HARASSMENT', child: Text('Harassment')),
+                        DropdownMenuItem(value: 'SPAM', child: Text('Spam')),
+                        DropdownMenuItem(
+                            value: 'IMPERSONATION',
+                            child: Text('Impersonation')),
+                        DropdownMenuItem(
+                            value: 'PRIVACY', child: Text('Privacy violation')),
+                        DropdownMenuItem(
+                            value: 'ILLEGAL_CONTENT',
+                            child: Text('Illegal content')),
+                        DropdownMenuItem(value: 'OTHER', child: Text('Other'))
+                      ],
+                      onChanged: (value) => setModal(() => reason = value!)),
+                  const SizedBox(height: 12),
+                  TextField(
+                      controller: details,
+                      maxLength: 2000,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                          labelText: 'Additional details (optional)')),
+                  SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Submit report')))
+                ]))));
+    if (submit == true) {
+      try {
+        await widget.api.reportContent(
+            reportedUserId: (post['authorUserId'] as num).toInt(),
+            entityType: 'SOCIAL_POST',
+            entityId: (post['id'] as num).toInt(),
+            reason: reason,
+            details: details.text.trim());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Report submitted for review.')));
+        }
+      } catch (e) {
+        if (mounted) setState(() => error = '$e');
+      }
+    }
+    details.dispose();
+  }
+
+  Future<void> showMyReports() async {
+    try {
+      final reports = await widget.api.myReports();
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (context) => FractionallySizedBox(
+              heightFactor: .82,
+              child: Column(children: [
+                const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('My reports',
+                            style: TextStyle(
+                                fontSize: 22, fontWeight: FontWeight.w900)))),
+                Expanded(
+                    child: reports.isEmpty
+                        ? const Center(child: Text('No reports submitted yet.'))
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                            itemCount: reports.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final report = reports[index];
+                              final status =
+                                  report['status']?.toString() ?? 'OPEN';
+                              return Card(
+                                  child: ListTile(
+                                      leading: Icon(status == 'RESOLVED'
+                                          ? Icons.check_circle_outline_rounded
+                                          : status == 'DISMISSED'
+                                              ? Icons.remove_circle_outline
+                                              : Icons.flag_outlined),
+                                      title: Text((report['reason'] ?? 'Report')
+                                          .toString()
+                                          .replaceAll('_', ' ')),
+                                      subtitle: Text(
+                                          '${report['entityType'] ?? 'Account'}${report['entityId'] == null ? '' : ' #${report['entityId']}'}\n$status${report['moderatorNotes'] == null ? '' : '\n${report['moderatorNotes']}'}'),
+                                      isThreeLine: true));
+                            }))
+              ])));
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+  }
+
+  Widget _post(Map<String, dynamic> p) {
+    final id = (p['id'] as num).toInt();
+    final media = p['mediaUrl']?.toString();
+    final type = p['mediaType']?.toString() ?? '';
+    final comments = (p['comments'] as List? ?? const [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+    return Card(
+        margin: const EdgeInsets.only(top: 12),
+        clipBehavior: Clip.antiAlias,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ListTile(
+              leading: CircleAvatar(
+                  child: Text((p['authorName'] ?? '?')
+                      .toString()
+                      .substring(0, 1)
+                      .toUpperCase())),
+              title: Text(p['authorName']?.toString() ?? ''),
+              subtitle: Text(p['audience'] == 'RELATIONSHIPS'
+                  ? 'Relationships'
+                  : p['audience']?.toString() ?? ''),
+              trailing: p['mine'] == true
+                  ? PopupMenuButton<String>(
+                      onSelected: (action) async {
+                        if (action == 'edit') await editPost(p);
+                        if (action == 'delete') {
+                          await widget.api.deleteSocialPost(id);
+                          await load();
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                            PopupMenuItem(
+                                value: 'edit', child: Text('Edit post')),
+                            PopupMenuItem(
+                                value: 'delete', child: Text('Delete post'))
+                          ])
+                  : null),
+          if ((p['caption'] ?? '').toString().isNotEmpty)
+            Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(p['caption'].toString())),
+          if (media != null && type.startsWith('image/'))
+            FutureBuilder<Uint8List>(
+                future: widget.api.socialMedia(media),
+                builder: (_, snap) => snap.hasData
+                    ? Image.memory(snap.data!,
+                        width: double.infinity, fit: BoxFit.contain)
+                    : const SizedBox(
+                        height: 160,
+                        child: Center(child: CircularProgressIndicator()))),
+          if (media != null && !type.startsWith('image/'))
+            ListTile(
+                leading: Icon(type.startsWith('video/')
+                    ? Icons.video_file_outlined
+                    : Icons.attach_file),
+                title: Text(p['mediaName']?.toString() ?? 'Attachment'),
+                subtitle: Text(type.startsWith('video/')
+                    ? 'Video attachment'
+                    : 'Shared attachment')),
+          Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(children: [
+                TextButton.icon(
+                    onPressed: () async {
+                      await widget.api.toggleSocialLike(id);
+                      await load();
+                    },
+                    icon: Icon(
+                        p['likedByMe'] == true
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: p['likedByMe'] == true ? Colors.pink : null),
+                    label: Text('${p['likeCount'] ?? 0}')),
+                IconButton(
+                    tooltip: p['savedByMe'] == true ? 'Unsave' : 'Save post',
+                    onPressed: () async {
+                      await widget.api.toggleSocialSave(id);
+                      await load();
+                    },
+                    icon: Icon(p['savedByMe'] == true
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_outline_rounded)),
+                IconButton(
+                    tooltip: 'Share post',
+                    onPressed: () => sharePost(p),
+                    icon: const Icon(Icons.send_outlined)),
+                if (p['mine'] != true)
+                  IconButton(
+                      tooltip: 'Report post',
+                      onPressed: () => reportPost(p),
+                      icon: const Icon(Icons.flag_outlined)),
+                const Spacer(),
+                Text('${p['commentCount'] ?? 0} comments')
+              ])),
+          ...comments.map((c) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+              child: Row(children: [
+                Expanded(child: Text('${c['authorName']}: ${c['message']}')),
+                if (c['mine'] == true || p['mine'] == true)
+                  IconButton(
+                      tooltip: 'Delete comment',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      onPressed: () async {
+                        await widget.api
+                            .deleteSocialComment(id, (c['id'] as num).toInt());
+                        await load();
+                      })
+              ]))),
+          Padding(
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+              child: Row(children: [
+                Expanded(
+                    child: TextField(
+                        controller: comment,
+                        decoration: const InputDecoration(
+                            hintText: 'Write a comment…', isDense: true))),
+                IconButton(
+                    icon: const Icon(Icons.send),
+                    onPressed: () async {
+                      if (comment.text.trim().isEmpty) return;
+                      await widget.api
+                          .addSocialComment(id, comment.text.trim());
+                      comment.clear();
+                      await load();
+                    })
+              ]))
+        ]));
+  }
+}
+
 class CirclesScreen extends StatefulWidget {
   const CirclesScreen({super.key, required this.api});
   final CircleNetApi api;
@@ -1983,6 +2873,7 @@ class CirclesScreen extends StatefulWidget {
 
 class _CirclesScreenState extends State<CirclesScreen> {
   List<CircleModel>? circles;
+  Map<int, int> unread = {};
   String? error;
   @override
   void initState() {
@@ -1992,10 +2883,14 @@ class _CirclesScreenState extends State<CirclesScreen> {
 
   Future<void> load() async {
     try {
-      final data = await widget.api.circles();
+      final values = await Future.wait<dynamic>(
+          [widget.api.circles(), widget.api.circleUnreadCounts()]);
+      final data = values[0] as List<CircleModel>;
+      final counts = values[1] as Map<int, int>;
       if (mounted) {
         setState(() {
           circles = data;
+          unread = counts;
           error = null;
         });
       }
@@ -2053,14 +2948,24 @@ class _CirclesScreenState extends State<CirclesScreen> {
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis),
                                 isThreeLine: true,
-                                trailing:
-                                    const Icon(Icons.chevron_right_rounded),
-                                onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (_) => CircleChatScreen(
-                                            api: widget.api,
-                                            circle: circle)))));
+                                trailing: (unread[circle.id] ?? 0) > 0
+                                    ? Badge(
+                                        label: Text(
+                                            (unread[circle.id] ?? 0) > 99
+                                                ? '99+'
+                                                : '${unread[circle.id]}'),
+                                        child: const Icon(
+                                            Icons.chevron_right_rounded))
+                                    : const Icon(Icons.chevron_right_rounded),
+                                onTap: () async {
+                                  await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => CircleChatScreen(
+                                              api: widget.api,
+                                              circle: circle)));
+                                  await load();
+                                }));
                       }))
           ])));
   Future<void> create() async {
@@ -2246,8 +3151,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 }
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, required this.api});
+  const ProfileScreen(
+      {super.key, required this.api, required this.onDataChanged});
   final CircleNetApi api;
+  final VoidCallback onDataChanged;
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
@@ -2326,11 +3233,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         subtitle: const Text(
                             'Optional: review AI suggestions for relationships and circles. Nothing is added without confirmation.'),
                         trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () async {
+                          final changed = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      ContactOrganizerScreen(api: widget.api)));
+                          if (changed == true) widget.onDataChanged();
+                        })),
+                Card(
+                    child: ListTile(
+                        leading: const CircleAvatar(
+                            child: Icon(Icons.shield_outlined)),
+                        title: const Text('Privacy & blocked accounts',
+                            style: TextStyle(fontWeight: FontWeight.w800)),
+                        subtitle: const Text(
+                            'Review and unblock accounts you have blocked.'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
                                 builder: (_) =>
-                                    ContactOrganizerScreen(api: widget.api))))),
+                                    BlockedAccountsScreen(api: widget.api))))),
                 const SizedBox(height: 12),
                 Card(
                     child: Padding(
@@ -2399,6 +3323,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+class BlockedAccountsScreen extends StatefulWidget {
+  const BlockedAccountsScreen({super.key, required this.api});
+  final CircleNetApi api;
+  @override
+  State<BlockedAccountsScreen> createState() => _BlockedAccountsScreenState();
+}
+
+class _BlockedAccountsScreenState extends State<BlockedAccountsScreen> {
+  List<Map<String, dynamic>> items = [];
+  bool loading = true;
+  String? error;
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    try {
+      final value = await widget.api.blockedUsers();
+      if (mounted)
+        setState(() {
+          items = value;
+          loading = false;
+          error = null;
+        });
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          loading = false;
+          error = '$e';
+        });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(title: const Text('Blocked accounts')),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+              ? _ErrorState(error!, retry: load)
+              : items.isEmpty
+                  ? const Center(child: Text('No blocked accounts.'))
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: items.length,
+                      itemBuilder: (_, i) {
+                        final item = items[i];
+                        return Card(
+                            child: ListTile(
+                                leading: const CircleAvatar(
+                                    child: Icon(Icons.person_off_outlined)),
+                                title: Text(item['displayName']?.toString() ??
+                                    'Account'),
+                                subtitle: const Text(
+                                    'Cannot discover, message, or view your shared content'),
+                                trailing: TextButton(
+                                    onPressed: () async {
+                                      await widget.api.unblockUser(
+                                          (item['userId'] as num).toInt());
+                                      await load();
+                                    },
+                                    child: const Text('Unblock'))));
+                      }));
+}
+
 class ContactOrganizerScreen extends StatefulWidget {
   const ContactOrganizerScreen({super.key, required this.api});
   final CircleNetApi api;
@@ -2411,15 +3402,26 @@ class _ContactOrganizerScreenState extends State<ContactOrganizerScreen> {
   String? error;
   List<Map<String, dynamic>> suggestions = [];
   static const relationshipTypes = [
-    'Friend',
     'Mother',
     'Father',
-    'Sister',
-    'Brother',
-    'Spouse',
+    'Wife',
+    'Husband',
     'Son',
     'Daughter',
+    'Brother',
+    'Sister',
+    'Grandmother',
+    'Grandfather',
+    'Granddaughter',
+    'Grandson',
+    'Aunt',
+    'Uncle',
+    'Niece',
+    'Nephew',
+    'Cousin',
+    'Guardian',
     'Relative',
+    'Friend',
     'Colleague',
     'Other'
   ];
@@ -2672,7 +3674,7 @@ class _ContactOrganizerScreenState extends State<ContactOrganizerScreen> {
                         onPressed: () => Navigator.pop(context),
                         child: const Text('Done'))
                   ]));
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context, true);
     } catch (exception) {
       if (mounted) setState(() => error = exception.toString());
     } finally {
@@ -2690,11 +3692,19 @@ class DirectChatScreen extends StatelessWidget {
       title: person.displayName,
       subtitle: 'Private conversation',
       load: () => api.directMessages(person.id),
-      send: (text, _) => api.sendDirectMessage(person.id, text),
-      sendAttachment: (text, bytes, name, _, onProgress) =>
+      send: (text, parentId) =>
+          api.sendDirectMessage(person.id, text, replyToMessageId: parentId),
+      sendAttachment: (text, bytes, name, parentId, onProgress) =>
           api.sendDirectAttachment(person.id, text, bytes, name,
-              onProgress: onProgress),
+              replyToMessageId: parentId, onProgress: onProgress),
       fetchAttachment: api.attachment,
+      allowReplies: true,
+      searchMessages: (query) => api.searchDirectMessages(person.id, query),
+      editMessage: (id, value) => api.editDirectMessage(person.id, id, value),
+      deleteMessage: (id) => api.deleteDirectMessage(person.id, id),
+      reactMessage: (id, emoji) => api.reactDirectMessage(person.id, id, emoji),
+      loadPresence: () => api.directPresence(person.id),
+      setTyping: (typing) => api.setDirectTyping(person.id, typing),
       person: person);
 }
 
@@ -2721,6 +3731,15 @@ class _CircleChatScreenState extends State<CircleChatScreen> {
                   parentMessageId: parentId, onProgress: onProgress),
           fetchAttachment: widget.api.attachment,
           allowReplies: true,
+          editMessage: (id, value) =>
+              widget.api.editCircleMessage(circle.id, id, value),
+          deleteMessage: (id) => widget.api.deleteCircleMessage(circle.id, id),
+          searchMessages: (query) =>
+              widget.api.searchCircleMessages(circle.id, query),
+          reactMessage: (id, emoji) =>
+              widget.api.reactCircleMessage(circle.id, id, emoji),
+          loadPresence: () => widget.api.circlePresence(circle.id),
+          setTyping: (typing) => widget.api.setCircleTyping(circle.id, typing),
           actions: [
             IconButton(
                 tooltip: 'Members',
@@ -2920,6 +3939,12 @@ class ConversationScreen extends StatefulWidget {
       required this.fetchAttachment,
       this.actions = const [],
       this.allowReplies = false,
+      this.searchMessages,
+      this.editMessage,
+      this.deleteMessage,
+      this.reactMessage,
+      this.loadPresence,
+      this.setTyping,
       this.person});
   final String title, subtitle;
   final Future<List<ConversationMessage>> Function() load;
@@ -2934,6 +3959,13 @@ class ConversationScreen extends StatefulWidget {
   final Future<Uint8List> Function(String) fetchAttachment;
   final List<Widget> actions;
   final bool allowReplies;
+  final Future<List<ConversationMessage>> Function(String query)?
+      searchMessages;
+  final Future<void> Function(int id, String value)? editMessage;
+  final Future<void> Function(int id)? deleteMessage;
+  final Future<void> Function(int id, String emoji)? reactMessage;
+  final Future<Map<String, dynamic>> Function()? loadPresence;
+  final Future<void> Function(bool typing)? setTyping;
   final Person? person;
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
@@ -2941,16 +3973,59 @@ class ConversationScreen extends StatefulWidget {
 
 class _ConversationScreenState extends State<ConversationScreen> {
   final text = TextEditingController();
+  Timer? messagePoller;
   List<ConversationMessage>? messages;
   String? error;
   bool sending = false;
   PlatformFile? selectedFile;
   ConversationMessage? replyingTo;
   double? uploadProgress;
+  bool showingSearchResults = false;
+  String? presenceText;
   @override
   void initState() {
     super.initState();
     load();
+    text.addListener(typingChanged);
+    messagePoller = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!showingSearchResults && !sending) load();
+      loadPresence();
+    });
+    loadPresence();
+  }
+
+  @override
+  void dispose() {
+    messagePoller?.cancel();
+    if (text.text.trim().isNotEmpty) widget.setTyping?.call(false);
+    text.removeListener(typingChanged);
+    text.dispose();
+    super.dispose();
+  }
+
+  void typingChanged() => widget.setTyping?.call(text.text.trim().isNotEmpty);
+
+  Future<void> loadPresence() async {
+    if (widget.loadPresence == null) return;
+    try {
+      final value = await widget.loadPresence!();
+      final typing = (value['typingUsers'] as List? ?? const [])
+          .map((item) => (item as Map)['displayName'].toString())
+          .toList();
+      String label;
+      if (typing.isNotEmpty) {
+        label =
+            '${typing.join(', ')} ${typing.length == 1 ? 'is' : 'are'} typing…';
+      } else if (value['online'] == true && widget.person != null) {
+        label = 'Online';
+      } else if (value['lastActiveAt'] != null && widget.person != null) {
+        final last = DateTime.tryParse(value['lastActiveAt'].toString());
+        label = last == null ? widget.subtitle : 'Last active ${_time(last)}';
+      } else {
+        label = widget.subtitle;
+      }
+      if (mounted) setState(() => presenceText = label);
+    } catch (_) {}
   }
 
   Future<void> load() async {
@@ -2964,6 +4039,82 @@ class _ConversationScreenState extends State<ConversationScreen> {
       }
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> search() async {
+    final controller = TextEditingController();
+    final query = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('Search messages'),
+                content: TextField(
+                    controller: controller,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                        hintText: 'Words or attachment name')),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () =>
+                          Navigator.pop(context, controller.text.trim()),
+                      child: const Text('Search'))
+                ]));
+    controller.dispose();
+    if (query == null) return;
+    if (query.isEmpty) {
+      showingSearchResults = false;
+      await load();
+      return;
+    }
+    try {
+      final result = await widget.searchMessages!(query);
+      if (mounted)
+        setState(() {
+          messages = result;
+          showingSearchResults = true;
+        });
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+  }
+
+  Future<void> messageAction(ConversationMessage item, String action) async {
+    try {
+      if (action == 'reply') {
+        setState(() => replyingTo = item);
+        return;
+      }
+      if (action == 'edit') {
+        final controller = TextEditingController(text: item.message);
+        final value = await showDialog<String>(
+            context: context,
+            builder: (context) => AlertDialog(
+                    title: const Text('Edit message'),
+                    content: TextField(controller: controller, maxLines: 3),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel')),
+                      FilledButton(
+                          onPressed: () =>
+                              Navigator.pop(context, controller.text.trim()),
+                          child: const Text('Save'))
+                    ]));
+        controller.dispose();
+        if (value != null) await widget.editMessage!(item.id, value);
+      } else if (action == 'delete') {
+        await widget.deleteMessage!(item.id);
+      } else if (action.startsWith('react:')) {
+        final emoji = action.substring(6);
+        await widget.reactMessage!(
+            item.id, item.myReaction == emoji ? '' : emoji);
+      }
+      await load();
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
     }
   }
 
@@ -3057,7 +4208,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               Text(widget.title,
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w900)),
-              Text(widget.subtitle,
+              Text(presenceText ?? widget.subtitle,
                   style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
@@ -3065,6 +4216,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ])
           ]),
           actions: [
+            if (widget.searchMessages != null)
+              IconButton(
+                  tooltip: 'Search messages',
+                  onPressed: search,
+                  icon: const Icon(Icons.search_rounded)),
             ...widget.actions,
             IconButton(onPressed: load, icon: const Icon(Icons.refresh_rounded))
           ]),
@@ -3164,7 +4320,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                                         fontSize: 11))
                                               ]))
                                     ],
-                                    if (item.message.isNotEmpty)
+                                    if (item.deleted)
+                                      const Text('This message was deleted',
+                                          style: TextStyle(
+                                              color: Color(0xFF7F748D),
+                                              fontStyle: FontStyle.italic))
+                                    else if (item.message.isNotEmpty)
                                       Text(item.message,
                                           style: const TextStyle(
                                               color: AppTheme.ink,
@@ -3185,20 +4346,81 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                               style: const TextStyle(
                                                   color: Color(0xFF7F748D),
                                                   fontSize: 9)),
-                                          if (widget.allowReplies) ...[
-                                            const SizedBox(width: 7),
+                                          if (item.editedAt != null)
+                                            const Text(' · edited',
+                                                style: TextStyle(
+                                                    color: Color(0xFF7F748D),
+                                                    fontSize: 9)),
+                                          if (item.mine && item.readCount > 0)
+                                            Text('  ✓✓ ${item.readCount}',
+                                                style: const TextStyle(
+                                                    color: AppTheme.primary,
+                                                    fontSize: 9,
+                                                    fontWeight:
+                                                        FontWeight.w700)),
+                                          if (widget.allowReplies)
                                             InkWell(
                                                 onTap: () => setState(
                                                     () => replyingTo = item),
                                                 child: const Padding(
-                                                    padding: EdgeInsets.all(2),
+                                                    padding: EdgeInsets.all(4),
                                                     child: Icon(
                                                         Icons.reply_rounded,
                                                         size: 15,
                                                         color:
-                                                            AppTheme.primary)))
-                                          ]
-                                        ])
+                                                            AppTheme.primary))),
+                                          if (widget.reactMessage != null ||
+                                              widget.editMessage != null ||
+                                              widget.deleteMessage != null)
+                                            PopupMenuButton<String>(
+                                                tooltip: 'Message actions',
+                                                padding: EdgeInsets.zero,
+                                                onSelected: (value) =>
+                                                    messageAction(item, value),
+                                                itemBuilder: (_) => [
+                                                      const PopupMenuItem(
+                                                          value: 'reply',
+                                                          child: Text('Reply')),
+                                                      if (item.mine &&
+                                                          !item.deleted)
+                                                        const PopupMenuItem(
+                                                            value: 'edit',
+                                                            child:
+                                                                Text('Edit')),
+                                                      if (item.mine &&
+                                                          !item.deleted)
+                                                        const PopupMenuItem(
+                                                            value: 'delete',
+                                                            child:
+                                                                Text('Delete')),
+                                                      if (!item.deleted &&
+                                                          widget.reactMessage !=
+                                                              null)
+                                                        for (final emoji in [
+                                                          '👍',
+                                                          '❤️',
+                                                          '😂',
+                                                          '😮',
+                                                          '😢',
+                                                          '🙏'
+                                                        ])
+                                                          PopupMenuItem(
+                                                              value:
+                                                                  'react:$emoji',
+                                                              child: Text(
+                                                                  '$emoji React'))
+                                                    ])
+                                        ]),
+                                    if (item.reactions.isNotEmpty)
+                                      Wrap(
+                                          spacing: 4,
+                                          children: item.reactions.entries
+                                              .map((entry) => Chip(
+                                                  label: Text(
+                                                      '${entry.key} ${entry.value}'),
+                                                  visualDensity:
+                                                      VisualDensity.compact))
+                                              .toList())
                                   ])));
                         })),
         if (replyingTo != null)

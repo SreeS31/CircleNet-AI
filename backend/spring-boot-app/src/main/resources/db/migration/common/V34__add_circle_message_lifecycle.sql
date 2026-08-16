@@ -1,0 +1,2 @@
+ALTER TABLE circle_posts ADD COLUMN edited_at TIMESTAMP NULL;
+ALTER TABLE circle_posts ADD COLUMN deleted_at TIMESTAMP NULL;

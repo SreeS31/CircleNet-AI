@@ -82,10 +82,19 @@ FAMILY_ALIASES = {
     "Father": {"father", "dad", "daddy", "nanna", "papa"},
     "Sister": {"sister", "sis", "akka", "chelli", "didi"},
     "Brother": {"brother", "bro", "anna", "thammudu", "bhai"},
-    "Spouse": {"wife", "husband", "spouse", "partner"},
+    "Wife": {"wife"},
+    "Husband": {"husband"},
     "Son": {"son", "boy"},
     "Daughter": {"daughter", "girl"},
-    "Relative": {"uncle", "aunt", "aunty", "cousin", "grandfather", "grandmother", "grandpa", "grandma", "mama", "mami", "chacha", "chachi"},
+    "Grandfather": {"grandfather", "grandpa"},
+    "Grandmother": {"grandmother", "grandma"},
+    "Uncle": {"uncle", "mama", "chacha"},
+    "Aunt": {"aunt", "aunty", "mami", "chachi"},
+    "Nephew": {"nephew"},
+    "Niece": {"niece"},
+    "Cousin": {"cousin"},
+    "Guardian": {"guardian"},
+    "Relative": {"relative", "family"},
 }
 EDUCATION_WORDS = {"school", "college", "university", "ssc", "inter", "intermediate", "degree", "btech", "mba", "class", "batch"}
 
@@ -104,7 +113,7 @@ def organize_contacts(request: ContactOrganizeRequest) -> list[ContactSuggestion
                 relationship, confidence, reasons = candidate, .9, [f"Name or label contains '{matches[0]}'"]
                 break
         circles: list[str] = []
-        if relationship in {"Mother", "Father", "Sister", "Brother", "Spouse", "Son", "Daughter", "Relative"}:
+        if relationship in {"Mother", "Father", "Sister", "Brother", "Wife", "Husband", "Son", "Daughter", "Grandmother", "Grandfather", "Granddaughter", "Grandson", "Aunt", "Uncle", "Niece", "Nephew", "Cousin", "Guardian", "Relative"}:
             circles.append("Family")
         organization = contact.organization.strip()
         if organization:

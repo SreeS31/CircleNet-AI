@@ -18,6 +18,7 @@ out/
 dist/
 build/
 target/
+mobile/flutter-app/artifacts/
 backend/spring-boot-app/var/
 .gradle/
 *.tsbuildinfo

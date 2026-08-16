@@ -16,7 +16,7 @@ CircleNet-AI is an enterprise-grade platform architecture for AI-native collabor
 
 ## Delivery status
 
-As of 9 August 2026, all 17 engineering milestones are implemented and verified. Production activation still requires deployment-owner cloud/provider credentials and operational validation. See [Milestone Status](docs/milestone-status.md) for evidence and the external launch checklist.
+As of 16 August 2026, all 20 engineering milestones are implemented and verified. The latest milestones add the shared social feed/stories, cross-channel account blocking, and rich private-message interactions. Production activation still requires deployment-owner cloud/provider credentials and operational validation. See [Milestone Status](docs/milestone-status.md) for evidence and the external launch checklist.
 
 ## Milestone 1: Foundation Repository
 

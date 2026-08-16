@@ -30,6 +30,9 @@ export type SessionProfile = {
 };
 
 export type UserProfile = Record<string, string | string[] | null> & { phoneNumber: string; photos: string[]; profilePhoto: string | null };
+export type PersonRecord = { nickname:string|null; contactPhone:string|null; contactEmail:string|null; address:string|null; city:string|null; country:string|null; occupation:string|null; importantDates:string|null; notes:string|null };
+export type PersonMemory = { id:number; title:string|null; note:string|null; mediaUrl:string|null; mediaName:string|null; mediaType:string|null; mediaSize:number|null; createdAt:string };
+export type PersonProfile = { id:number; displayName:string; profilePhoto:string|null; location:string|null; gender:string|null; bio:string|null; employer:string|null; jobTitle:string|null; institution:string|null; managedCategory:string|null; dateOfBirth:string|null; dateOfDeath:string|null; managedBiography:string|null; managedByMe:boolean; privateRecord:PersonRecord; memories:PersonMemory[] };
 
 export async function fetchUserProfile() { return authenticatedRequest<UserProfile>('/api/profile/me'); }
 export async function saveUserProfile(profile: UserProfile) { return authenticatedRequest<UserProfile>('/api/profile/me', { method: 'PUT', body: JSON.stringify(profile) }); }
@@ -37,6 +40,23 @@ export async function uploadProfilePhoto(file: File) { const body=new FormData()
 export async function removeProfilePhoto() { return authenticatedRequest<UserProfile>('/api/profile/me/photo',{method:'DELETE'}); }
 export async function uploadGalleryPhoto(file: File) { const body=new FormData();body.append('file',file);return authenticatedRequest<UserProfile>('/api/profile/me/photos',{method:'POST',body}); }
 export async function removeGalleryPhoto(index: number) { return authenticatedRequest<UserProfile>(`/api/profile/me/photos/${index}`,{method:'DELETE'}); }
+export async function fetchPersonProfile(id:number){return authenticatedRequest<PersonProfile>(`/api/people/${id}/profile`);}
+export async function uploadPersonProfilePhoto(id:number,file:File){if(file.size>5*1024*1024)throw new Error('Profile photo must be 5 MB or smaller.');if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Choose a JPG, PNG, or WebP photo.');const body=new FormData();body.append('file',file);return authenticatedRequest<PersonProfile>(`/api/people/${id}/photo`,{method:'POST',body});}
+export async function savePersonRecord(id:number,value:PersonRecord){return authenticatedRequest<PersonProfile>(`/api/people/${id}/record`,{method:'PUT',body:JSON.stringify(value)});}
+export async function addPersonMemory(id:number,title:string,note:string,file?:File){
+  if(file&&file.size>25*1024*1024)throw new Error('Attachment must be 25 MB or smaller.');
+  const body=new FormData();if(title)body.append('title',title);if(note)body.append('note',note);if(file)body.append('file',file);
+  const upload=(mayRefresh:boolean):Promise<PersonMemory>=>new Promise<PersonMemory>((resolve,reject)=>{
+    const session=getStoredAuthSession();const request=new XMLHttpRequest();request.open('POST',`${API_BASE_URL}/api/people/${id}/memories`);if(session?.accessToken)request.setRequestHeader('Authorization',`${session.tokenType||'Bearer'} ${session.accessToken}`);
+    const announce=(progress:number,status:'uploading'|'processing'|'complete'|'error',message:string)=>window.dispatchEvent(new CustomEvent('circlenet:upload-progress',{detail:{progress,status,message,fileName:file?.name||'Memory'}}));
+    announce(0,'uploading','Preparing upload…');request.upload.onprogress=event=>{if(event.lengthComputable)announce(Math.min(99,Math.round(event.loaded/event.total*100)),'uploading','Uploading memory…');};request.upload.onload=()=>announce(99,'processing','Upload received. Saving memory…');
+    request.onerror=()=>{announce(0,'error','Upload failed');reject(new ApiError(0,'The upload connection failed. If this is a cloud file, download it locally and try again.'));};
+    request.onload=async()=>{if(request.status>=200&&request.status<300){announce(100,'complete','Upload completed');try{resolve(JSON.parse(request.responseText) as PersonMemory);window.setTimeout(()=>{const gallery=document.querySelector<HTMLDetailsElement>('.memory-gallery-disclosure');if(gallery){gallery.open=true;gallery.scrollIntoView({behavior:'smooth',block:'start'});}},700);}catch{reject(new ApiError(request.status,'The upload completed but its response could not be read.'));}return;}if(request.status===401&&mayRefresh){announce(0,'processing','Refreshing session…');try{await refreshSessionOrThrow();resolve(await upload(false));}catch{clearAuthSession();announce(0,'error','Session expired');reject(new ApiError(401,'Session expired. Please sign in again.'));}return;}let message=`Request failed: ${request.status}`;try{const value=JSON.parse(request.responseText) as {message?:string;error?:string};message=value.message||value.error||message;}catch{}announce(0,'error',message);reject(new ApiError(request.status,message));};request.send(body);
+  });
+  return upload(true);
+}
+export async function deletePersonMemory(personId:number,memoryId:number){return authenticatedRequest<void>(`/api/people/${personId}/memories/${memoryId}`,{method:'DELETE'});}
+export async function fetchPersonMemoryMedia(path:string){return authenticatedRequest<Blob>(path,{responseType:'blob'});}
 
 type RequestOptions = RequestInit & {
   skipAuth?: boolean;
@@ -146,10 +166,13 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
     headers.Authorization = `${session.tokenType || 'Bearer'} ${session.accessToken}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  } catch (error) {
+    if (init?.body instanceof FormData) throw new ApiError(0, 'The browser could not read or upload this file. If it is stored in OneDrive or another cloud folder, download it to this device or start the cloud provider, then choose it again.');
+    throw error;
+  }
 
   if (!response.ok) {
     const errorBody = await response.text();
@@ -296,13 +319,67 @@ export type NetworkRelationship = { id: number; type: string; visibilityScope: V
 export type NetworkCircleMember = { person: NetworkPerson; admin: boolean; creator: boolean };
 export type CirclePostingPermission = 'ALL_MEMBERS' | 'ADMINS_ONLY';
 export type NetworkCircle = { id: number; name: string; description: string; members: NetworkCircleMember[]; ownerName: string; ownerPhoto?: string | null; ownedByCurrentUser: boolean; currentUserAdmin: boolean; postingPermission: CirclePostingPermission; currentUserCanPost: boolean };
-export type CirclePost = { id:number; circleId:number; parentPostId?:number|null; authorId:number; authorName:string; authorPhoto?:string|null; message:string; attachmentUrl?:string|null; attachmentName?:string|null; attachmentType?:string|null; attachmentSize?:number|null; createdAt:string; currentUserAuthor:boolean };
-export type DirectMessage = { id:number; senderId:number; recipientId:number; senderName:string; senderPhoto?:string|null; message:string; attachmentUrl?:string|null; attachmentName?:string|null; attachmentType?:string|null; attachmentSize?:number|null; createdAt:string; currentUserAuthor:boolean };
+export type CirclePost = { id:number; circleId:number; parentPostId?:number|null; authorId:number; authorName:string; authorPhoto?:string|null; message:string; attachmentUrl?:string|null; attachmentName?:string|null; attachmentType?:string|null; attachmentSize?:number|null; createdAt:string; editedAt?:string|null; deletedAt?:string|null; reactions:Record<string,number>; myReaction?:string|null; readCount:number; currentUserAuthor:boolean };
+export type DirectMessage = { id:number; senderId:number; recipientId:number; senderName:string; senderPhoto?:string|null; message:string; attachmentUrl?:string|null; attachmentName?:string|null; attachmentType?:string|null; attachmentSize?:number|null; createdAt:string; deliveredAt?:string|null; readAt?:string|null; replyToMessageId?:number|null; replyPreview?:string|null; editedAt?:string|null; deletedAt?:string|null; reactions:Record<string,number>; myReaction?:string|null; currentUserAuthor:boolean };
+export type DirectConversation = { userId:number; displayName:string; profilePhoto?:string|null; lastMessage:string; lastMessageAt:string; unreadCount:number };
 export type DirectCall = { id:number; callerId:number; recipientId:number; callerName:string; callerPhoto?:string|null; recipientName:string; recipientPhoto?:string|null; callType:'AUDIO'|'VIDEO'; status:'RINGING'|'ACCEPTED'|'REJECTED'|'ENDED'; offerSdp:string; answerSdp?:string|null; createdAt:string; updatedAt:string; currentUserCaller:boolean };
 export type BroadcastAudienceType = 'HORIZONTAL' | 'VERTICAL' | 'LOCATION';
 export type BroadcastRecipient = { userId:number; displayName:string; relationship:string; location?:string|null; profilePhoto?:string|null };
 export type BroadcastAudience = { audienceType:BroadcastAudienceType; anchorUserId?:number|null; locationQuery?:string|null; recipients:BroadcastRecipient[]; excludedCount:number };
 export type BroadcastResult = { broadcastId:number; audienceType:BroadcastAudienceType; deliveredCount:number; failedCount:number; failures:string[]; createdAt:string };
+export type ImportedContact = { contact_key:string; display_name:string; phones:string[]; emails:string[]; organization:string; job_title:string; labels:string[] };
+export type ContactSuggestion = { contact_key:string; display_name:string; phone?:string|null; email?:string|null; suggested_relationship:string; suggested_circles:string[]; confidence:number; reasons:string[]; requires_review:boolean; selected?:boolean };
+export type ContactOrganizerResult = { peopleAdded:number; circleMembershipsAdded:number; skipped:string[] };
+export type SocialComment = { id:number; authorUserId:number; authorName:string; authorPhoto?:string|null; message:string; createdAt:string; mine:boolean };
+export type SocialPost = { id:number; authorUserId:number; authorName:string; authorPhoto?:string|null; caption:string; audience:'PUBLIC'|'RELATIONSHIPS'|'CIRCLE'; circleId?:number|null; mediaUrl?:string|null; mediaName?:string|null; mediaType?:string|null; mediaSize?:number|null; likeCount:number; commentCount:number; likedByMe:boolean; savedByMe:boolean; mine:boolean; createdAt:string; updatedAt:string; comments:SocialComment[] };
+export type SocialStory = { id:number; authorUserId:number; authorName:string; authorPhoto?:string|null; caption:string; audience:'PUBLIC'|'RELATIONSHIPS'; mediaUrl:string; mediaType:string; createdAt:string; expiresAt:string; viewCount:number; viewedByMe:boolean; mine:boolean };
+export type BlockedUser = { userId:number; displayName:string; profilePhoto?:string|null; blockedAt:string };
+export type AppNotification = { id:number; type:string; title:string; body:string; actionUrl?:string|null; entityType?:string|null; entityId?:number|null; readAt?:string|null; createdAt:string };
+export type PresenceStatus = { online:boolean; lastActiveAt?:string|null; typingUsers:{userId:number;displayName:string}[] };
+export type NotificationPreferences = { emailEnabled:boolean; smsEnabled:boolean; pushEnabled:boolean; messagesEnabled:boolean; circlesEnabled:boolean; relationshipsEnabled:boolean; callsEnabled:boolean; invitationsEnabled:boolean; socialEnabled:boolean };
+export async function fetchNotifications(){return authenticatedRequest<AppNotification[]>('/api/notifications');}
+export async function fetchUnreadNotificationCount(){return authenticatedRequest<{count:number}>('/api/notifications/unread-count');}
+export async function markNotificationRead(id:number){return authenticatedRequest<AppNotification>(`/api/notifications/${id}/read`,{method:'POST'});}
+export async function markAllNotificationsRead(){return authenticatedRequest<void>('/api/notifications/read-all',{method:'POST'});}
+export async function fetchNotificationPreferences(){return authenticatedRequest<NotificationPreferences>('/api/notifications/preferences');}
+export async function updateNotificationPreferences(values:NotificationPreferences){return authenticatedRequest<NotificationPreferences>('/api/notifications/preferences',{method:'PUT',body:JSON.stringify(values)});}
+export async function fetchBlockedUsers(){return authenticatedRequest<BlockedUser[]>('/api/privacy/blocks');}
+export async function blockUser(userId:number){return authenticatedRequest<BlockedUser>('/api/privacy/blocks',{method:'POST',body:JSON.stringify({userId})});}
+export async function unblockUser(userId:number){return authenticatedRequest<void>(`/api/privacy/blocks/${userId}`,{method:'DELETE'});}
+function uploadSocial<T>(path:string,body:FormData){return new Promise<T>((resolve,reject)=>{const session=getStoredAuthSession();const xhr=new XMLHttpRequest();xhr.open('POST',`${API_BASE_URL}${path}`);if(session?.accessToken)xhr.setRequestHeader('Authorization',`${session.tokenType||'Bearer'} ${session.accessToken}`);xhr.onerror=()=>reject(new ApiError(0,'Upload could not reach the server.'));xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300){try{resolve(JSON.parse(xhr.responseText) as T);}catch{reject(new ApiError(xhr.status,'The server returned an invalid response.'));}}else reject(new ApiError(xhr.status,xhr.responseText||`Upload failed (${xhr.status})`));};xhr.send(body);});}
+export async function fetchSocialFeed(){return authenticatedRequest<SocialPost[]>('/api/social/feed');}
+export async function fetchSavedSocialPosts(){return authenticatedRequest<SocialPost[]>('/api/social/saved');}
+export async function createSocialPost(caption:string,audience:SocialPost['audience'],file?:File,circleId?:number){const body=new FormData();if(caption.trim())body.append('caption',caption.trim());body.append('audience',audience);if(circleId)body.append('circleId',String(circleId));if(file)body.append('file',file);try{return await uploadSocial<SocialPost>('/api/social/posts',body);}catch(error){if(!isUnauthorizedError(error))throw error;await refreshSessionOrThrow();return uploadSocial<SocialPost>('/api/social/posts',body);}}
+export async function updateSocialPost(id:number,caption:string){return authenticatedRequest<SocialPost>(`/api/social/posts/${id}`,{method:'PUT',body:JSON.stringify({caption})});}
+export async function deleteSocialPost(id:number){return authenticatedRequest<void>(`/api/social/posts/${id}`,{method:'DELETE'});}
+export async function toggleSocialLike(id:number){return authenticatedRequest<SocialPost>(`/api/social/posts/${id}/like`,{method:'POST'});}
+export async function toggleSocialSave(id:number){return authenticatedRequest<SocialPost>(`/api/social/posts/${id}/save`,{method:'POST'});}
+export async function shareSocialPost(id:number,destinationType:'DIRECT'|'CIRCLE',targetId:number,message:string){return authenticatedRequest<{destinationType:string;targetId:number;messageId:number}>(`/api/social/posts/${id}/share`,{method:'POST',body:JSON.stringify({destinationType,targetId,message})});}
+export async function reportContent(payload:{reportedUserId?:number;entityType?:string;entityId?:number;reason:string;details?:string}){return authenticatedRequest<{id:number;status:string}>('/api/moderation/reports',{method:'POST',body:JSON.stringify(payload)});}
+export type AbuseReport={id:number;reportedUserId?:number|null;entityType?:string|null;entityId?:number|null;reason:string;details?:string|null;status:'OPEN'|'REVIEWING'|'RESOLVED'|'DISMISSED';moderatorNotes?:string|null;createdAt:string;updatedAt:string};
+export async function fetchModerationReports(){return authenticatedRequest<AbuseReport[]>('/api/moderation/reports');}
+export async function fetchMyReports(){return authenticatedRequest<AbuseReport[]>('/api/moderation/reports/mine');}
+export async function updateModerationReport(id:number,status:AbuseReport['status'],notes:string){return authenticatedRequest<AbuseReport>(`/api/moderation/reports/${id}`,{method:'PUT',body:JSON.stringify({status,notes})});}
+export async function addSocialComment(id:number,message:string){return authenticatedRequest<SocialComment>(`/api/social/posts/${id}/comments`,{method:'POST',body:JSON.stringify({message})});}
+export async function deleteSocialComment(postId:number,commentId:number){return authenticatedRequest<void>(`/api/social/posts/${postId}/comments/${commentId}`,{method:'DELETE'});}
+export async function fetchSocialStories(){return authenticatedRequest<SocialStory[]>('/api/social/stories');}
+export async function viewSocialStory(id:number){return authenticatedRequest<SocialStory>(`/api/social/stories/${id}/view`,{method:'POST'});}
+export async function createSocialStory(caption:string,audience:SocialStory['audience'],file:File){const body=new FormData();body.append('caption',caption.trim());body.append('audience',audience);body.append('file',file);try{return await uploadSocial<SocialStory>('/api/social/stories',body);}catch(error){if(!isUnauthorizedError(error))throw error;await refreshSessionOrThrow();return uploadSocial<SocialStory>('/api/social/stories',body);}}
+export async function deleteSocialStory(id:number){return authenticatedRequest<void>(`/api/social/stories/${id}`,{method:'DELETE'});}
+export async function fetchSocialMedia(path:string){return authenticatedRequest<Blob>(path,{responseType:'blob'});}
+
+export async function analyzeImportedContacts(contacts:ImportedContact[]){
+  return authenticatedRequest<ContactSuggestion[]>('/api/contact-organizer/analyze',{method:'POST',body:JSON.stringify({consent:true,contacts})});
+}
+export async function acceptImportedContacts(suggestions:ContactSuggestion[]){
+  return authenticatedRequest<ContactOrganizerResult>('/api/contact-organizer/accept',{method:'POST',body:JSON.stringify({consent:true,suggestions:suggestions.map(item=>({displayName:item.display_name,phone:item.phone,email:item.email,relationship:item.suggested_relationship,circles:item.suggested_circles,selected:item.selected===true}))})});
+}
+export async function startContactOAuth(email:string,provider:'google'|'microsoft'){
+  return authenticatedRequest<{authorizationUrl:string;provider:string}>('/api/contact-organizer/oauth/start',{method:'POST',body:JSON.stringify({email,provider})});
+}
+export async function fetchContactOAuthResult(resultKey:string){
+  return authenticatedRequest<ContactSuggestion[]>(`/api/contact-organizer/oauth/results/${encodeURIComponent(resultKey)}`);
+}
 
 export async function searchNetworkPeople(query: string) {
   return authenticatedRequest<NetworkPerson[]>(`/api/network/search?q=${encodeURIComponent(query)}`);
@@ -372,12 +449,27 @@ export async function updateMyCircle(circleId: number, name: string, description
 }
 
 export async function fetchCirclePosts(circleId:number){return authenticatedRequest<CirclePost[]>(`/api/network/circles/${circleId}/posts`);}
+export async function fetchCircleUnreadCounts(){return authenticatedRequest<Record<string,number>>('/api/network/circles/unread-counts');}
+export async function heartbeatPresence(){return authenticatedRequest<void>('/api/network/presence/heartbeat',{method:'POST'});}
+export async function fetchDirectPresence(userId:number){return authenticatedRequest<PresenceStatus>(`/api/network/presence/direct/${userId}`);}
+export async function setDirectTyping(userId:number,typing:boolean){return authenticatedRequest<void>(`/api/network/presence/direct/${userId}/typing`,{method:'POST',body:JSON.stringify({typing})});}
+export async function fetchCirclePresence(circleId:number){return authenticatedRequest<PresenceStatus>(`/api/network/presence/circles/${circleId}`);}
+export async function setCircleTyping(circleId:number,typing:boolean){return authenticatedRequest<void>(`/api/network/presence/circles/${circleId}/typing`,{method:'POST',body:JSON.stringify({typing})});}
 function uploadCirclePostRequest(circleId:number,body:FormData,onProgress?:(percentage:number)=>void){return new Promise<CirclePost>((resolve,reject)=>{const session=getStoredAuthSession();const xhr=new XMLHttpRequest();xhr.open('POST',`${API_BASE_URL}/api/network/circles/${circleId}/posts`);if(session?.accessToken)xhr.setRequestHeader('Authorization',`${session.tokenType||'Bearer'} ${session.accessToken}`);xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress?.(Math.min(99,Math.round(event.loaded/event.total*100)));};xhr.onerror=()=>reject(new ApiError(0,'Upload could not reach the server. Check your connection and try again.'));xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300){onProgress?.(100);try{resolve(JSON.parse(xhr.responseText) as CirclePost);}catch{reject(new ApiError(xhr.status,'The server returned an invalid upload response.'));}return;}let message=`Upload failed (${xhr.status})`;try{const parsed=JSON.parse(xhr.responseText) as {message?:string;error?:string};message=parsed.message||parsed.error||message;}catch{if(xhr.responseText)message=xhr.responseText;}reject(new ApiError(xhr.status,message));};xhr.send(body);});}
 export async function createCirclePost(circleId:number,message:string,file?:File,parentPostId?:number,onProgress?:(percentage:number)=>void){const body=new FormData();if(message.trim())body.append('message',message.trim());if(file)body.append('file',file);if(parentPostId)body.append('parentPostId',String(parentPostId));try{return await uploadCirclePostRequest(circleId,body,onProgress);}catch(error){if(!isUnauthorizedError(error))throw error;await refreshSessionOrThrow();return uploadCirclePostRequest(circleId,body,onProgress);}}
+export async function editCirclePost(circleId:number,postId:number,message:string){return authenticatedRequest<CirclePost>(`/api/network/circles/${circleId}/posts/${postId}`,{method:'PUT',body:JSON.stringify({message})});}
+export async function deleteCirclePost(circleId:number,postId:number){return authenticatedRequest<CirclePost>(`/api/network/circles/${circleId}/posts/${postId}`,{method:'DELETE'});}
+export async function searchCirclePosts(circleId:number,query:string){return authenticatedRequest<CirclePost[]>(`/api/network/circles/${circleId}/posts/search?q=${encodeURIComponent(query)}`);}
+export async function reactCirclePost(circleId:number,postId:number,emoji:string){return authenticatedRequest<CirclePost>(`/api/network/circles/${circleId}/posts/${postId}/reaction`,{method:'POST',body:JSON.stringify({emoji})});}
 export async function fetchCircleAttachment(circleId:number,postId:number){return authenticatedRequest<Blob>(`/api/network/circles/${circleId}/posts/${postId}/attachment`,{responseType:'blob'});}
 export async function fetchDirectMessages(otherUserId:number){return authenticatedRequest<DirectMessage[]>(`/api/network/messages/with/${otherUserId}`);}
+export async function fetchDirectConversations(){return authenticatedRequest<DirectConversation[]>('/api/network/messages/conversations');}
 function uploadDirectMessageRequest(otherUserId:number,body:FormData,onProgress?:(percentage:number)=>void){return new Promise<DirectMessage>((resolve,reject)=>{const session=getStoredAuthSession();const xhr=new XMLHttpRequest();xhr.open('POST',`${API_BASE_URL}/api/network/messages/with/${otherUserId}`);if(session?.accessToken)xhr.setRequestHeader('Authorization',`${session.tokenType||'Bearer'} ${session.accessToken}`);xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress?.(Math.min(99,Math.round(event.loaded/event.total*100)));};xhr.onerror=()=>reject(new ApiError(0,'Upload could not reach the server. Check your connection and try again.'));xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300){onProgress?.(100);try{resolve(JSON.parse(xhr.responseText) as DirectMessage);}catch{reject(new ApiError(xhr.status,'The server returned an invalid upload response.'));}return;}let errorMessage=`Message failed (${xhr.status})`;try{const parsed=JSON.parse(xhr.responseText) as {message?:string;error?:string};errorMessage=parsed.message||parsed.error||errorMessage;}catch{if(xhr.responseText)errorMessage=xhr.responseText;}reject(new ApiError(xhr.status,errorMessage));};xhr.send(body);});}
-export async function sendDirectMessage(otherUserId:number,message:string,file?:File,onProgress?:(percentage:number)=>void){const body=new FormData();if(message.trim())body.append('message',message.trim());if(file)body.append('file',file);try{return await uploadDirectMessageRequest(otherUserId,body,onProgress);}catch(error){if(!isUnauthorizedError(error))throw error;await refreshSessionOrThrow();return uploadDirectMessageRequest(otherUserId,body,onProgress);}}
+export async function sendDirectMessage(otherUserId:number,message:string,file?:File,onProgress?:(percentage:number)=>void,replyToMessageId?:number){const body=new FormData();if(message.trim())body.append('message',message.trim());if(file)body.append('file',file);if(replyToMessageId)body.append('replyToMessageId',String(replyToMessageId));try{return await uploadDirectMessageRequest(otherUserId,body,onProgress);}catch(error){if(!isUnauthorizedError(error))throw error;await refreshSessionOrThrow();return uploadDirectMessageRequest(otherUserId,body,onProgress);}}
+export async function searchDirectMessages(otherUserId:number,query:string){return authenticatedRequest<DirectMessage[]>(`/api/network/messages/with/${otherUserId}/search?q=${encodeURIComponent(query)}`);}
+export async function editDirectMessage(otherUserId:number,messageId:number,message:string){return authenticatedRequest<DirectMessage>(`/api/network/messages/with/${otherUserId}/${messageId}`,{method:'PUT',body:JSON.stringify({message})});}
+export async function deleteDirectMessage(otherUserId:number,messageId:number){return authenticatedRequest<DirectMessage>(`/api/network/messages/with/${otherUserId}/${messageId}`,{method:'DELETE'});}
+export async function reactDirectMessage(otherUserId:number,messageId:number,emoji:string){return authenticatedRequest<DirectMessage>(`/api/network/messages/with/${otherUserId}/${messageId}/reaction`,{method:'POST',body:JSON.stringify({emoji})});}
 export async function fetchDirectMessageAttachment(otherUserId:number,messageId:number){return authenticatedRequest<Blob>(`/api/network/messages/with/${otherUserId}/${messageId}/attachment`,{responseType:'blob'});}
 export async function startDirectCall(recipientId:number,callType:'AUDIO'|'VIDEO',offerSdp:string){return authenticatedRequest<DirectCall>('/api/network/calls',{method:'POST',body:JSON.stringify({recipientId,callType,offerSdp})});}
 export async function fetchIncomingCalls(){return authenticatedRequest<DirectCall[]>('/api/network/calls/incoming');}

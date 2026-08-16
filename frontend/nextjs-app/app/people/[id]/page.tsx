@@ -1,0 +1,60 @@
+'use client';
+
+import Link from 'next/link';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  addPersonMemory, deletePersonMemory, fetchPersonMemoryMedia, fetchPersonProfile,
+  hasAuthSession, isUnauthorizedError, PersonMemory, PersonProfile, PersonRecord,
+  savePersonRecord, uploadPersonProfilePhoto,
+} from '../../lib/api';
+import { formatMediaSize, optimizeMediaUpload } from '../../lib/mediaOptimization';
+
+const empty: PersonRecord = { nickname:null, contactPhone:null, contactEmail:null, address:null, city:null, country:null, occupation:null, importantDates:null, notes:null };
+type Viewer = { item: PersonMemory; url: string };
+
+function MemoryTile({ item, onOpen, onDelete }: { item:PersonMemory; onOpen:(viewer:Viewer)=>void; onDelete:()=>void }) {
+  const [url,setUrl]=useState('');
+  useEffect(()=>{if(!item.mediaUrl)return;let object='';fetchPersonMemoryMedia(item.mediaUrl).then(blob=>{object=URL.createObjectURL(blob);setUrl(object);}).catch(()=>setUrl(''));return()=>{if(object)URL.revokeObjectURL(object);};},[item.mediaUrl]);
+  const visual=item.mediaType?.startsWith('image/')||item.mediaType?.startsWith('video/');
+  return <article className="memory-tile">
+    <button className="memory-thumbnail" disabled={!url} onClick={()=>url&&onOpen({item,url})} aria-label={`Open ${item.title||item.mediaName||'memory'}`}>
+      {!item.mediaUrl&&<span className="memory-text-icon">Aa</span>}
+      {item.mediaUrl&&!url&&<span className="memory-loading">Loading…</span>}
+      {url&&item.mediaType?.startsWith('image/')&&<img src={url} alt=""/>}
+      {url&&item.mediaType?.startsWith('video/')&&<><video src={url} muted preload="metadata"/><i>▶</i></>}
+      {url&&item.mediaType?.startsWith('audio/')&&<span className="memory-file-icon">♫<small>Audio</small></span>}
+      {url&&!visual&&!item.mediaType?.startsWith('audio/')&&<span className="memory-file-icon">▤<small>{item.mediaName?.split('.').pop()?.toUpperCase()||'File'}</small></span>}
+    </button>
+    <div className="memory-tile-copy"><time>{new Date(item.createdAt).toLocaleDateString()}</time><h3>{item.title||item.mediaName||'Memory'}</h3>{item.note&&<p>{item.note}</p>}<footer>{item.mediaSize&&<span>{formatMediaSize(item.mediaSize)}</span>}{url&&!visual&&<a href={url} target="_blank" rel="noreferrer">Open</a>}<button onClick={onDelete}>Delete</button></footer></div>
+  </article>;
+}
+
+export default function PersonPage() {
+  const {id}=useParams<{id:string}>(), personId=Number(id), router=useRouter();
+  const [profile,setProfile]=useState<PersonProfile|null>(null), [record,setRecord]=useState<PersonRecord>(empty);
+  const [title,setTitle]=useState(''), [note,setNote]=useState(''), [file,setFile]=useState<File>();
+  const [busy,setBusy]=useState(false), [message,setMessage]=useState(''), [viewer,setViewer]=useState<Viewer|null>(null);
+  const load=useCallback(async()=>{try{const value=await fetchPersonProfile(personId);setProfile(value);setRecord(value.privateRecord||empty);}catch(error){if(isUnauthorizedError(error))router.replace('/auth');else setMessage((error as Error).message);}},[personId,router]);
+  useEffect(()=>{if(!hasAuthSession())router.replace('/auth');else void load();},[load,router]);
+  useEffect(()=>{const close=(event:KeyboardEvent)=>{if(event.key==='Escape')setViewer(null);};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close);},[]);
+  const save=async(event:FormEvent)=>{event.preventDefault();setBusy(true);try{const value=await savePersonRecord(personId,record);setProfile(value);setRecord(value.privateRecord);setMessage('Private person details saved.');}catch(error){setMessage((error as Error).message);}finally{setBusy(false);}};
+  const add=async(event:FormEvent)=>{event.preventDefault();setBusy(true);try{await addPersonMemory(personId,title,note,file);setTitle('');setNote('');setFile(undefined);await load();setMessage('Upload completed. Your new memory is shown in the gallery.');}catch(error){setMessage((error as Error).message);}finally{setBusy(false);}};
+  if(!profile)return <main className="container person-page"><div className="card social-empty"><p>{message||'Loading person profile…'}</p></div></main>;
+  return <main className="container person-page person-page-refined">
+    <header className="card person-hero refined-person-hero">
+      <div className="person-photo-control"><div className="person-page-avatar">{profile.profilePhoto?<img src={profile.profilePhoto} alt=""/>:profile.displayName.charAt(0).toUpperCase()}</div>{profile.managedByMe&&<label className="person-photo-button">Change photo<input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={async event=>{const selected=event.target.files?.[0];event.currentTarget.value='';if(!selected)return;setBusy(true);setMessage('Optimizing profile photo…');try{const optimized=await optimizeMediaUpload(selected);const updated=await uploadPersonProfilePhoto(personId,optimized);setProfile(updated);setMessage('Profile photo uploaded successfully.');}catch(error){setMessage((error as Error).message);}finally{setBusy(false);}}}/></label>}</div>
+      <div><p className="eyebrow">PERSON PROFILE</p><h1>{record.nickname||profile.displayName}</h1><p>{[profile.jobTitle,profile.employer,profile.location].filter(Boolean).join(' · ')||'CircleNet connection'}</p><div>{profile.managedCategory&&<span>{profile.managedCategory.toLowerCase()} profile</span>}{profile.gender&&<span>{profile.gender}</span>}<span>{profile.memories.length} memories</span></div></div>
+      <nav><Link href="/dashboard" className="btn btn-secondary">Relationships</Link></nav>
+    </header>
+    {message&&<p className="network-message" role="status">{message}</p>}
+    <section className="person-accordion-grid">
+      <details className="card person-disclosure"><summary><span className="disclosure-icon">◉</span><span><strong>About and basic details</strong><small>Biography, dates, location, education and work</small></span><i>⌄</i></summary><div className="disclosure-content person-about"><dl><div><dt>Full name</dt><dd>{profile.displayName}</dd></div><div><dt>Born</dt><dd>{profile.dateOfBirth||'Not added'}</dd></div>{profile.dateOfDeath&&<div><dt>Remembered</dt><dd>{profile.dateOfDeath}</dd></div>}<div><dt>Location</dt><dd>{profile.location||'Not added'}</dd></div><div><dt>Education</dt><dd>{profile.institution||'Not added'}</dd></div><div><dt>Occupation</dt><dd>{record.occupation||profile.jobTitle||profile.employer||'Not added'}</dd></div></dl>{(profile.bio||profile.managedBiography)&&<p>{profile.managedBiography||profile.bio}</p>}</div></details>
+      <details className="card person-disclosure"><summary><span className="disclosure-icon">◇</span><span><strong>Your private details</strong><small>Contact, address, important dates and notes</small></span><i>⌄</i></summary><div className="disclosure-content person-private-summary"><dl><div><dt>Phone</dt><dd>{record.contactPhone||'Not added'}</dd></div><div><dt>Email</dt><dd>{record.contactEmail||'Not added'}</dd></div><div><dt>Address</dt><dd>{[record.address,record.city,record.country].filter(Boolean).join(', ')||'Not added'}</dd></div><div><dt>Important dates</dt><dd>{record.importantDates||'Not added'}</dd></div></dl>{record.notes&&<blockquote>{record.notes}</blockquote>}</div></details>
+      <details className="card person-disclosure person-disclosure-wide"><summary><span className="disclosure-icon">✎</span><span><strong>Edit complete details</strong><small>Update your private record for this person</small></span><i>⌄</i></summary><form className="disclosure-content person-record-form" onSubmit={save}><div className="person-form-grid">{([['nickname','Preferred name / nickname'],['contactPhone','Mobile number'],['contactEmail','Email address'],['occupation','Occupation / role'],['address','Address'],['city','City'],['country','Country'],['importantDates','Important dates and occasions'],['notes','Private notes / biography']] as [keyof PersonRecord,string][]).map(([key,label])=><label className={['address','importantDates','notes'].includes(key)?'wide':''} key={key}><span>{label}</span>{['address','importantDates','notes'].includes(key)?<textarea value={record[key]||''} onChange={event=>setRecord({...record,[key]:event.target.value})}/>:<input type={key==='contactEmail'?'email':'text'} value={record[key]||''} onChange={event=>setRecord({...record,[key]:event.target.value})}/>}</label>)}</div><footer><button className="btn btn-primary" disabled={busy}>Save all details</button></footer></form></details>
+      <details className="card person-disclosure person-disclosure-wide"><summary><span className="disclosure-icon">＋</span><span><strong>Add a new memory</strong><small>Upload a photo, video, audio, document or story</small></span><i>⌄</i></summary><form className="disclosure-content memory-composer" onSubmit={add}><input value={title} onChange={event=>setTitle(event.target.value)} placeholder="Memory title"/><textarea value={note} onChange={event=>setNote(event.target.value)} placeholder="Write the story or memory…"/><div><label className="btn btn-secondary">{file?`${file.name} · ${formatMediaSize(file.size)}`:'Choose media or document'}<input hidden type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={async event=>{const selected=event.target.files?.[0];event.currentTarget.value='';if(!selected)return;setBusy(true);setMessage('Optimizing selected media…');try{const optimized=await optimizeMediaUpload(selected,value=>setMessage(`Optimizing video… ${value}%`));setFile(optimized);setMessage(optimized.size<selected.size?`Optimized ${formatMediaSize(selected.size)} to ${formatMediaSize(optimized.size)}.`:'File is ready to upload.');}catch(error){setFile(undefined);setMessage((error as Error).message);}finally{setBusy(false);}}}/></label><button className="btn btn-primary" disabled={busy||(!title.trim()&&!note.trim()&&!file)}>Save memory</button></div><small>High-quality optimization is applied automatically. Final upload limit: 25 MB.</small></form></details>
+      <details className="card person-disclosure person-disclosure-wide memory-gallery-disclosure"><summary><span className="disclosure-icon">▦</span><span><strong>Memory gallery</strong><small>{profile.memories.length} photos, videos, audio files, documents and stories</small></span><i>⌄</i></summary><div className="disclosure-content memory-gallery-grid">{profile.memories.map(item=><MemoryTile key={item.id} item={item} onOpen={setViewer} onDelete={async()=>{if(confirm('Delete this memory?')){await deletePersonMemory(personId,item.id);await load();}}}/>)}{!profile.memories.length&&<div className="social-empty"><p>No memories added yet.</p></div>}</div></details>
+    </section>
+    {viewer&&<div className="memory-lightbox" role="dialog" aria-modal="true" aria-label={viewer.item.title||'Memory viewer'} onMouseDown={event=>{if(event.target===event.currentTarget)setViewer(null);}}><header><div><strong>{viewer.item.title||viewer.item.mediaName||'Memory'}</strong><small>{new Date(viewer.item.createdAt).toLocaleDateString()}</small></div><a href={viewer.url} download={viewer.item.mediaName||true}>Download</a><button onClick={()=>setViewer(null)} aria-label="Close viewer">×</button></header><div>{viewer.item.mediaType?.startsWith('image/')&&<img src={viewer.url} alt={viewer.item.title||'Memory'}/>} {viewer.item.mediaType?.startsWith('video/')&&<video src={viewer.url} controls autoPlay playsInline/>}{viewer.item.mediaType?.startsWith('audio/')&&<audio src={viewer.url} controls autoPlay/>}{!viewer.item.mediaType?.match(/^(image|video|audio)\//)&&<iframe src={viewer.url} title={viewer.item.title||viewer.item.mediaName||'Document'}/>}</div>{viewer.item.note&&<p>{viewer.item.note}</p>}</div>}
+  </main>;
+}

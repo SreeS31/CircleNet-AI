@@ -15,6 +15,11 @@ public class DirectMessageEntity {
   @Column(name="attachment_type") private String attachmentType;
   @Column(name="attachment_size") private Long attachmentSize;
   @Column(name="created_at",nullable=false) private Instant createdAt=Instant.now();
+  @Column(name="delivered_at") private Instant deliveredAt;
+  @Column(name="read_at") private Instant readAt;
+  @Column(name="reply_to_message_id") private Long replyToMessageId;
+  @Column(name="edited_at") private Instant editedAt;
+  @Column(name="deleted_at") private Instant deletedAt;
   public Long getId(){return id;}
   public Long getSenderUserId(){return senderUserId;} public void setSenderUserId(Long value){senderUserId=value;}
   public Long getRecipientUserId(){return recipientUserId;} public void setRecipientUserId(Long value){recipientUserId=value;}
@@ -24,4 +29,9 @@ public class DirectMessageEntity {
   public String getAttachmentType(){return attachmentType;} public void setAttachmentType(String value){attachmentType=value;}
   public Long getAttachmentSize(){return attachmentSize;} public void setAttachmentSize(Long value){attachmentSize=value;}
   public Instant getCreatedAt(){return createdAt;} public void setCreatedAt(Instant value){createdAt=value;}
+  public Instant getDeliveredAt(){return deliveredAt;} public void setDeliveredAt(Instant value){deliveredAt=value;}
+  public Instant getReadAt(){return readAt;} public void setReadAt(Instant value){readAt=value;}
+  public Long getReplyToMessageId(){return replyToMessageId;} public void setReplyToMessageId(Long value){replyToMessageId=value;}
+  public Instant getEditedAt(){return editedAt;} public void setEditedAt(Instant value){editedAt=value;}
+  public Instant getDeletedAt(){return deletedAt;} public void setDeletedAt(Instant value){deletedAt=value;}
 }

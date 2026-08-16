@@ -1,0 +1,12 @@
+package com.circlenet.domain.person.model;
+import jakarta.persistence.*;import java.time.Instant;
+@Entity @Table(name="person_records") @IdClass(PersonRecordEntity.Key.class)
+public class PersonRecordEntity {
+ @Id @Column(name="owner_user_id") private Long ownerUserId; @Id @Column(name="person_user_id") private Long personUserId;
+ private String nickname; @Column(name="contact_phone") private String contactPhone; @Column(name="contact_email") private String contactEmail;
+ @Column(columnDefinition="TEXT") private String address; private String city; private String country; private String occupation;
+ @Column(name="important_dates",columnDefinition="TEXT") private String importantDates; @Column(columnDefinition="TEXT") private String notes;
+ @Column(name="updated_at",nullable=false) private Instant updatedAt=Instant.now();
+ public Long getOwnerUserId(){return ownerUserId;}public void setOwnerUserId(Long v){ownerUserId=v;}public Long getPersonUserId(){return personUserId;}public void setPersonUserId(Long v){personUserId=v;}public String getNickname(){return nickname;}public void setNickname(String v){nickname=v;}public String getContactPhone(){return contactPhone;}public void setContactPhone(String v){contactPhone=v;}public String getContactEmail(){return contactEmail;}public void setContactEmail(String v){contactEmail=v;}public String getAddress(){return address;}public void setAddress(String v){address=v;}public String getCity(){return city;}public void setCity(String v){city=v;}public String getCountry(){return country;}public void setCountry(String v){country=v;}public String getOccupation(){return occupation;}public void setOccupation(String v){occupation=v;}public String getImportantDates(){return importantDates;}public void setImportantDates(String v){importantDates=v;}public String getNotes(){return notes;}public void setNotes(String v){notes=v;}public Instant getUpdatedAt(){return updatedAt;}public void setUpdatedAt(Instant v){updatedAt=v;}
+ public static class Key implements java.io.Serializable {public Long ownerUserId;public Long personUserId;public Key(){}public Key(Long o,Long p){ownerUserId=o;personUserId=p;}public boolean equals(Object x){return x instanceof Key k&&java.util.Objects.equals(ownerUserId,k.ownerUserId)&&java.util.Objects.equals(personUserId,k.personUserId);}public int hashCode(){return java.util.Objects.hash(ownerUserId,personUserId);}}
+}

@@ -8,6 +8,7 @@ import UserNetworkDashboard from './UserNetworkDashboard';
 
 type ResourceType = 'user' | 'person' | 'circle' | 'project' | 'task' | 'milestone';
 type ToastTone = 'success' | 'error';
+const supportedRelationshipTypes=['Mother','Father','Wife','Husband','Son','Daughter','Brother','Sister','Grandmother','Grandfather','Granddaughter','Grandson','Aunt','Uncle','Niece','Nephew','Cousin','Guardian','Relative','Friend','Colleague','Other'];
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -678,6 +679,7 @@ export default function DashboardPage() {
           {sessionUser && <span style={{ color: '#334155', fontSize: '0.9rem' }}>Signed in as {sessionUser.username}</span>}
           <Link href="/">Back home</Link>
           <Link href="/session">Session</Link>
+          <Link href="/moderation">Moderation</Link>
           <button type="button" className="btn" onClick={handleLogout}>Sign out</button>
         </div>
       </div>
@@ -1081,9 +1083,9 @@ export default function DashboardPage() {
           <ul>{circles.map((circle) => <li key={circle.id || circle.name}>{circle.name} {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => handleAdminEdit('circle', circle)}>Edit</button>}</li>)}</ul>
         </div>
         <div className="card">
-          <h3>Relationships</h3>
-          {sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem' }} onClick={() => handleAdminCreate('relationship')}>Add relationship</button>}
-          <div>{relationships.map((relationship) => <div key={relationship.id || relationship.type}><div className="relationship-line" /><span>{relationship.type}</span>{sessionUser?.role === 'ADMIN' && <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => handleAdminEdit('relationship', relationship)}>Edit</button>}</div>)}</div>
+          <h3>Supported relationship types</h3>
+          <p style={{ color: '#64748b' }}>Family types are used by the tree. Friend, Colleague, and Other remain network-only connections.</p>
+          <div>{supportedRelationshipTypes.map((type) => <div key={type}><div className="relationship-line" /><span>{type}</span></div>)}</div>
         </div>
         <div className="card">
           <h3>Permissions</h3>

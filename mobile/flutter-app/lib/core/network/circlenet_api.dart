@@ -51,11 +51,129 @@ class CircleNetApi {
           as List)
       .map((item) => Relationship.fromJson(item as Map<String, dynamic>))
       .toList();
+  Future<List<Map<String, dynamic>>> socialFeed() async =>
+      (await _json(_client.get('/api/social/feed', bearerToken: _token))
+              as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+  Future<List<Map<String, dynamic>>> savedSocialPosts() async =>
+      (await _json(_client.get('/api/social/saved', bearerToken: _token))
+              as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+  Future<List<Map<String, dynamic>>> socialStories() async =>
+      (await _json(_client.get('/api/social/stories', bearerToken: _token))
+              as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+  Future<Map<String, dynamic>> viewSocialStory(int id) async =>
+      Map<String, dynamic>.from(await _json(_client.post(
+              '/api/social/stories/$id/view', const {}, bearerToken: _token))
+          as Map);
+  Future<void> createSocialPost(String caption, String audience,
+          {int? circleId, Uint8List? bytes, String? fileName}) async =>
+      _json(_client.postMultipart(
+          '/api/social/posts',
+          {
+            'caption': caption,
+            'audience': audience,
+            if (circleId != null) 'circleId': '$circleId'
+          },
+          bearerToken: _token,
+          fileBytes: bytes,
+          fileName: fileName));
+  Future<void> createSocialStory(
+          String caption, Uint8List bytes, String fileName) async =>
+      _json(_client.postMultipart('/api/social/stories',
+          {'caption': caption, 'audience': 'RELATIONSHIPS'},
+          bearerToken: _token, fileBytes: bytes, fileName: fileName));
+  Future<Map<String, dynamic>> toggleSocialLike(int id) async =>
+      Map<String, dynamic>.from(await _json(_client.post(
+          '/api/social/posts/$id/like', const {},
+          bearerToken: _token)) as Map);
+  Future<Map<String, dynamic>> toggleSocialSave(int id) async =>
+      Map<String, dynamic>.from(await _json(_client.post(
+          '/api/social/posts/$id/save', const {},
+          bearerToken: _token)) as Map);
+  Future<void> shareSocialPost(
+          int id, String destinationType, int targetId, String message) async =>
+      _json(_client.post(
+          '/api/social/posts/$id/share',
+          {
+            'destinationType': destinationType,
+            'targetId': targetId,
+            'message': message
+          },
+          bearerToken: _token));
+  Future<void> reportContent(
+          {int? reportedUserId,
+          String? entityType,
+          int? entityId,
+          required String reason,
+          String details = ''}) async =>
+      _json(_client.post(
+          '/api/moderation/reports',
+          {
+            if (reportedUserId != null) 'reportedUserId': reportedUserId,
+            if (entityType != null) 'entityType': entityType,
+            if (entityId != null) 'entityId': entityId,
+            'reason': reason,
+            'details': details
+          },
+          bearerToken: _token));
+  Future<List<Map<String, dynamic>>> myReports() async => (await _json(
+              _client.get('/api/moderation/reports/mine', bearerToken: _token))
+          as List)
+      .map((item) => Map<String, dynamic>.from(item as Map))
+      .toList();
+  Future<void> addSocialComment(int id, String message) async =>
+      _json(_client.post('/api/social/posts/$id/comments', {'message': message},
+          bearerToken: _token));
+  Future<void> updateSocialPost(int id, String caption) async => _json(_client
+      .put('/api/social/posts/$id', {'caption': caption}, bearerToken: _token));
+  Future<void> deleteSocialPost(int id) async =>
+      _json(_client.delete('/api/social/posts/$id', bearerToken: _token));
+  Future<void> deleteSocialComment(int postId, int commentId) async =>
+      _json(_client.delete('/api/social/posts/$postId/comments/$commentId',
+          bearerToken: _token));
+  Future<void> deleteSocialStory(int id) async =>
+      _json(_client.delete('/api/social/stories/$id', bearerToken: _token));
+  Future<Uint8List> socialMedia(String path) async {
+    final response = await _client.get(path, bearerToken: _token);
+    if (!response.isSuccess)
+      throw CircleNetApiException('Media could not be loaded');
+    return response.bodyBytes;
+  }
+
   Future<List<CircleModel>> circles() async =>
       (await _json(_client.get('/api/network/circles', bearerToken: _token))
               as List)
           .map((item) => CircleModel.fromJson(item as Map<String, dynamic>))
           .toList();
+  Future<Map<int, int>> circleUnreadCounts() async {
+    final data = await _json(_client.get('/api/network/circles/unread-counts',
+        bearerToken: _token)) as Map<String, dynamic>;
+    return data.map(
+        (key, value) => MapEntry(int.parse(key), (value as num? ?? 0).toInt()));
+  }
+
+  Future<void> heartbeatPresence() async => _json(_client
+      .post('/api/network/presence/heartbeat', const {}, bearerToken: _token));
+  Future<Map<String, dynamic>> directPresence(int userId) async =>
+      Map<String, dynamic>.from(await _json(_client
+          .get('/api/network/presence/direct/$userId', bearerToken: _token)));
+  Future<void> setDirectTyping(int userId, bool typing) async => _json(_client
+      .post('/api/network/presence/direct/$userId/typing', {'typing': typing},
+          bearerToken: _token));
+  Future<Map<String, dynamic>> circlePresence(int circleId) async =>
+      Map<String, dynamic>.from(await _json(_client.get(
+          '/api/network/presence/circles/$circleId',
+          bearerToken: _token)));
+  Future<void> setCircleTyping(int circleId, bool typing) async =>
+      _json(_client.post(
+          '/api/network/presence/circles/$circleId/typing', {'typing': typing},
+          bearerToken: _token));
+
   Future<List<Person>> search(String query) async {
     final people = (await _json(_client.get(
             '/api/network/search?q=${Uri.encodeQueryComponent(query)}',
@@ -82,13 +200,13 @@ class CircleNetApi {
           int.parse(item['id'].toString()):
               (item['score'] as num?)?.toDouble() ?? 0
       };
-      people.sort((a, b) =>
-          (scores[b.id] ?? 0).compareTo(scores[a.id] ?? 0));
+      people.sort((a, b) => (scores[b.id] ?? 0).compareTo(scores[a.id] ?? 0));
     } catch (_) {
       // Search remains available when the optional AI ranking service is down.
     }
     return people;
   }
+
   Future<Relationship> addRelationship(
           Person person, String type, String visibility) async =>
       Relationship.fromJson(await _json(_client.post(
@@ -160,6 +278,28 @@ class CircleNetApi {
               'parentPostId': parentMessageId.toString()
           },
           bearerToken: _token));
+  Future<void> editCircleMessage(
+          int circleId, int messageId, String message) async =>
+      _json(_client.put('/api/network/circles/$circleId/posts/$messageId',
+          {'message': message},
+          bearerToken: _token));
+  Future<void> deleteCircleMessage(int circleId, int messageId) async =>
+      _json(_client.delete('/api/network/circles/$circleId/posts/$messageId',
+          bearerToken: _token));
+  Future<List<ConversationMessage>> searchCircleMessages(
+          int circleId, String query) async =>
+      (await _json(_client.get(
+              '/api/network/circles/$circleId/posts/search?q=${Uri.encodeQueryComponent(query)}',
+              bearerToken: _token)) as List)
+          .map((item) =>
+              ConversationMessage.fromJson(item as Map<String, dynamic>))
+          .toList();
+  Future<void> reactCircleMessage(
+          int circleId, int messageId, String emoji) async =>
+      _json(_client.post(
+          '/api/network/circles/$circleId/posts/$messageId/reaction',
+          {'emoji': emoji},
+          bearerToken: _token));
   Future<void> postCircleAttachment(
     int id,
     String message,
@@ -186,25 +326,61 @@ class CircleNetApi {
           .map((item) =>
               ConversationMessage.fromJson(item as Map<String, dynamic>))
           .toList();
-  Future<void> sendDirectMessage(int userId, String message) async =>
+  Future<List<DirectConversation>> directConversations() async => (await _json(
+          _client.get('/api/network/messages/conversations',
+              bearerToken: _token)) as List)
+      .map((item) => DirectConversation.fromJson(item as Map<String, dynamic>))
+      .toList();
+  Future<void> sendDirectMessage(int userId, String message,
+          {int? replyToMessageId}) async =>
       _json(_client.postMultipart(
-          '/api/network/messages/with/$userId', {'message': message},
+          '/api/network/messages/with/$userId',
+          {
+            'message': message,
+            if (replyToMessageId != null)
+              'replyToMessageId': '$replyToMessageId'
+          },
           bearerToken: _token));
   Future<void> sendDirectAttachment(
     int userId,
     String message,
     Uint8List bytes,
     String fileName, {
+    int? replyToMessageId,
     void Function(double progress)? onProgress,
   }) async =>
       _json(_client.postMultipart(
         '/api/network/messages/with/$userId',
-        {'message': message},
+        {
+          'message': message,
+          if (replyToMessageId != null) 'replyToMessageId': '$replyToMessageId'
+        },
         bearerToken: _token,
         fileBytes: bytes,
         fileName: fileName,
         onProgress: onProgress,
       ));
+  Future<List<ConversationMessage>> searchDirectMessages(
+          int userId, String query) async =>
+      (await _json(_client.get(
+              '/api/network/messages/with/$userId/search?q=${Uri.encodeQueryComponent(query)}',
+              bearerToken: _token)) as List)
+          .map((e) => ConversationMessage.fromJson(e as Map<String, dynamic>))
+          .toList();
+  Future<void> editDirectMessage(
+          int userId, int messageId, String message) async =>
+      _json(_client.put(
+          '/api/network/messages/with/$userId/$messageId', {'message': message},
+          bearerToken: _token));
+  Future<void> deleteDirectMessage(int userId, int messageId) async =>
+      _json(_client.delete('/api/network/messages/with/$userId/$messageId',
+          bearerToken: _token));
+  Future<void> reactDirectMessage(
+          int userId, int messageId, String emoji) async =>
+      _json(_client.post(
+          '/api/network/messages/with/$userId/$messageId/reaction',
+          {'emoji': emoji},
+          bearerToken: _token));
   Future<Map<String, dynamic>> previewBroadcast(String audienceType,
       {int? anchorUserId, String? location}) async {
     final query = <String, String>{'audienceType': audienceType};
@@ -255,6 +431,15 @@ class CircleNetApi {
           as List)
       .map((item) => DirectCallModel.fromJson(item as Map<String, dynamic>))
       .toList();
+  Future<List<Map<String, dynamic>>> blockedUsers() async =>
+      (await _json(_client.get('/api/privacy/blocks', bearerToken: _token))
+              as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+  Future<void> blockUser(int userId) async => _json(_client
+      .post('/api/privacy/blocks', {'userId': userId}, bearerToken: _token));
+  Future<void> unblockUser(int userId) async =>
+      _json(_client.delete('/api/privacy/blocks/$userId', bearerToken: _token));
   Future<DirectCallModel> call(int id) async => DirectCallModel.fromJson(
       await _json(_client.get('/api/network/calls/$id', bearerToken: _token))
           as Map<String, dynamic>);
@@ -294,7 +479,8 @@ class CircleNetApi {
   Future<Map<String, dynamic>> acceptContactSuggestions(
           List<Map<String, dynamic>> suggestions) async =>
       Map<String, dynamic>.from(await _json(_client.post(
-          '/api/contact-organizer/accept', {'consent': true, 'suggestions': suggestions},
+          '/api/contact-organizer/accept',
+          {'consent': true, 'suggestions': suggestions},
           bearerToken: _token)) as Map);
 }
 

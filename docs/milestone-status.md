@@ -1,13 +1,13 @@
 # CircleNet-AI Milestone Status
 
-Audit date: 9 August 2026
+Audit date: 16 August 2026
 
 ## Summary
 
 | Category | Count |
 | --- | ---: |
-| Total engineering milestones | 17 |
-| Implemented milestones | 17 |
+| Total engineering milestones | 20 |
+| Implemented milestones | 20 |
 | Pending engineering milestones | 0 |
 | External production activation items | 4 groups |
 
@@ -34,14 +34,17 @@ All planned application milestones are implemented. Production activation still 
 | 15. Security, Reliability, and End-to-End Quality | Complete | Rate limiting, mutation audit, abuse moderation, Prometheus health/metrics, Trivy CI, backup/restore runbook, and Playwright desktop/mobile accessibility checks are implemented. |
 | 16. AI-Native Product Capabilities | Complete | Explainable search ranking, duplicate suggestions, consent-gated family insights/profile enrichment, human-review flags, limits, proxy API, and evaluations are implemented. |
 | 17. AI Contact Organizer | Complete | Optional post-login contact permission, native Android/iOS reader, multilingual relationship classification, dynamic company/education/family circle suggestions, confidence/reasons, review/edit/remove controls, and explicit confirmation are implemented. Raw contacts are not retained by the analysis service. |
+| 18. Social Feed and Stories | Complete | Privacy-scoped personal/circle posts, media, likes, comments, saved/shared posts, 24-hour stories with idempotent view tracking, watched indicators and owner counts, web/mobile clients, notification events, reporting, ownership enforcement, and integration lifecycle coverage are implemented. |
+| 19. Communication Privacy | Complete | Persisted delivery/read timestamps, bidirectional account blocking, discovery filtering, social-content filtering, message enforcement, web/mobile block management, and integration coverage are implemented. |
+| 20. Rich Private Messaging | Complete | Reply linkage, editing, soft deletion with media cleanup, emoji reactions, conversation search, delivery/read display, web/mobile controls, ownership enforcement, and full lifecycle integration coverage are implemented. |
 
 ## Verification results
 
-- Backend: 24 tests passed; 26 Flyway migrations validated.
-- Frontend: production build and eight-page static generation passed; dependency audit reports zero vulnerabilities. Two advisory `<img>` optimization warnings remain for authenticated blob images.
+- Backend: 28 tests passed; 38 Flyway migrations validated.
+- Frontend: production build and 15-route static generation passed; dependency audit reports zero vulnerabilities. Advisory `<img>` optimization warnings remain for authenticated blob images.
 - Browser quality: four Playwright checks passed across desktop and mobile Chromium, including critical WCAG 2.0/2.1 A/AA checks.
 - AI service: six tests passed.
-- Mobile: widget tests passed and `flutter analyze` reports no issues.
+- Mobile: widget tests passed; the shared feed, stories, and blocked-account management are available in the authenticated shell.
 - Infrastructure: production Docker Compose interpolation and schema validation passed using placeholder deployment values.
 
 ## External production activation checklist

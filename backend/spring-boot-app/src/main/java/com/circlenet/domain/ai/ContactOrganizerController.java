@@ -14,12 +14,14 @@ import org.springframework.web.server.ResponseStatusException;
 public class ContactOrganizerController {
   private final RestClient ai;
   private final ContactOrganizerService organizer;
+  private final ContactOAuthService contactOAuth;
 
   public ContactOrganizerController(RestClient.Builder builder,
       @Value("${circlenet.ai.base-url:http://localhost:8081/api/v1}") String baseUrl,
-      ContactOrganizerService organizer) {
+      ContactOrganizerService organizer, ContactOAuthService contactOAuth) {
     this.ai = builder.baseUrl(baseUrl).build();
     this.organizer = organizer;
+    this.contactOAuth = contactOAuth;
   }
 
   @PostMapping("/analyze")
@@ -59,4 +61,21 @@ public class ContactOrganizerController {
   public record AcceptContactSuggestionsRequest(boolean consent, List<AcceptedContactSuggestion> suggestions) {}
   public record AcceptedContactSuggestion(String displayName, String phone, String email,
       String relationship, List<String> circles, boolean selected) {}
+
+  @PostMapping("/oauth/start")
+  public ContactOAuthService.StartResult startOAuth(Principal principal,
+      @RequestBody ContactOAuthService.StartRequest request) {
+    return contactOAuth.start(Long.valueOf(principal.getName()), request);
+  }
+
+  @GetMapping(value="/oauth/callback/{provider}", produces="text/html")
+  public String oauthCallback(@PathVariable String provider, @RequestParam(required=false) String code,
+      @RequestParam String state, @RequestParam(required=false) String error) {
+    return contactOAuth.callback(provider, code, state, error);
+  }
+
+  @GetMapping("/oauth/results/{resultKey}")
+  public Object oauthResults(Principal principal, @PathVariable String resultKey) {
+    return contactOAuth.consume(Long.valueOf(principal.getName()), resultKey);
+  }
 }

@@ -33,16 +33,19 @@ import com.circlenet.domain.profile.UserProfileRepository;
 import com.circlenet.domain.profile.model.UserProfileEntity;
 import com.circlenet.domain.notification.NotificationCommand;
 import com.circlenet.domain.notification.NotificationService;
+import com.circlenet.domain.privacy.UserBlockRepository;
 
 @Service
 @Transactional
 public class NetworkService {
   private static final Set<String> RELATIONSHIP_TYPES = Set.of(
-      "Friend", "Spouse", "Parent", "Mother", "Father", "Child", "Son", "Daughter",
-      "Sibling", "Sister", "Brother", "Colleague", "Relative", "Other");
+      "Mother", "Father", "Wife", "Husband", "Son", "Daughter", "Brother", "Sister",
+      "Grandmother", "Grandfather", "Granddaughter", "Grandson", "Aunt", "Uncle",
+      "Niece", "Nephew", "Cousin", "Guardian", "Relative", "Friend", "Colleague", "Other");
   private static final Set<String> VISIBILITY_SCOPES = Set.of("PUBLIC", "FRIENDS", "RELATIVES", "COLLEAGUES");
-  private static final Set<String> RELATIVE_TYPES = Set.of("spouse", "parent", "mother", "father",
-      "child", "son", "daughter", "sibling", "sister", "brother", "relative");
+  private static final Set<String> RELATIVE_TYPES = Set.of("wife", "husband", "mother", "father",
+      "son", "daughter", "sister", "brother", "grandmother", "grandfather", "granddaughter",
+      "grandson", "aunt", "uncle", "niece", "nephew", "cousin", "guardian", "relative");
 
   private final UserRepository userRepository;
   private final RelationshipRepository relationshipRepository;
@@ -50,16 +53,18 @@ public class NetworkService {
   private final PasswordEncoder passwordEncoder;
   private final UserProfileRepository profileRepository;
   private final NotificationService notificationService;
+  private final UserBlockRepository blockRepository;
 
   public NetworkService(UserRepository userRepository, RelationshipRepository relationshipRepository,
       CircleRepository circleRepository, PasswordEncoder passwordEncoder, UserProfileRepository profileRepository,
-      NotificationService notificationService) {
+      NotificationService notificationService, UserBlockRepository blockRepository) {
     this.userRepository = userRepository;
     this.relationshipRepository = relationshipRepository;
     this.circleRepository = circleRepository;
     this.passwordEncoder = passwordEncoder;
     this.profileRepository = profileRepository;
     this.notificationService = notificationService;
+    this.blockRepository = blockRepository;
   }
 
   @Transactional(readOnly = true)
@@ -72,7 +77,7 @@ public class NetworkService {
         .map(RelationshipEntity::getRelatedUserId).filter(id -> id != null)
         .map(this::requireUser).filter(user -> matchesSearch(user, normalizedQuery, ownedRelationships))
         .forEach(user -> matches.putIfAbsent(user.getId(), user));
-    return matches.values().stream().filter(user -> isVisibleTo(currentUserId, user.getId())).limit(50)
+    return matches.values().stream().filter(user -> !blockRepository.blockedEitherWay(currentUserId,user.getId())).filter(user -> isVisibleTo(currentUserId, user.getId())).limit(50)
         .map(user -> toPerson(user, relationshipName(ownedRelationships, user.getId()))).toList();
   }
 
@@ -86,14 +91,7 @@ public class NetworkService {
 
   @Transactional(readOnly = true)
   public List<String> relationshipTypes() {
-    LinkedHashSet<String> types = new LinkedHashSet<>(RELATIONSHIP_TYPES);
-    relationshipRepository.findByOwnerUserIdIsNull().stream()
-        .map(RelationshipEntity::getType)
-        .filter(type -> type != null && !type.isBlank())
-        .forEach(type -> {
-          if (types.stream().noneMatch(existing -> existing.equalsIgnoreCase(type.trim()))) types.add(type.trim());
-        });
-    return types.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    return RELATIONSHIP_TYPES.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
   }
 
   public NetworkRelationshipDto addRelationship(Long currentUserId, AddRelationshipRequest request) {

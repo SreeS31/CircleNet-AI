@@ -1,6 +1,8 @@
 package com.circlenet.domain.network;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -58,6 +60,18 @@ class NetworkControllerTest {
         .andExpect(jsonPath("$.members[?(@.person.id == " + friend.get("id").asLong() + " && @.admin == true)]").exists());
 
     String friendToken = login(friend.get("phoneNumber").asText());
+    mockMvc.perform(post("/api/network/presence/heartbeat").header(auth(), "Bearer " + friendToken)).andExpect(status().isOk());
+    mockMvc.perform(post("/api/network/presence/direct/" + owner.get("id").asLong() + "/typing")
+        .header(auth(), "Bearer " + friendToken).contentType(MediaType.APPLICATION_JSON).content("{\"typing\":true}"))
+        .andExpect(status().isOk());
+    mockMvc.perform(get("/api/network/presence/direct/" + friend.get("id").asLong()).header(auth(), "Bearer " + token))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.online").value(true))
+        .andExpect(jsonPath("$.typingUsers[0].userId").value(friend.get("id").asLong()));
+    mockMvc.perform(post("/api/network/presence/circles/" + circleId + "/typing")
+        .header(auth(), "Bearer " + friendToken).contentType(MediaType.APPLICATION_JSON).content("{\"typing\":true}"))
+        .andExpect(status().isOk());
+    mockMvc.perform(get("/api/network/presence/circles/" + circleId).header(auth(), "Bearer " + token))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.typingUsers[0].userId").value(friend.get("id").asLong()));
     mockMvc.perform(put("/api/network/circles/" + circleId).header(auth(), "Bearer " + friendToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content("{\"name\":\"Close friends updated\",\"description\":\"Updated by a circle admin\"}"))
@@ -71,6 +85,17 @@ class NetworkControllerTest {
         .andExpect(jsonPath("$[0].name").value("Close friends updated"))
         .andExpect(jsonPath("$[0].ownerName").value("Asha Rao"))
         .andExpect(jsonPath("$[0].ownedByCurrentUser").value(false));
+
+    MvcResult circlePost=mockMvc.perform(multipart("/api/network/circles/"+circleId+"/posts").param("message","Original circle update").header(auth(),"Bearer "+friendToken)).andExpect(status().isOk()).andReturn();
+    long circlePostId=objectMapper.readTree(circlePost.getResponse().getContentAsString()).get("id").asLong();
+    mockMvc.perform(get("/api/network/circles/unread-counts").header(auth(),"Bearer "+token)).andExpect(status().isOk()).andExpect(jsonPath("$['"+circleId+"']").value(1));
+    mockMvc.perform(get("/api/network/circles/"+circleId+"/posts").header(auth(),"Bearer "+token)).andExpect(status().isOk()).andExpect(jsonPath("$[0].readCount").value(1));
+    mockMvc.perform(get("/api/network/circles/unread-counts").header(auth(),"Bearer "+token)).andExpect(status().isOk()).andExpect(jsonPath("$['"+circleId+"']").value(0));
+    mockMvc.perform(post("/api/network/circles/"+circleId+"/posts/"+circlePostId+"/reaction").header(auth(),"Bearer "+token).contentType(MediaType.APPLICATION_JSON).content("{\"emoji\":\"👍\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.reactions['👍']").value(1)).andExpect(jsonPath("$.myReaction").value("👍"));
+    mockMvc.perform(get("/api/network/circles/"+circleId+"/posts/search").param("q","original").header(auth(),"Bearer "+friendToken)).andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(circlePostId));
+    mockMvc.perform(put("/api/network/circles/"+circleId+"/posts/"+circlePostId).header(auth(),"Bearer "+friendToken).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Edited circle update\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.message").value("Edited circle update")).andExpect(jsonPath("$.editedAt").exists());
+    mockMvc.perform(put("/api/network/circles/"+circleId+"/posts/"+circlePostId).header(auth(),"Bearer "+token).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Not mine\"}")).andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/network/circles/"+circleId+"/posts/"+circlePostId).header(auth(),"Bearer "+friendToken)).andExpect(status().isOk()).andExpect(jsonPath("$.deletedAt").exists()).andExpect(jsonPath("$.message").value(""));
   }
 
   @Test
@@ -80,7 +105,7 @@ class NetworkControllerTest {
 
     mockMvc.perform(post("/api/network/relationships/add-person").header(auth(), "Bearer " + token)
         .contentType(MediaType.APPLICATION_JSON)
-        .content("{\"fullName\":\"Little Tara\",\"type\":\"Child\",\"visibilityScope\":\"RELATIVES\",\"managedCategory\":\"CHILD\",\"dateOfBirth\":\"2020-03-14\"}"))
+        .content("{\"fullName\":\"Little Tara\",\"type\":\"Daughter\",\"visibilityScope\":\"RELATIVES\",\"managedCategory\":\"CHILD\",\"dateOfBirth\":\"2020-03-14\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.contactPhone").doesNotExist())
         .andExpect(jsonPath("$.person.accountStatus").value("MANAGED"))

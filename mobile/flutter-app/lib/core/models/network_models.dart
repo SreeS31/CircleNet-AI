@@ -95,6 +95,36 @@ class CircleModel {
       postingPermission: json['postingPermission'] as String? ?? 'ALL_MEMBERS');
 }
 
+class DirectConversation {
+  DirectConversation(
+      {required this.userId,
+      required this.displayName,
+      required this.lastMessage,
+      required this.lastMessageAt,
+      required this.unreadCount,
+      this.profilePhoto});
+  final int userId, unreadCount;
+  final String displayName, lastMessage;
+  final String? profilePhoto;
+  final DateTime lastMessageAt;
+  Person get person => Person(
+      id: userId,
+      displayName: displayName,
+      accountStatus: 'ACTIVE',
+      profilePhoto: profilePhoto,
+      identityType: 'ACCOUNT');
+  factory DirectConversation.fromJson(Map<String, dynamic> json) =>
+      DirectConversation(
+          userId: (json['userId'] as num).toInt(),
+          displayName: json['displayName'] as String? ?? 'Unknown',
+          profilePhoto: json['profilePhoto'] as String?,
+          lastMessage: json['lastMessage'] as String? ?? '',
+          lastMessageAt:
+              DateTime.tryParse(json['lastMessageAt'] as String? ?? '') ??
+                  DateTime.now(),
+          unreadCount: (json['unreadCount'] as num? ?? 0).toInt());
+}
+
 class ConversationMessage {
   ConversationMessage(
       {required this.id,
@@ -107,7 +137,10 @@ class ConversationMessage {
       this.attachmentName,
       this.attachmentType,
       this.attachmentSize,
-      this.parentMessageId});
+      this.parentMessageId,
+      this.deliveredAt,
+      this.readAt,
+      this.readCount = 0});
   final int id;
   final String authorName;
   final String message;
@@ -119,6 +152,14 @@ class ConversationMessage {
   final String? attachmentType;
   final int? attachmentSize;
   final int? parentMessageId;
+  final DateTime? deliveredAt;
+  final DateTime? readAt;
+  final int readCount;
+  bool get deleted => deletedAt != null;
+  late final DateTime? editedAt;
+  late final DateTime? deletedAt;
+  late final Map<String, int> reactions;
+  late final String? myReaction;
   bool get hasAttachment => attachmentUrl?.isNotEmpty == true;
   factory ConversationMessage.fromJson(Map<String, dynamic> json) =>
       ConversationMessage(
@@ -134,7 +175,18 @@ class ConversationMessage {
           attachmentName: json['attachmentName'] as String?,
           attachmentType: json['attachmentType'] as String?,
           attachmentSize: (json['attachmentSize'] as num?)?.toInt(),
-          parentMessageId: (json['parentPostId'] as num?)?.toInt());
+          parentMessageId:
+              ((json['parentPostId'] ?? json['replyToMessageId']) as num?)
+                  ?.toInt(),
+          deliveredAt: DateTime.tryParse(json['deliveredAt'] as String? ?? ''),
+          readAt: DateTime.tryParse(json['readAt'] as String? ?? ''),
+          readCount: (json['readCount'] as num? ?? 0).toInt())
+        ..editedAt = DateTime.tryParse(json['editedAt'] as String? ?? '')
+        ..deletedAt = DateTime.tryParse(json['deletedAt'] as String? ?? '')
+        ..reactions = Map<String, int>.from(
+            (json['reactions'] as Map? ?? const {})
+                .map((k, v) => MapEntry(k.toString(), (v as num).toInt())))
+        ..myReaction = json['myReaction'] as String?;
 }
 
 class UserProfileModel {

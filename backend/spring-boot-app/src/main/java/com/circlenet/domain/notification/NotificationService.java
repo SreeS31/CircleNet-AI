@@ -70,6 +70,7 @@ public class NotificationService {
     var p=preference(userId); p.setEmailEnabled(request.emailEnabled()); p.setSmsEnabled(request.smsEnabled()); p.setPushEnabled(request.pushEnabled());
     p.setMessagesEnabled(request.messagesEnabled()); p.setCirclesEnabled(request.circlesEnabled()); p.setRelationshipsEnabled(request.relationshipsEnabled());
     p.setCallsEnabled(request.callsEnabled()); p.setInvitationsEnabled(request.invitationsEnabled()); p.setUpdatedAt(Instant.now());
+    p.setSocialEnabled(request.socialEnabled());
     return preferenceDto(preferences.save(p));
   }
 
@@ -96,9 +97,9 @@ public class NotificationService {
     return preferences.findById(userId).orElseGet(() -> {var p=new NotificationPreferenceEntity(); p.setUserId(userId); p.setUnsubscribeToken(UUID.randomUUID().toString()); return preferences.save(p);});
   }
   private void queue(Long notificationId,String channel,String destination){var d=new NotificationDeliveryEntity();d.setNotificationId(notificationId);d.setChannel(channel);d.setDestination(destination);deliveries.save(d);}
-  private boolean categoryEnabled(NotificationPreferenceEntity p,String type){return switch(normalize(type)){case "DIRECT_MESSAGE"->p.isMessagesEnabled();case "CIRCLE_MESSAGE"->p.isCirclesEnabled();case "RELATIONSHIP"->p.isRelationshipsEnabled();case "CALL"->p.isCallsEnabled();case "INVITATION"->p.isInvitationsEnabled();default->true;};}
+  private boolean categoryEnabled(NotificationPreferenceEntity p,String type){return switch(normalize(type)){case "DIRECT_MESSAGE"->p.isMessagesEnabled();case "CIRCLE_MESSAGE"->p.isCirclesEnabled();case "RELATIONSHIP"->p.isRelationshipsEnabled();case "CALL"->p.isCallsEnabled();case "INVITATION"->p.isInvitationsEnabled();case "SOCIAL_LIKE","SOCIAL_COMMENT"->p.isSocialEnabled();default->true;};}
   private String normalize(String value){return value==null?"GENERAL":value.trim().toUpperCase(Locale.ROOT);}
   private boolean hasText(String value){return value!=null&&!value.isBlank();}
-  private NotificationPreferenceDto preferenceDto(NotificationPreferenceEntity p){return new NotificationPreferenceDto(p.isEmailEnabled(),p.isSmsEnabled(),p.isPushEnabled(),p.isMessagesEnabled(),p.isCirclesEnabled(),p.isRelationshipsEnabled(),p.isCallsEnabled(),p.isInvitationsEnabled());}
+  private NotificationPreferenceDto preferenceDto(NotificationPreferenceEntity p){return new NotificationPreferenceDto(p.isEmailEnabled(),p.isSmsEnabled(),p.isPushEnabled(),p.isMessagesEnabled(),p.isCirclesEnabled(),p.isRelationshipsEnabled(),p.isCallsEnabled(),p.isInvitationsEnabled(),p.isSocialEnabled());}
   private NotificationDto dto(NotificationEntity n){var ds=deliveries.findByNotificationId(n.getId()).stream().map(d->new NotificationDto.DeliveryDto(d.getChannel(),d.getStatus(),d.getAttempts(),d.getLastError(),d.getSentAt())).toList();return new NotificationDto(n.getId(),n.getType(),n.getTitle(),n.getBody(),n.getActionUrl(),n.getEntityType(),n.getEntityId(),n.getReadAt(),n.getCreatedAt(),ds);}
 }
