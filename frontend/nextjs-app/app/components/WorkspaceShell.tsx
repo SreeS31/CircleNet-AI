@@ -12,6 +12,7 @@ const navigation = [
   { href: '/circles', icon: '◎', label: 'Circles' },
   { href: '/notifications', icon: '♢', label: 'Notifications' },
   { href: '/profile', icon: '♙', label: 'Profile' },
+  { href: '/timeline', icon: '◇', label: 'Timeline' },
 ];
 
 const utilities = [

@@ -84,8 +84,7 @@ public class NetworkService {
   @Transactional(readOnly = true)
   public List<NetworkRelationshipDto> relationships(Long currentUserId) {
     return relationshipRepository.findByOwnerUserId(currentUserId).stream()
-        .map(entity -> new NetworkRelationshipDto(entity.getId(), entity.getType(), entity.getVisibilityScope(), entity.getContactPhone(), entity.getContactEmail(), entity.getVisibilityCompany(), entity.getRelativeToUserId(),
-            toPerson(requireUser(entity.getRelatedUserId()), entity.getContactName())))
+        .map(entity -> relationshipDto(entity, requireUser(entity.getRelatedUserId())))
         .toList();
   }
 
@@ -106,6 +105,9 @@ public class NetworkService {
     relationship.setOwnerUserId(currentUserId);
     relationship.setRelatedUserId(related.getId());
     relationship.setType(type);
+    relationship.setMilestoneDate(cleanDate(request.milestoneDate(), "Relationship date"));
+    relationship.setRelatedBirthDate(cleanDate(request.dateOfBirth(), "Date of birth"));
+    relationship.setRelatedDeathDate(cleanDate(request.dateOfDeath(), "Date of death"));
     relationship.setContactName(profileDisplayName(related));
     if (relationship.getContactPhone() == null) relationship.setContactPhone(related.getPhoneNumber());
     if (relationship.getContactEmail() == null) relationship.setContactEmail(related.getEmail());
@@ -183,6 +185,9 @@ public class NetworkService {
     relationship.setRelatedUserId(person.getId());
     relationship.setRelativeToUserId(relativeToUserId);
     relationship.setType(type);
+    relationship.setMilestoneDate(cleanDate(request.milestoneDate(), "Relationship date"));
+    relationship.setRelatedBirthDate(cleanDate(request.dateOfBirth(), "Date of birth"));
+    relationship.setRelatedDeathDate(cleanDate(request.dateOfDeath(), "Date of death"));
     relationship.setContactName(fullName);
     relationship.setContactPhone(phoneNumber);
     relationship.setContactEmail(cleanEmail(request.email()));
@@ -220,6 +225,9 @@ public class NetworkService {
         ? null : normalizePhoneNumber(request.contactPhone()));
     relationship.setContactEmail(cleanEmail(request.contactEmail()));
     relationship.setType(normalizeRelationshipType(request.type()));
+    relationship.setMilestoneDate(cleanDate(request.milestoneDate(), "Relationship date"));
+    relationship.setRelatedBirthDate(cleanDate(request.dateOfBirth(), "Date of birth"));
+    relationship.setRelatedDeathDate(cleanDate(request.dateOfDeath(), "Date of death"));
     applyVisibility(currentUserId, relationship, request.visibilityScope(), request.visibilityCompany());
     relationship = relationshipRepository.save(relationship);
     return relationshipDto(relationship, requireUser(relationship.getRelatedUserId()));
@@ -338,8 +346,11 @@ public class NetworkService {
   }
 
   private NetworkRelationshipDto relationshipDto(RelationshipEntity relationship, UserEntity person) {
+    String profileBirth=profileRepository.findById(person.getId()).map(UserProfileEntity::getDateOfBirth).orElse(null);
+    String birth=profileBirth!=null&&!profileBirth.isBlank()?profileBirth:(person.getManagedDateOfBirth()!=null?person.getManagedDateOfBirth():relationship.getRelatedBirthDate());
+    String death=person.getManagedDateOfDeath()!=null?person.getManagedDateOfDeath():relationship.getRelatedDeathDate();
     return new NetworkRelationshipDto(relationship.getId(), relationship.getType(), relationship.getVisibilityScope(), relationship.getContactPhone(), relationship.getContactEmail(),
-        relationship.getVisibilityCompany(), relationship.getRelativeToUserId(), toPerson(person, relationship.getContactName()));
+        relationship.getVisibilityCompany(), relationship.getRelativeToUserId(), relationship.getMilestoneDate(), birth, death, toPerson(person, relationship.getContactName()));
   }
 
   private String cleanEmail(String email) {

@@ -30,7 +30,7 @@ export type SessionProfile = {
 };
 
 export type UserProfile = Record<string, string | string[] | null> & { phoneNumber: string; photos: string[]; profilePhoto: string | null };
-export type PersonRecord = { nickname:string|null; contactPhone:string|null; contactEmail:string|null; address:string|null; city:string|null; country:string|null; occupation:string|null; importantDates:string|null; notes:string|null };
+export type PersonRecord = { nickname:string|null; contactPhone:string|null; contactEmail:string|null; address:string|null; city:string|null; country:string|null; occupation:string|null; dateOfBirth:string|null; marriageDate:string|null; dateOfDeath:string|null; importantDates:string|null; notes:string|null };
 export type PersonMemory = { id:number; title:string|null; note:string|null; mediaUrl:string|null; mediaName:string|null; mediaType:string|null; mediaSize:number|null; createdAt:string };
 export type PersonProfile = { id:number; displayName:string; profilePhoto:string|null; location:string|null; gender:string|null; bio:string|null; employer:string|null; jobTitle:string|null; institution:string|null; managedCategory:string|null; dateOfBirth:string|null; dateOfDeath:string|null; managedBiography:string|null; managedByMe:boolean; privateRecord:PersonRecord; memories:PersonMemory[] };
 
@@ -315,7 +315,7 @@ export async function updateUser(id: number, payload: { username: string; email?
 
 export type NetworkPerson = { id: number; firstName?: string; surname?: string; displayName: string; phoneNumber?: string | null; location?: string; accountStatus: 'ACTIVE' | 'INVITED' | 'MANAGED'; profilePhoto?: string | null; identityType?: 'ACCOUNT' | 'MANAGED'; managedCategory?: 'CHILD' | 'MEMORIAL' | 'OTHER' | null; claimStatus?: 'NONE' | 'NOT_CLAIMABLE' | 'GUARDIAN_APPROVAL_REQUIRED'; gender?: string | null };
 export type VisibilityScope = 'PUBLIC' | 'FRIENDS' | 'RELATIVES' | 'COLLEAGUES';
-export type NetworkRelationship = { id: number; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string | null; contactPhone?: string | null; contactEmail?: string | null; relativeToUserId?: number | null; person: NetworkPerson };
+export type NetworkRelationship = { id: number; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string | null; contactPhone?: string | null; contactEmail?: string | null; relativeToUserId?: number | null; milestoneDate?: string | null; dateOfBirth?: string | null; dateOfDeath?: string | null; person: NetworkPerson };
 export type NetworkCircleMember = { person: NetworkPerson; admin: boolean; creator: boolean };
 export type CirclePostingPermission = 'ALL_MEMBERS' | 'ADMINS_ONLY';
 export type NetworkCircle = { id: number; name: string; description: string; members: NetworkCircleMember[]; ownerName: string; ownerPhoto?: string | null; ownedByCurrentUser: boolean; currentUserAdmin: boolean; postingPermission: CirclePostingPermission; currentUserCanPost: boolean };
@@ -410,13 +410,13 @@ export async function fetchRelationshipTypes() {
   return authenticatedRequest<string[]>('/api/network/relationship-types');
 }
 
-export async function addMyRelationship(relatedUserId: number, type: string, visibilityScope: VisibilityScope, visibilityCompany?: string) {
+export async function addMyRelationship(relatedUserId: number, type: string, visibilityScope: VisibilityScope, visibilityCompany?: string, dates?: {milestoneDate?:string;dateOfBirth?:string;dateOfDeath?:string}) {
   return authenticatedRequest<NetworkRelationship>('/api/network/relationships', {
-    method: 'POST', body: JSON.stringify({ relatedUserId, type, visibilityScope, visibilityCompany }),
+    method: 'POST', body: JSON.stringify({ relatedUserId, type, visibilityScope, visibilityCompany, ...dates }),
   });
 }
 
-export async function addPersonToMyNetwork(payload: { fullName: string; phoneNumber?: string; email?: string; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string; identityType?: 'ACCOUNT' | 'MANAGED'; managedCategory?: 'CHILD' | 'MEMORIAL' | 'OTHER'; dateOfBirth?: string; dateOfDeath?: string; notes?: string; relativeToUserId?: number }) {
+export async function addPersonToMyNetwork(payload: { fullName: string; phoneNumber?: string; email?: string; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string; identityType?: 'ACCOUNT' | 'MANAGED'; managedCategory?: 'CHILD' | 'MEMORIAL' | 'OTHER'; dateOfBirth?: string; dateOfDeath?: string; milestoneDate?: string; notes?: string; relativeToUserId?: number }) {
   return authenticatedRequest<NetworkRelationship>('/api/network/relationships/add-person', {
     method: 'POST', body: JSON.stringify(payload),
   });
@@ -426,7 +426,7 @@ export async function removeMyRelationship(id: number) {
   return authenticatedRequest<void>(`/api/network/relationships/${id}`, { method: 'DELETE' });
 }
 
-export async function updateMyRelationship(id: number, payload: { contactName: string; contactPhone?: string; contactEmail?: string; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string }) {
+export async function updateMyRelationship(id: number, payload: { contactName: string; contactPhone?: string; contactEmail?: string; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string; milestoneDate?:string; dateOfBirth?:string; dateOfDeath?:string }) {
   return authenticatedRequest<NetworkRelationship>(`/api/network/relationships/${id}`, {
     method: 'PUT', body: JSON.stringify(payload),
   });

@@ -37,7 +37,7 @@ public class ContactOrganizerService {
       try {
         var relationship = network.addPerson(userId, new AddPersonRequest(
             suggestion.displayName(), suggestion.phone(), suggestion.email(), suggestion.relationship(),
-            "FRIENDS", null, hasPhone ? "ACCOUNT" : "MANAGED", hasPhone ? null : "OTHER", null, null,
+            "FRIENDS", null, hasPhone ? "ACCOUNT" : "MANAGED", hasPhone ? null : "OTHER", null, null, null,
             "Added from the optional AI contact organizer after user confirmation", null));
         peopleAdded++;
         if (suggestion.circles() == null) continue;

@@ -11,6 +11,7 @@ import { startDirectCall, fetchIncomingCalls, fetchDirectCall, acceptDirectCall,
 import type { BroadcastAudience, BroadcastAudienceType, CirclePost, CirclePostingPermission, DirectCall, DirectMessage, PresenceStatus, VisibilityScope } from '../lib/api';
 import CountryPhoneInput from '../components/CountryPhoneInput';
 import WebContactOrganizer from './WebContactOrganizer';
+import LifeTimeline from '../components/LifeTimeline';
 
 const defaultRelationshipTypes = ['Mother','Father','Wife','Husband','Son','Daughter','Brother','Sister','Grandmother','Grandfather','Granddaughter','Grandson','Aunt','Uncle','Niece','Nephew','Cousin','Guardian','Relative','Friend','Colleague','Other'];
 const circleAttachmentLimit=25*1024*1024;
@@ -155,6 +156,9 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const [relationshipType, setRelationshipType] = useState<Record<number, string>>({});
   const [visibilityChoice, setVisibilityChoice] = useState<Record<number, VisibilityScope>>({});
   const [companyChoice, setCompanyChoice] = useState<Record<number, string>>({});
+  const [relationshipMilestoneDates,setRelationshipMilestoneDates]=useState<Record<number,string>>({});
+  const [relationshipBirthDates,setRelationshipBirthDates]=useState<Record<number,string>>({});
+  const [relationshipDeathDates,setRelationshipDeathDates]=useState<Record<number,string>>({});
   const [circleSearch, setCircleSearch] = useState<Record<number, string>>({});
   const [circleChoice, setCircleChoice] = useState<Record<number, string>>({});
   const [circleName, setCircleName] = useState('');
@@ -166,12 +170,14 @@ export default function UserNetworkDashboard({ username }: { username: string })
   const [managedCategory, setManagedCategory] = useState<'CHILD' | 'MEMORIAL' | 'OTHER'>('CHILD');
   const [managedDateOfBirth, setManagedDateOfBirth] = useState('');
   const [managedDateOfDeath, setManagedDateOfDeath] = useState('');
+  const [relationshipMilestoneDate,setRelationshipMilestoneDate]=useState('');
+  const [isDeceased,setIsDeceased]=useState(false);
   const [managedNotes, setManagedNotes] = useState('');
   const [directRelationshipType, setDirectRelationshipType] = useState('');
   const [directVisibility, setDirectVisibility] = useState<VisibilityScope | ''>('');
   const [directCompany, setDirectCompany] = useState('');
   const [employmentCompanies, setEmploymentCompanies] = useState<string[]>([]);
-  const [editingRelationship, setEditingRelationship] = useState<{ id: number; contactName: string; contactPhone: string; contactEmail: string; type: string; visibilityScope: VisibilityScope; visibilityCompany: string } | null>(null);
+  const [editingRelationship, setEditingRelationship] = useState<{ id: number; contactName: string; contactPhone: string; contactEmail: string; type: string; visibilityScope: VisibilityScope; visibilityCompany: string; milestoneDate?:string; dateOfBirth?:string; dateOfDeath?:string } | null>(null);
   const [expandedRelationships, setExpandedRelationships] = useState<Record<number, boolean>>({});
   const [editingCircle, setEditingCircle] = useState<{ id: number; name: string; description: string; postingPermission: CirclePostingPermission } | null>(null);
   const [expandedCircles,setExpandedCircles]=useState<Record<number,boolean>>({});
@@ -274,7 +280,8 @@ export default function UserNetworkDashboard({ username }: { username: string })
     setBusy(true);
     try {
       await addMyRelationship(person.id, selectedRelation, scope,
-        scope === 'COLLEAGUES' ? companyChoice[person.id] : undefined);
+        scope === 'COLLEAGUES' ? companyChoice[person.id] : undefined,
+        {milestoneDate:relationshipMilestoneDates[person.id]||undefined,dateOfBirth:relationshipBirthDates[person.id]||undefined,dateOfDeath:relationshipDeathDates[person.id]||undefined});
       await refresh();
       setMessage(`${person.displayName} already exists, so only the relationship was added.`);
     } catch (error) { setMessage(errorMessage(error)); }
@@ -317,8 +324,9 @@ export default function UserNetworkDashboard({ username }: { username: string })
         type: directRelationshipType, visibilityScope: directVisibility,
         visibilityCompany: directVisibility === 'COLLEAGUES' ? directCompany : undefined, identityType,
         managedCategory: identityType === 'MANAGED' ? managedCategory : undefined,
-        dateOfBirth: identityType === 'MANAGED' ? managedDateOfBirth || undefined : undefined,
-        dateOfDeath: identityType === 'MANAGED' && managedCategory === 'MEMORIAL' ? managedDateOfDeath || undefined : undefined,
+        milestoneDate: relationshipMilestoneDate || undefined,
+        dateOfBirth: managedDateOfBirth || undefined,
+        dateOfDeath: isDeceased || managedCategory === 'MEMORIAL' ? managedDateOfDeath || undefined : undefined,
         notes: identityType === 'MANAGED' ? managedNotes || undefined : undefined,
         relativeToUserId: addingRelativeTo?.id });
       const existing = relationship.person.accountStatus === 'ACTIVE';
@@ -331,7 +339,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
       setDirectRelationshipType('');
       setDirectVisibility('');
       setDirectCompany('');
-      setManagedDateOfBirth(''); setManagedDateOfDeath(''); setManagedNotes('');
+      setManagedDateOfBirth(''); setManagedDateOfDeath(''); setRelationshipMilestoneDate(''); setIsDeceased(false); setManagedNotes('');
       setAddingRelativeTo(null);
       setMessage(identityType === 'MANAGED'
         ? `${relationship.person.displayName} was added as ${relationshipOwnerName}'s ${directRelationshipType.toLowerCase()}. It can be used in relationships and circles but cannot sign in.`
@@ -363,6 +371,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
         contactEmail: editingRelationship.contactEmail || undefined, type: editingRelationship.type,
         visibilityScope: editingRelationship.visibilityScope,
         visibilityCompany: editingRelationship.visibilityScope === 'COLLEAGUES' ? editingRelationship.visibilityCompany : undefined,
+        milestoneDate:editingRelationship.milestoneDate||undefined,dateOfBirth:editingRelationship.dateOfBirth||undefined,dateOfDeath:editingRelationship.dateOfDeath||undefined,
       });
       setEditingRelationship(null);
       await refresh();
@@ -565,6 +574,7 @@ export default function UserNetworkDashboard({ username }: { username: string })
       <article><span className="metric-symbol messages">✉</span><div><strong>{unreadMessages}</strong><small>Unread messages</small></div></article>
       <article><span className="metric-symbol alerts">◇</span><div><strong>{unreadNotifications}</strong><small>Notifications</small></div></article>
     </section>
+    <LifeTimeline compact />
     <WebContactOrganizer onImported={refresh}/>
 
     <p className="network-message" role="status">{message}</p>
@@ -579,9 +589,13 @@ export default function UserNetworkDashboard({ username }: { username: string })
         <CountryPhoneInput className="quick-add-mobile" required={identityType === 'ACCOUNT'} value={mobileToAdd} onChange={setMobileToAdd} placeholder={identityType === 'ACCOUNT' ? 'Mobile number' : 'Mobile number (optional)'}/>
         <input className="quick-add-email" type="email" value={emailToAdd} onChange={e => setEmailToAdd(e.target.value)} placeholder="Email address (optional)" />
         <SearchableSelect className="quick-add-relationship" value={directRelationshipType} placeholder="Relation" options={relationshipTypes} onChange={setDirectRelationshipType}/>
+        {['Wife','Husband'].includes(directRelationshipType)&&<label className="relationship-date-field"><span>Marriage date</span><input type="date" value={relationshipMilestoneDate} onChange={event=>setRelationshipMilestoneDate(event.target.value)}/></label>}
+        {['Son','Daughter','Grandson','Granddaughter'].includes(directRelationshipType)&&<label className="relationship-date-field"><span>Date of birth</span><input type="date" value={managedDateOfBirth} onChange={event=>setManagedDateOfBirth(event.target.value)}/></label>}
+        <label className="relationship-deceased-toggle"><input type="checkbox" checked={isDeceased||managedCategory==='MEMORIAL'} onChange={event=>setIsDeceased(event.target.checked)}/><span>This person is deceased</span></label>
+        {(isDeceased||managedCategory==='MEMORIAL')&&<label className="relationship-date-field"><span>Date of death</span><input type="date" value={managedDateOfDeath} onChange={event=>setManagedDateOfDeath(event.target.value)}/></label>}
         <SearchableSelect className="quick-add-visibility" value={visibilityLabel(directVisibility)} placeholder="View" options={visibilityLabels} onChange={label => setDirectVisibility(visibilityValue(label) as VisibilityScope)}/>
         {directVisibility === 'COLLEAGUES' && <SearchableSelect className="quick-add-company" value={directCompany} placeholder="Company" options={employmentCompanies} onChange={setDirectCompany}/>}
-        {identityType === 'MANAGED' && <div className="managed-person-fields"><SearchableSelect value={managedCategory === 'CHILD' ? 'Child / dependent' : managedCategory === 'MEMORIAL' ? 'Memorial person' : 'Other managed person'} placeholder="Managed category" options={['Child / dependent', 'Memorial person', 'Other managed person']} onChange={value => setManagedCategory(value === 'Memorial person' ? 'MEMORIAL' : value === 'Other managed person' ? 'OTHER' : 'CHILD')}/><label><span>Date of birth (optional)</span><input type="date" value={managedDateOfBirth} onChange={event => setManagedDateOfBirth(event.target.value)}/></label>{managedCategory === 'MEMORIAL' && <label><span>Date of death (optional)</span><input type="date" value={managedDateOfDeath} onChange={event => setManagedDateOfDeath(event.target.value)}/></label>}<textarea value={managedNotes} onChange={event => setManagedNotes(event.target.value)} placeholder="Biography or guardian notes (optional)" maxLength={2000}/><p>{managedCategory === 'MEMORIAL' ? 'Memorial profiles are permanently non-claimable.' : 'This profile is managed by you. Any future account claim requires guardian approval.'}</p></div>}
+        {identityType === 'MANAGED' && <div className="managed-person-fields"><SearchableSelect value={managedCategory === 'CHILD' ? 'Child / dependent' : managedCategory === 'MEMORIAL' ? 'Memorial person' : 'Other managed person'} placeholder="Managed category" options={['Child / dependent', 'Memorial person', 'Other managed person']} onChange={value => setManagedCategory(value === 'Memorial person' ? 'MEMORIAL' : value === 'Other managed person' ? 'OTHER' : 'CHILD')}/>{!['Son','Daughter','Grandson','Granddaughter'].includes(directRelationshipType)&&<label><span>Date of birth (optional)</span><input type="date" value={managedDateOfBirth} onChange={event => setManagedDateOfBirth(event.target.value)}/></label>}<textarea value={managedNotes} onChange={event => setManagedNotes(event.target.value)} placeholder="Biography or guardian notes (optional)" maxLength={2000}/><p>{managedCategory === 'MEMORIAL' ? 'Memorial profiles are permanently non-claimable.' : 'This profile is managed by you. Any future account claim requires guardian approval.'}</p></div>}
         <button className="btn btn-primary" disabled={busy}>{busy ? 'Checking…' : 'Add person'}</button>
       </form>
       {communication && <div className="invite-callout"><span>{communication.existing ? `${communication.name} was added. Send them a notification:` : `No user found for ${inviteMobile}. Send a registration invitation:`}</span><div className="communication-actions"><a className="btn btn-secondary" href={`sms:${communication.mobile}?body=${encodeURIComponent(communicationMessage(communication))}`}>Send SMS</a>{communication.email && <a className="btn btn-secondary" href={`mailto:${communication.email}?subject=${encodeURIComponent('CircleNet-AI relationship notification')}&body=${encodeURIComponent(communicationMessage(communication))}`}>Send email</a>}<button type="button" className="btn btn-secondary" onClick={copyInvitation}>Copy message</button></div></div>}
@@ -605,6 +619,9 @@ export default function UserNetworkDashboard({ username }: { username: string })
               <div className="people-identity"><strong>{person.displayName}</strong><small>{person.location || 'Location not provided'}</small><PersonStatus person={person}/></div>
               {!relationship ? <div className="people-controls">
                 <SearchableSelect value={relationshipType[person.id] || ''} placeholder="Relation" options={relationshipTypes} onChange={type => setRelationshipType({...relationshipType,[person.id]:type})}/>
+                {['Wife','Husband'].includes(relationshipType[person.id])&&<label className="relationship-inline-date"><span>Marriage date</span><input type="date" value={relationshipMilestoneDates[person.id]||''} onChange={event=>setRelationshipMilestoneDates({...relationshipMilestoneDates,[person.id]:event.target.value})}/></label>}
+                {['Son','Daughter','Grandson','Granddaughter'].includes(relationshipType[person.id])&&<label className="relationship-inline-date"><span>Date of birth</span><input type="date" value={relationshipBirthDates[person.id]||''} onChange={event=>setRelationshipBirthDates({...relationshipBirthDates,[person.id]:event.target.value})}/></label>}
+                <label className="relationship-inline-date"><span>Date of death (if deceased)</span><input type="date" value={relationshipDeathDates[person.id]||''} onChange={event=>setRelationshipDeathDates({...relationshipDeathDates,[person.id]:event.target.value})}/></label>
                 <SearchableSelect value={visibilityLabel(visibilityChoice[person.id] || '')} placeholder="View" options={visibilityLabels} onChange={label => setVisibilityChoice({...visibilityChoice,[person.id]:visibilityValue(label) as VisibilityScope})}/>
                 {visibilityChoice[person.id] === 'COLLEAGUES' && <SearchableSelect value={companyChoice[person.id] || ''} placeholder="Company" options={employmentCompanies} onChange={company => setCompanyChoice({...companyChoice,[person.id]:company})}/>}
                 <button className="btn btn-primary" disabled={busy} onClick={() => connect(person)}>Add relationship</button>

@@ -42,6 +42,15 @@ public class RelationshipEntity {
   @Column(name = "visibility_company")
   private String visibilityCompany;
 
+  @Column(name = "milestone_date")
+  private String milestoneDate;
+
+  @Column(name = "related_birth_date")
+  private String relatedBirthDate;
+
+  @Column(name = "related_death_date")
+  private String relatedDeathDate;
+
   public Long getId() {
     return id;
   }
@@ -70,4 +79,10 @@ public class RelationshipEntity {
   public void setVisibilityScope(String visibilityScope) { this.visibilityScope = visibilityScope; }
   public String getVisibilityCompany() { return visibilityCompany; }
   public void setVisibilityCompany(String visibilityCompany) { this.visibilityCompany = visibilityCompany; }
+  public String getMilestoneDate() { return milestoneDate; }
+  public void setMilestoneDate(String milestoneDate) { this.milestoneDate = milestoneDate; }
+  public String getRelatedBirthDate() { return relatedBirthDate; }
+  public void setRelatedBirthDate(String relatedBirthDate) { this.relatedBirthDate = relatedBirthDate; }
+  public String getRelatedDeathDate() { return relatedDeathDate; }
+  public void setRelatedDeathDate(String relatedDeathDate) { this.relatedDeathDate = relatedDeathDate; }
 }
