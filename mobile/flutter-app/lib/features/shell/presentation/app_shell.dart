@@ -2548,8 +2548,11 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: const [
-          'jpg','jpeg','png','webp','mp4','webm','mp3','m4a','wav','ogg',
-          'pdf','txt','doc','docx','xls','xlsx','ppt','pptx'
+          'jpg','jpeg','jfif','png','webp','gif','bmp','tif','tiff','avif',
+          'heic','heif','ico','svg','psd','dng','cr2','nef','arw',
+          'glb','gltf','obj','stl','fbx','3mf','dae','ply','usdz','blend',
+          'mp4','webm','mp3','m4a','wav','ogg','pdf','txt','doc','docx',
+          'xls','xlsx','ppt','pptx'
         ],
         withData: true);
     if (result != null && mounted) {
@@ -4543,8 +4546,33 @@ class _ConversationScreenState extends State<ConversationScreen> {
       allowedExtensions: const [
         'jpg',
         'jpeg',
+        'jfif',
         'png',
         'webp',
+        'gif',
+        'bmp',
+        'tif',
+        'tiff',
+        'avif',
+        'heic',
+        'heif',
+        'ico',
+        'svg',
+        'psd',
+        'dng',
+        'cr2',
+        'nef',
+        'arw',
+        'glb',
+        'gltf',
+        'obj',
+        'stl',
+        'fbx',
+        '3mf',
+        'dae',
+        'ply',
+        'usdz',
+        'blend',
         'mp4',
         'webm',
         'mp3',
