@@ -1685,7 +1685,7 @@ class RelationshipTile extends StatelessWidget {
     return Card(
         child: InkWell(
             borderRadius: BorderRadius.circular(22),
-            onTap: person.canConnect ? () => showConnect(context) : null,
+            onTap: () => showConnect(context),
             child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Row(children: [
@@ -1720,11 +1720,10 @@ class RelationshipTile extends StatelessWidget {
                                   : const Color(0xFF9A6100))
                         ])
                       ])),
-                  if (person.canConnect)
-                    IconButton.filledTonal(
-                        tooltip: 'Connect',
-                        onPressed: () => showConnect(context),
-                        icon: const Icon(Icons.connect_without_contact_rounded))
+                  IconButton.filledTonal(
+                      tooltip: 'Person actions',
+                      onPressed: () => showConnect(context),
+                      icon: const Icon(Icons.more_horiz_rounded))
                 ]))));
   }
 
@@ -1745,29 +1744,40 @@ class RelationshipTile extends StatelessWidget {
                     const Text('Choose how you want to connect.',
                         style: TextStyle(color: Color(0xFF718096))),
                     const SizedBox(height: 16),
+                    if (relationship.person.canConnect) ...[
+                      _ConnectAction(
+                          icon: Icons.chat_bubble_rounded,
+                          label: 'Text message',
+                          color: AppTheme.primary,
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => DirectChatScreen(
+                                        api: api,
+                                        person: relationship.person)));
+                          }),
+                      _ConnectAction(
+                          icon: Icons.call_rounded,
+                          label: 'Audio call',
+                          color: const Color(0xFF16875C),
+                          onTap: () => _startCall(context, 'AUDIO')),
+                      _ConnectAction(
+                          icon: Icons.videocam_rounded,
+                          label: 'Video call',
+                          color: const Color(0xFFD15C87),
+                          onTap: () => _startCall(context, 'VIDEO')),
+                    ],
+                    const Divider(height: 22),
                     _ConnectAction(
-                        icon: Icons.chat_bubble_rounded,
-                        label: 'Text message',
-                        color: AppTheme.primary,
+                        icon: Icons.person_add_alt_1_rounded,
+                        label: 'Add relationship to this person',
+                        color: const Color(0xFF16875C),
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => DirectChatScreen(
-                                      api: api, person: relationship.person)));
+                          _addRelationship(context);
                         }),
-                    _ConnectAction(
-                        icon: Icons.call_rounded,
-                        label: 'Audio call',
-                        color: const Color(0xFF16875C),
-                        onTap: () => _startCall(context, 'AUDIO')),
-                    _ConnectAction(
-                        icon: Icons.videocam_rounded,
-                        label: 'Video call',
-                        color: const Color(0xFFD15C87),
-                        onTap: () => _startCall(context, 'VIDEO')),
-                    const Divider(height: 22),
                     _ConnectAction(
                         icon: Icons.edit_rounded,
                         label: 'Edit relationship',
@@ -1785,6 +1795,129 @@ class RelationshipTile extends StatelessWidget {
                           _remove(context);
                         })
                   ]))));
+
+  Future<void> _addRelationship(BuildContext context) async {
+    final name = TextEditingController();
+    final phone = TextEditingController();
+    final email = TextEditingController();
+    var type = 'Relative';
+    var visibility = 'RELATIVES';
+    final saved = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (context) => StatefulBuilder(
+            builder: (context, setModal) => SafeArea(
+                child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                        20, 0, 20, 24 + MediaQuery.viewInsetsOf(context).bottom),
+                    child: SingleChildScrollView(
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Text('Add relationship to ${relationship.person.displayName}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 6),
+                      Text(
+                          'This person will appear directly in ${relationship.person.displayName}â€™s family branch.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Color(0xFF718096))),
+                      const SizedBox(height: 16),
+                      TextField(
+                          controller: name,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                              labelText: 'Full name',
+                              prefixIcon: Icon(Icons.person_outline_rounded))),
+                      const SizedBox(height: 10),
+                      TextField(
+                          controller: phone,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                              labelText: 'Mobile number (optional)',
+                              prefixIcon: Icon(Icons.phone_outlined))),
+                      const SizedBox(height: 10),
+                      TextField(
+                          controller: email,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                              labelText: 'Email (optional)',
+                              prefixIcon: Icon(Icons.email_outlined))),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                          initialValue: type,
+                          decoration: InputDecoration(
+                              labelText:
+                                  'Relationship to ${relationship.person.displayName}'),
+                          items: const [
+                            'Father', 'Mother', 'Husband', 'Wife', 'Son',
+                            'Daughter', 'Brother', 'Sister', 'Grandfather',
+                            'Grandmother', 'Grandson', 'Granddaughter', 'Uncle',
+                            'Aunt', 'Nephew', 'Niece', 'Cousin', 'Guardian',
+                            'Relative', 'Friend', 'Colleague', 'Other'
+                          ].map((value) => DropdownMenuItem(
+                              value: value, child: Text(value))).toList(),
+                          onChanged: (value) => setModal(() => type = value!)),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                          initialValue: visibility,
+                          decoration:
+                              const InputDecoration(labelText: 'Who can view'),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'RELATIVES', child: Text('Relatives')),
+                            DropdownMenuItem(
+                                value: 'FRIENDS', child: Text('Friends')),
+                            DropdownMenuItem(
+                                value: 'COLLEAGUES', child: Text('Colleagues')),
+                            DropdownMenuItem(
+                                value: 'PUBLIC', child: Text('Public'))
+                          ],
+                          onChanged: (value) =>
+                              setModal(() => visibility = value!)),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                              icon: const Icon(Icons.person_add_alt_1_rounded),
+                              onPressed: () {
+                                if (name.text.trim().isEmpty) return;
+                                Navigator.pop(context, true);
+                              },
+                              label: const Text('Add relationship')))
+                    ]))))));
+    if (saved != true) {
+      name.dispose();
+      phone.dispose();
+      email.dispose();
+      return;
+    }
+    try {
+      await api.addPersonRelationship(
+          fullName: name.text,
+          phoneNumber: phone.text.isEmpty ? null : phone.text,
+          email: email.text.isEmpty ? null : email.text,
+          type: type,
+          visibility: visibility,
+          relativeToUserId: relationship.person.id);
+      onRemoved();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                '${name.text.trim()} added to ${relationship.person.displayName}â€™s branch.')));
+      }
+    } catch (exception) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(exception.toString()),
+            backgroundColor: const Color(0xFFB4233C)));
+      }
+    } finally {
+      name.dispose();
+      phone.dispose();
+      email.dispose();
+    }
+  }
   void _startCall(BuildContext context, String type) {
     Navigator.pop(context);
     Navigator.push(

@@ -227,6 +227,27 @@ class CircleNetApi {
             'visibilityScope': visibility
           },
           bearerToken: _token)) as Map<String, dynamic>);
+  Future<Relationship> addPersonRelationship({
+    required String fullName,
+    required String type,
+    required String visibility,
+    required int relativeToUserId,
+    String? phoneNumber,
+    String? email,
+  }) async =>
+      Relationship.fromJson(await _json(_client.post(
+          '/api/network/relationships/add-person',
+          {
+            'fullName': fullName.trim(),
+            'phoneNumber': phoneNumber?.trim(),
+            'email': email?.trim(),
+            'type': type,
+            'visibilityScope': visibility,
+            'identityType': 'MANAGED',
+            'managedCategory': 'OTHER',
+            'relativeToUserId': relativeToUserId,
+          },
+          bearerToken: _token)) as Map<String, dynamic>);
   Future<void> removeRelationship(int id) async => _json(
       _client.delete('/api/network/relationships/$id', bearerToken: _token));
   Future<Relationship> updateRelationship(
