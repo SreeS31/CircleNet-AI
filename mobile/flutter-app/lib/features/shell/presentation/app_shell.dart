@@ -1729,9 +1729,10 @@ class RelationshipTile extends StatelessWidget {
 
   void showConnect(BuildContext context) => showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -2023,20 +2024,11 @@ class RelationshipTile extends StatelessWidget {
   }
 
   Future<void> _remove(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-                title: const Text('Remove relationship?'),
-                content: Text(
-                    '${relationship.person.displayName} will be removed from your relationship tree.'),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Remove'))
-                ]));
+    final confirmed = await _confirmDestructiveAction(context,
+        title: 'Remove relationship?',
+        message:
+            '${relationship.person.displayName} will disappear from your relationship tree and circles will no longer use this relationship. Their CircleNet account and your existing messages are not deleted.',
+        confirmLabel: 'Remove relationship');
     if (confirmed != true) return;
     try {
       await api.removeRelationship(relationship.id);
@@ -2373,6 +2365,29 @@ class _ConnectAction extends StatelessWidget {
       onTap: onTap);
 }
 
+Future<bool> _confirmDestructiveAction(BuildContext context,
+        {required String title,
+        required String message,
+        required String confirmLabel}) async =>
+    await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+                icon: const Icon(Icons.warning_amber_rounded,
+                    color: Color(0xFFB4233C), size: 34),
+                title: Text(title),
+                content: Text(message),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFB4233C)),
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      child: Text(confirmLabel))
+                ])) ??
+    false;
+
 String _time(DateTime value) =>
     '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 
@@ -2634,6 +2649,13 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                             tooltip: 'Delete story',
                             color: Colors.white,
                             onPressed: () async {
+                              final confirmed = await _confirmDestructiveAction(
+                                  dialogContext,
+                                  title: 'Delete story?',
+                                  message:
+                                      'This story will be removed immediately and people will no longer be able to view it. This action cannot be undone.',
+                                  confirmLabel: 'Delete story');
+                              if (!confirmed) return;
                               await widget.api.deleteSocialStory(
                                   (story['id'] as num).toInt());
                               if (dialogContext.mounted) {
@@ -2718,27 +2740,12 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                             onTap: () => viewStory(s),
                             onLongPress: s['mine'] == true
                                 ? () async {
-                                    final remove = await showDialog<bool>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                                title: const Text(
-                                                    'Delete this story?'),
-                                                content: const Text(
-                                                    'It will be removed immediately.'),
-                                                actions: [
-                                                  TextButton(
-                                                      onPressed: () =>
-                                                          Navigator.pop(
-                                                              context, false),
-                                                      child:
-                                                          const Text('Cancel')),
-                                                  FilledButton(
-                                                      onPressed: () =>
-                                                          Navigator.pop(
-                                                              context, true),
-                                                      child:
-                                                          const Text('Delete'))
-                                                ]));
+                                    final remove =
+                                        await _confirmDestructiveAction(context,
+                                            title: 'Delete story?',
+                                            message:
+                                                'This story will be removed immediately and people will no longer be able to view it. This action cannot be undone.',
+                                            confirmLabel: 'Delete story');
                                     if (remove == true) {
                                       await widget.api.deleteSocialStory(
                                           (s['id'] as num).toInt());
@@ -3077,8 +3084,16 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
               trailing: p['mine'] == true
                   ? PopupMenuButton<String>(
                       onSelected: (action) async {
-                        if (action == 'edit') await editPost(p);
-                        if (action == 'delete') {
+                        if (action == 'edit') {
+                          await editPost(p);
+                        } else if (action == 'delete') {
+                          final confirmed =
+                              await _confirmDestructiveAction(context,
+                                  title: 'Delete post?',
+                                  message:
+                                      'This diary post, its attachment, reactions, and comments will no longer appear in the feed. This action cannot be undone.',
+                                  confirmLabel: 'Delete post');
+                          if (!confirmed) return;
                           await widget.api.deleteSocialPost(id);
                           await load();
                         }
@@ -3157,6 +3172,13 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.close_rounded, size: 16),
                       onPressed: () async {
+                        final confirmed = await _confirmDestructiveAction(
+                            context,
+                            title: 'Delete comment?',
+                            message:
+                                'This comment will be permanently removed from the conversation. This action cannot be undone.',
+                            confirmLabel: 'Delete comment');
+                        if (!confirmed) return;
                         await widget.api
                             .deleteSocialComment(id, (c['id'] as num).toInt());
                         await load();
@@ -3704,6 +3726,14 @@ class _BlockedAccountsScreenState extends State<BlockedAccountsScreen> {
                                     'Cannot discover, message, or view your shared content'),
                                 trailing: TextButton(
                                     onPressed: () async {
+                                      final confirmed =
+                                          await _confirmDestructiveAction(
+                                              context,
+                                              title: 'Unblock this account?',
+                                              message:
+                                                  '${item['displayName'] ?? 'This account'} will be able to discover you and interact with content according to your privacy settings again.',
+                                              confirmLabel: 'Unblock account');
+                                      if (!confirmed) return;
                                       await widget.api.unblockUser(
                                           (item['userId'] as num).toInt());
                                       await load();
@@ -4175,6 +4205,29 @@ class _CircleChatScreenState extends State<CircleChatScreen> {
                                     : PopupMenuButton<String>(
                                         onSelected: (action) async {
                                           try {
+                                            if (action == 'remove') {
+                                              final confirmed =
+                                                  await _confirmDestructiveAction(
+                                                      context,
+                                                      title:
+                                                          'Remove circle member?',
+                                                      message:
+                                                          '${member.person.displayName} will lose access to this circle and its private conversation. Their account and direct messages are not deleted.',
+                                                      confirmLabel:
+                                                          'Remove member');
+                                              if (!confirmed) return;
+                                            } else if (member.admin) {
+                                              final confirmed =
+                                                  await _confirmDestructiveAction(
+                                                      context,
+                                                      title:
+                                                          'Remove administrator access?',
+                                                      message:
+                                                          '${member.person.displayName} will remain a circle member but will no longer be able to manage members, settings, or administrators.',
+                                                      confirmLabel:
+                                                          'Remove admin');
+                                              if (!confirmed) return;
+                                            }
                                             final updated = action == 'remove'
                                                 ? await widget.api
                                                     .removeCircleMember(
@@ -4429,6 +4482,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
         controller.dispose();
         if (value != null) await widget.editMessage!(item.id, value);
       } else if (action == 'delete') {
+        final confirmed = await _confirmDestructiveAction(context,
+            title: 'Delete message?',
+            message:
+                'The message content and attachment will be removed from this conversation and replaced with a deleted-message notice. This action cannot be undone.',
+            confirmLabel: 'Delete message');
+        if (!confirmed) return;
         await widget.deleteMessage!(item.id);
       } else if (action.startsWith('react:')) {
         final emoji = action.substring(6);
