@@ -565,7 +565,15 @@ export default function UserNetworkDashboard({ username }: { username: string })
   Array.from(descendantGroupsByLevel.entries()).sort(([left],[right])=>left-right).forEach(([,groups]) => {
     const packed=groups.map(group => { const source=graphPositions.get(group.source)!; const partners=(spouseNeighbours.get(group.source)||[]).map(id=>graphPositions.get(id)).filter((position):position is {x:number;y:number}=>Boolean(position)); const sourceCenter=[source,...partners].reduce((sum,position)=>sum+position.x+graphNodeWidth/2,0)/(partners.length+1); const memberIds=Array.from(new Set(group.edges.flatMap(edge => [edge.target,...(spouseNeighbours.get(edge.target)||[])]))); const width=memberIds.length*graphNodeWidth+Math.max(0,memberIds.length-1)*spouseGap; return {group,memberIds,width,desired:sourceCenter-width/2}; }).sort((left,right)=>left.desired-right.desired);
     let cursor=70;
-    packed.forEach(item => { const start=Math.max(item.desired,cursor); item.memberIds.forEach((id,index) => { const current=graphPositions.get(id); if(current) graphPositions.set(id,{x:start+index*(graphNodeWidth+spouseGap),y:current.y}); }); cursor=start+item.width+householdGap; });
+    const starts=packed.map(item => { const start=Math.max(item.desired,cursor); cursor=start+item.width+householdGap; return start; });
+    // Keep the signed-in person's children directly beneath their household.
+    // Collision packing can otherwise push them behind a sibling's branch,
+    // making direct sons/daughters look like children of another relative.
+    const selfChildrenIndex=packed.findIndex(item=>item.group.source===selfGraphId);
+    const requestedShift=selfChildrenIndex<0 ? 0 : packed[selfChildrenIndex].desired-starts[selfChildrenIndex];
+    const lastIndex=packed.length-1;
+    const rowShift=packed.length ? Math.max(40-starts[0],Math.min(requestedShift,graphCanvasWidth-40-(starts[lastIndex]+packed[lastIndex].width))) : 0;
+    packed.forEach((item,itemIndex) => { const start=starts[itemIndex]+rowShift; item.memberIds.forEach((id,index) => { const current=graphPositions.get(id); if(current) graphPositions.set(id,{x:start+index*(graphNodeWidth+spouseGap),y:current.y}); }); });
   });
   const descendantLaneBySource = new Map(descendantEdgeGroups.map((group,index) => [group.source,index]));
 
