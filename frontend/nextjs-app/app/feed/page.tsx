@@ -32,6 +32,8 @@ import {
 
 function Media({ path, type, alt, onViewed }: { path: string; type?: string | null; alt: string; onViewed?:()=>void }) {
   const [url, setUrl] = useState('');
+  const [fullScreen, setFullScreen] = useState(false);
+  const [scale, setScale] = useState(1);
   const onViewedRef = useRef(onViewed);
   useEffect(() => { onViewedRef.current = onViewed; }, [onViewed]);
   useEffect(() => {
@@ -41,7 +43,7 @@ function Media({ path, type, alt, onViewed }: { path: string; type?: string | nu
   }, [path]);
   if (!url) return <div className="social-media-loading">Loading media…</div>;
   if (type?.startsWith('video/')) return <video className="social-media" src={url} controls playsInline />;
-  if (type?.startsWith('image/')) return <img className="social-media" src={url} alt={alt} />;
+  if (type?.startsWith('image/')) return <><button type="button" className="social-media-thumbnail" onClick={()=>{setScale(1);setFullScreen(true);}} aria-label={`Open ${alt} full screen`}><img src={url} alt={alt}/><span>⌕ View full size</span></button>{fullScreen&&<div className="social-image-viewer" role="dialog" aria-modal="true" aria-label={`${alt} image viewer`} onMouseDown={event=>{if(event.target===event.currentTarget)setFullScreen(false);}} onWheel={event=>{event.preventDefault();setScale(value=>Math.max(.5,Math.min(8,value*(event.deltaY<0?1.15:.87))));}}><header><strong>{alt}</strong><button type="button" onClick={()=>setFullScreen(false)} aria-label="Close image viewer">×</button></header><div className="social-image-stage"><img src={url} alt={alt} style={{transform:`scale(${scale})`}}/></div><nav aria-label="Image zoom controls"><button type="button" onClick={()=>setScale(value=>Math.max(.5,value/1.35))} aria-label="Zoom out">−</button><button type="button" onClick={()=>setScale(1)}>Reset</button><output>{Math.round(scale*100)}%</output><button type="button" onClick={()=>setScale(value=>Math.min(8,value*1.35))} aria-label="Zoom in">＋</button></nav></div>}</>;
   return <a className="social-document btn btn-secondary" href={url} download><span aria-hidden="true">▤</span><span>View or download document</span></a>;
 }
 

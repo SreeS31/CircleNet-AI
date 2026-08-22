@@ -2344,6 +2344,125 @@ class _Tag extends StatelessWidget {
               color: foreground, fontSize: 10, fontWeight: FontWeight.w900)));
 }
 
+class _FeedImageAttachment extends StatelessWidget {
+  const _FeedImageAttachment({required this.bytes, required this.name});
+  final Uint8List bytes;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+      button: true,
+      label: 'Open $name full screen',
+      child: InkWell(
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  fullscreenDialog: true,
+                  builder: (_) => _FullScreenImageViewer(
+                      bytes: bytes, name: name))),
+          child: Stack(alignment: Alignment.bottomRight, children: [
+            Container(
+                width: double.infinity,
+                height: 230,
+                color: const Color(0xFFF3F0F8),
+                child: Image.memory(bytes, fit: BoxFit.contain)),
+            Container(
+                margin: const EdgeInsets.all(10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: .72),
+                    borderRadius: BorderRadius.circular(999)),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.zoom_in_rounded, color: Colors.white, size: 18),
+                  SizedBox(width: 4),
+                  Text('View full size',
+                      style: TextStyle(color: Colors.white, fontSize: 11))
+                ]))
+          ])));
+}
+
+class _FullScreenImageViewer extends StatefulWidget {
+  const _FullScreenImageViewer({required this.bytes, required this.name});
+  final Uint8List bytes;
+  final String name;
+
+  @override
+  State<_FullScreenImageViewer> createState() =>
+      _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
+  final TransformationController controller = TransformationController();
+  double scale = 1;
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  void setScale(double value) {
+    scale = value.clamp(.5, 8);
+    controller.value = Matrix4.diagonal3Values(scale, scale, 1);
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      backgroundColor: const Color(0xFF100E14),
+      appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          title: Text(widget.name,
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+          actions: [
+            IconButton(
+                tooltip: 'Reset zoom',
+                onPressed: () => setScale(1),
+                icon: const Icon(Icons.center_focus_strong_rounded))
+          ]),
+      body: Stack(children: [
+        Positioned.fill(
+            child: InteractiveViewer(
+                transformationController: controller,
+                minScale: .5,
+                maxScale: 8,
+                boundaryMargin: const EdgeInsets.all(120),
+                onInteractionEnd: (_) => setState(() =>
+                    scale = controller.value.getMaxScaleOnAxis()),
+                child: Center(child: Image.memory(widget.bytes)))),
+        Positioned(
+            left: 0,
+            right: 0,
+            bottom: 24,
+            child: SafeArea(
+                child: Center(
+                    child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: .78),
+                            borderRadius: BorderRadius.circular(999)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          IconButton(
+                              tooltip: 'Zoom out',
+                              color: Colors.white,
+                              onPressed: () => setScale(scale / 1.35),
+                              icon: const Icon(Icons.remove_rounded)),
+                          Text('${(scale * 100).round()}%',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800)),
+                          IconButton(
+                              tooltip: 'Zoom in',
+                              color: Colors.white,
+                              onPressed: () => setScale(scale * 1.35),
+                              icon: const Icon(Icons.add_rounded))
+                        ])))))
+      ]));
+}
+
 class _ConnectAction extends StatelessWidget {
   const _ConnectAction(
       {required this.icon,
@@ -3116,8 +3235,9 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
             FutureBuilder<Uint8List>(
                 future: widget.api.socialMedia(media),
                 builder: (_, snap) => snap.hasData
-                    ? Image.memory(snap.data!,
-                        width: double.infinity, fit: BoxFit.contain)
+                    ? _FeedImageAttachment(
+                        bytes: snap.data!,
+                        name: p['mediaName']?.toString() ?? 'Image')
                     : const SizedBox(
                         height: 160,
                         child: Center(child: CircularProgressIndicator()))),
