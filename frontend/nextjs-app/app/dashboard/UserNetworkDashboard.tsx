@@ -551,7 +551,10 @@ export default function UserNetworkDashboard({ username }: { username: string })
     householdsByLevel.set(level,households);
   });
   const widestGraphRow = Math.max(...Array.from(householdsByLevel.values()).map(households => households.reduce((width,household) => width+household.length*graphNodeWidth+Math.max(0,household.length-1)*spouseGap,0)+Math.max(0,households.length-1)*householdGap),1);
-  const graphCanvasWidth = Math.max(1400,widestGraphRow+320);
+  // Leave enough horizontal room for every parental household to keep its own
+  // child group centered below the couple. A tight canvas forces collision
+  // packing to merge neighbouring family branches into one visual tree.
+  const graphCanvasWidth = Math.max(2200,widestGraphRow+1000);
   const graphCanvasHeight = (maxGraphLevel-minGraphLevel+1)*graphLevelHeight+130;
   const graphPositions = new Map<number,{x:number;y:number}>();
   householdsByLevel.forEach((households,level) => { const rowWidth=households.reduce((width,household) => width+household.length*graphNodeWidth+Math.max(0,household.length-1)*spouseGap,0)+Math.max(0,households.length-1)*householdGap; let cursor=(graphCanvasWidth-rowWidth)/2; households.forEach(household => { household.forEach(person => { graphPositions.set(person.id,{x:cursor,y:55+(level-minGraphLevel)*graphLevelHeight}); cursor+=graphNodeWidth+spouseGap; }); cursor+=householdGap-spouseGap; }); });
@@ -564,15 +567,19 @@ export default function UserNetworkDashboard({ username }: { username: string })
   descendantEdgeGroups.forEach(group => { const targetLevel=graphLevels.get(group.edges[0].target); if(targetLevel!==undefined) descendantGroupsByLevel.set(targetLevel,[...(descendantGroupsByLevel.get(targetLevel)||[]),group]); });
   Array.from(descendantGroupsByLevel.entries()).sort(([left],[right])=>left-right).forEach(([,groups]) => {
     const packed=groups.map(group => { const source=graphPositions.get(group.source)!; const partners=(spouseNeighbours.get(group.source)||[]).map(id=>graphPositions.get(id)).filter((position):position is {x:number;y:number}=>Boolean(position)); const sourceCenter=[source,...partners].reduce((sum,position)=>sum+position.x+graphNodeWidth/2,0)/(partners.length+1); const memberIds=Array.from(new Set(group.edges.flatMap(edge => [edge.target,...(spouseNeighbours.get(edge.target)||[])]))); const width=memberIds.length*graphNodeWidth+Math.max(0,memberIds.length-1)*spouseGap; return {group,memberIds,width,desired:sourceCenter-width/2}; }).sort((left,right)=>left.desired-right.desired);
-    let cursor=70;
-    const starts=packed.map(item => { const start=Math.max(item.desired,cursor); cursor=start+item.width+householdGap; return start; });
-    // Keep the signed-in person's children directly beneath their household.
-    // Collision packing can otherwise push them behind a sibling's branch,
-    // making direct sons/daughters look like children of another relative.
     const selfChildrenIndex=packed.findIndex(item=>item.group.source===selfGraphId);
-    const requestedShift=selfChildrenIndex<0 ? 0 : packed[selfChildrenIndex].desired-starts[selfChildrenIndex];
+    const anchorIndex=selfChildrenIndex>=0 ? selfChildrenIndex : Math.floor(packed.length/2);
+    const starts=new Array<number>(packed.length);
+    if(packed.length){
+      starts[anchorIndex]=packed[anchorIndex].desired;
+      for(let itemIndex=anchorIndex-1;itemIndex>=0;itemIndex--) starts[itemIndex]=Math.min(packed[itemIndex].desired,starts[itemIndex+1]-householdGap-packed[itemIndex].width);
+      for(let itemIndex=anchorIndex+1;itemIndex<packed.length;itemIndex++) starts[itemIndex]=Math.max(packed[itemIndex].desired,starts[itemIndex-1]+packed[itemIndex-1].width+householdGap);
+    }
+    // Pack outward from the signed-in household. This keeps every couple's
+    // children together while protecting the primary family branch from being
+    // displaced by nieces, nephews, or sibling households.
     const lastIndex=packed.length-1;
-    const rowShift=packed.length ? Math.max(40-starts[0],Math.min(requestedShift,graphCanvasWidth-40-(starts[lastIndex]+packed[lastIndex].width))) : 0;
+    const rowShift=packed.length ? Math.max(40-starts[0],Math.min(0,graphCanvasWidth-40-(starts[lastIndex]+packed[lastIndex].width))) : 0;
     packed.forEach((item,itemIndex) => { const start=starts[itemIndex]+rowShift; item.memberIds.forEach((id,index) => { const current=graphPositions.get(id); if(current) graphPositions.set(id,{x:start+index*(graphNodeWidth+spouseGap),y:current.y}); }); });
   });
   const descendantLaneBySource = new Map(descendantEdgeGroups.map((group,index) => [group.source,index]));
