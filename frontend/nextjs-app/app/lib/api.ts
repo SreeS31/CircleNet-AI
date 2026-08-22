@@ -331,7 +331,7 @@ export type ImportedContact = { contact_key:string; display_name:string; phones:
 export type ContactSuggestion = { contact_key:string; display_name:string; phone?:string|null; email?:string|null; suggested_relationship:string; suggested_circles:string[]; confidence:number; reasons:string[]; requires_review:boolean; selected?:boolean };
 export type ContactOrganizerResult = { peopleAdded:number; circleMembershipsAdded:number; skipped:string[] };
 export type SocialComment = { id:number; authorUserId:number; authorName:string; authorPhoto?:string|null; message:string; createdAt:string; mine:boolean };
-export type SocialPost = { id:number; authorUserId:number; authorName:string; authorPhoto?:string|null; caption:string; audience:'PUBLIC'|'RELATIONSHIPS'|'CIRCLE'; circleId?:number|null; mediaUrl?:string|null; mediaName?:string|null; mediaType?:string|null; mediaSize?:number|null; likeCount:number; commentCount:number; likedByMe:boolean; savedByMe:boolean; mine:boolean; createdAt:string; updatedAt:string; comments:SocialComment[] };
+export type SocialPost = { id:number; authorUserId:number; authorName:string; authorPhoto?:string|null; caption:string; audience:'PRIVATE'|'PUBLIC'|'FRIENDS'|'RELATIVES'|'RELATIONSHIPS'|'CIRCLE'; circleId?:number|null; mediaUrl?:string|null; mediaName?:string|null; mediaType?:string|null; mediaSize?:number|null; likeCount:number; commentCount:number; likedByMe:boolean; savedByMe:boolean; mine:boolean; createdAt:string; updatedAt:string; comments:SocialComment[] };
 export type SocialStory = { id:number; authorUserId:number; authorName:string; authorPhoto?:string|null; caption:string; audience:'PUBLIC'|'RELATIONSHIPS'; mediaUrl:string; mediaType:string; createdAt:string; expiresAt:string; viewCount:number; viewedByMe:boolean; mine:boolean };
 export type BlockedUser = { userId:number; displayName:string; profilePhoto?:string|null; blockedAt:string };
 export type AppNotification = { id:number; type:string; title:string; body:string; actionUrl?:string|null; entityType?:string|null; entityId?:number|null; readAt?:string|null; createdAt:string };
@@ -424,6 +424,21 @@ export async function addPersonToMyNetwork(payload: { fullName: string; phoneNum
 
 export async function removeMyRelationship(id: number) {
   return authenticatedRequest<void>(`/api/network/relationships/${id}`, { method: 'DELETE' });
+}
+
+export type RelationshipImportRowResult = { rowNumber: number; fullName: string; success: boolean; message: string; createdUserId: number | null; relationshipId: number | null };
+export type RelationshipImportResult = { totalRows: number; successCount: number; errorCount: number; rows: RelationshipImportRowResult[] };
+export async function bulkImportRelationships(file: File) {
+  const body = new FormData(); body.append('file', file);
+  return authenticatedRequest<RelationshipImportResult>('/api/network/relationships/bulk-import', { method: 'POST', body });
+}
+export async function downloadRelationshipImportTemplate() {
+  const blob = await authenticatedRequest<Blob>('/api/network/relationships/bulk-import/template', { responseType: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = 'relationship_bulk_import_template.xlsx';
+  document.body.appendChild(link); link.click(); link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function updateMyRelationship(id: number, payload: { contactName: string; contactPhone?: string; contactEmail?: string; type: string; visibilityScope: VisibilityScope; visibilityCompany?: string; milestoneDate?:string; dateOfBirth?:string; dateOfDeath?:string }) {

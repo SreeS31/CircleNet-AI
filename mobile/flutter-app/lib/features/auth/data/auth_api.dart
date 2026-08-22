@@ -23,9 +23,7 @@ class AuthApi {
     final response =
         await _apiClient.post(AppConfig.authLoginPath, request.toJson());
     if (!response.isSuccess) {
-      throw AuthApiException(
-        'Login failed with status ${response.statusCode}',
-      );
+      throw AuthApiException(_message(response, 'Login failed'));
     }
 
     final data = response.decodeJson();
@@ -34,6 +32,14 @@ class AuthApi {
     }
 
     return AuthTokenBundle.fromJson(data);
+  }
+
+  String _message(ApiResponse response, String fallback) {
+    try {
+      final body = response.decodeJson();
+      if (body is Map && body['message'] != null) return body['message'].toString();
+    } catch (_) {}
+    return '$fallback with status ${response.statusCode}';
   }
 
   Future<AuthTokenBundle> refresh(RefreshRequest request) async {

@@ -63,7 +63,7 @@ spec:
       securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: ai-agent
-          image: ghcr.io/OWNER/circlenet-ai:VERSION
+          image: ghcr.io/OWNER/circlenet-ai-agent:VERSION
           ports: [{ containerPort: 8081 }]
           env: [{ name: AI_ENV, value: production }, { name: AI_LOG_LEVEL, value: INFO }]
           resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 500m, memory: 512Mi } }

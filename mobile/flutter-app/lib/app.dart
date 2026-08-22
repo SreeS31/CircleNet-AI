@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:circlenet_mobile/core/theme/app_theme.dart';
 import 'package:circlenet_mobile/features/auth/data/session_store.dart';
+import 'package:circlenet_mobile/features/auth/data/auth_api.dart';
 import 'package:circlenet_mobile/features/auth/models/auth_models.dart';
 import 'package:circlenet_mobile/features/auth/presentation/auth_screen.dart';
 import 'package:circlenet_mobile/features/shell/presentation/app_shell.dart';
@@ -20,14 +21,22 @@ class _CircleNetMobileAppState extends State<CircleNetMobileApp> {
   @override
   void initState() {
     super.initState();
-    _store.load().then((value) {
-      if (mounted) {
-        setState(() {
-          _session = value;
-          _restoring = false;
-        });
+    _restoreValidSession();
+  }
+
+  Future<void> _restoreValidSession() async {
+    final saved = await _store.load();
+    AuthTokenBundle? valid;
+    if (saved != null) {
+      try {
+        valid = await AuthApi().refresh(
+            RefreshRequest(refreshToken: saved.refreshToken));
+        await _store.save(valid);
+      } catch (_) {
+        await _store.clear();
       }
-    });
+    }
+    if (mounted) setState(() { _session = valid; _restoring = false; });
   }
 
   @override
@@ -52,27 +61,24 @@ class _CircleNetMobileAppState extends State<CircleNetMobileApp> {
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
   @override
-  Widget build(BuildContext context) => const Scaffold(
+  Widget build(BuildContext context) => Scaffold(
         body: DecoratedBox(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
               gradient: LinearGradient(
                   colors: [Color(0xFF6251C8), Color(0xFFD47DA9)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight)),
           child: Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-            CircleAvatar(
-                radius: 34,
-                backgroundColor: Colors.white24,
-                child: Icon(Icons.hub_rounded, color: Colors.white, size: 38)),
-            SizedBox(height: 16),
-            Text('CircleNet',
+            Image.asset('assets/brand/circlenet-logo.png', width: 96, height: 96),
+            const SizedBox(height: 16),
+            const Text('CircleNet',
                 style: TextStyle(
                     color: Colors.white,
                     fontSize: 30,
                     fontWeight: FontWeight.w900)),
-            SizedBox(height: 20),
-            CircularProgressIndicator(color: Colors.white)
+            const SizedBox(height: 20),
+            const CircularProgressIndicator(color: Colors.white)
           ])),
         ),
       );

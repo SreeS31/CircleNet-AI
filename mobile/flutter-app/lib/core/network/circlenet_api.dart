@@ -126,6 +126,15 @@ class CircleNetApi {
           as List)
       .map((item) => Map<String, dynamic>.from(item as Map))
       .toList();
+  Future<List<Map<String, dynamic>>> moderationReports() async => (await _json(
+              _client.get('/api/moderation/reports', bearerToken: _token))
+          as List)
+      .map((item) => Map<String, dynamic>.from(item as Map))
+      .toList();
+  Future<void> updateModerationReport(
+          int id, String status, String notes) async =>
+      _json(_client.put('/api/moderation/reports/$id',
+          {'status': status, 'notes': notes}, bearerToken: _token));
   Future<void> addSocialComment(int id, String message) async =>
       _json(_client.post('/api/social/posts/$id/comments', {'message': message},
           bearerToken: _token));
@@ -140,8 +149,9 @@ class CircleNetApi {
       _json(_client.delete('/api/social/stories/$id', bearerToken: _token));
   Future<Uint8List> socialMedia(String path) async {
     final response = await _client.get(path, bearerToken: _token);
-    if (!response.isSuccess)
-      throw CircleNetApiException('Media could not be loaded');
+    if (!response.isSuccess) {
+      throw const CircleNetApiException('Media could not be loaded');
+    }
     return response.bodyBytes;
   }
 

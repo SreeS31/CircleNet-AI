@@ -8,7 +8,7 @@ public class SocialPostEntity {
   @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
   @Column(name="author_user_id",nullable=false) private Long authorUserId;
   @Column(length=4000,nullable=false) private String caption="";
-  @Column(length=24,nullable=false) private String audience="RELATIONSHIPS";
+  @Column(length=24,nullable=false) private String audience="PRIVATE";
   @Column(name="circle_id") private Long circleId;
   @Column(name="media_key") private String mediaKey;
   @Column(name="media_name") private String mediaName;

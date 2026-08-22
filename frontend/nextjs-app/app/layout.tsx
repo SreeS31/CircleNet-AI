@@ -7,7 +7,11 @@ export const metadata: Metadata = {
     default: 'CircleNet Intelligence Cloud',
     template: '%s | CircleNet'
   },
-  description: 'Enterprise relationship intelligence, project delivery and team analytics in one connected workspace.'
+  description: 'Enterprise relationship intelligence, project delivery and team analytics in one connected workspace.',
+  icons: {
+    icon: '/favicon.png',
+    apple: '/circlenet-logo.png'
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

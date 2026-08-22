@@ -9,7 +9,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class CorsConfig implements WebMvcConfigurer {
   private final String[] allowedOrigins;
 
-  public CorsConfig(@Value("${circlenet.cors.allowed-origins:http://localhost:3000,http://127.0.0.1:3000,http://localhost:3002,http://127.0.0.1:3002}") String origins) {
+  public CorsConfig(@Value("${circlenet.cors.allowed-origins:http://localhost:3000,http://127.0.0.1:3000,http://localhost:3002,http://127.0.0.1:3002,http://localhost:8088,http://127.0.0.1:8088}") String origins) {
     this.allowedOrigins = java.util.Arrays.stream(origins.split(","))
         .map(String::trim).filter(value -> !value.isBlank()).toArray(String[]::new);
   }

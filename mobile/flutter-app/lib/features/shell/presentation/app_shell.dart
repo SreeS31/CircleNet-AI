@@ -48,14 +48,20 @@ class _AppShellState extends State<AppShell> {
             api: api,
             onDataChanged: () {
               if (mounted) setState(() => syncVersion++);
-            })
+            }),
+        MoreScreen(
+            api: api,
+            session: widget.session,
+            onSignOut: signOut,
+            onSelectPrimaryPage: (value) => setState(() => index = value))
       ];
+  static const mobileDestinationIndexes = <int>[0, 1, 2, 3, 7];
   List<NavigationDestination> get destinations => [
-        NavigationDestination(
+        const NavigationDestination(
             icon: Icon(Icons.account_tree_outlined),
             selectedIcon: Icon(Icons.account_tree_rounded),
             label: 'Network'),
-        NavigationDestination(
+        const NavigationDestination(
             icon: Icon(Icons.dynamic_feed_outlined),
             selectedIcon: Icon(Icons.dynamic_feed_rounded),
             label: 'Feed'),
@@ -95,14 +101,18 @@ class _AppShellState extends State<AppShell> {
                     unreadNotifications > 99 ? '99+' : '$unreadNotifications'),
                 child: const Icon(Icons.notifications_rounded)),
             label: 'Alerts'),
-        NavigationDestination(
+        const NavigationDestination(
             icon: Icon(Icons.person_search_outlined),
             selectedIcon: Icon(Icons.person_search_rounded),
             label: 'Discover'),
-        NavigationDestination(
+        const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profile')
+            label: 'Profile'),
+        const NavigationDestination(
+            icon: Icon(Icons.apps_outlined),
+            selectedIcon: Icon(Icons.apps_rounded),
+            label: 'More')
       ];
   @override
   void initState() {
@@ -136,21 +146,24 @@ class _AppShellState extends State<AppShell> {
     } catch (_) {}
     try {
       final count = await api.unreadNotificationCount();
-      if (mounted && count != unreadNotifications)
+      if (mounted && count != unreadNotifications) {
         setState(() => unreadNotifications = count);
+      }
     } catch (_) {}
     try {
       final conversations = await api.directConversations();
       final count =
           conversations.fold<int>(0, (sum, item) => sum + item.unreadCount);
-      if (mounted && count != unreadMessages)
+      if (mounted && count != unreadMessages) {
         setState(() => unreadMessages = count);
+      }
     } catch (_) {}
     try {
       final counts = await api.circleUnreadCounts();
       final count = counts.values.fold<int>(0, (sum, value) => sum + value);
-      if (mounted && count != unreadCircleMessages)
+      if (mounted && count != unreadCircleMessages) {
         setState(() => unreadCircleMessages = count);
+      }
     } catch (_) {}
     if (showingIncomingCall) return;
     try {
@@ -270,9 +283,14 @@ class _AppShellState extends State<AppShell> {
       bottomNavigationBar: wide
           ? null
           : NavigationBar(
-              selectedIndex: index,
-              onDestinationSelected: (value) => setState(() => index = value),
-              destinations: destinations,
+              selectedIndex: mobileDestinationIndexes.contains(index)
+                  ? mobileDestinationIndexes.indexOf(index)
+                  : mobileDestinationIndexes.length - 1,
+              onDestinationSelected: (value) =>
+                  setState(() => index = mobileDestinationIndexes[value]),
+              destinations: mobileDestinationIndexes
+                  .map((destinationIndex) => destinations[destinationIndex])
+                  .toList(),
             ),
     );
   }
@@ -287,14 +305,118 @@ class _BrandMark extends StatelessWidget {
   const _BrandMark();
   @override
   Widget build(BuildContext context) =>
-      const Column(mainAxisSize: MainAxisSize.min, children: [
-        CircleAvatar(
-            backgroundColor: AppTheme.primary,
-            child: Icon(Icons.hub_rounded, color: Colors.white)),
-        SizedBox(height: 6),
-        Text('CircleNet',
+      Column(mainAxisSize: MainAxisSize.min, children: [
+        Image.asset('assets/brand/circlenet-logo.png', width: 48, height: 48),
+        const SizedBox(height: 6),
+        const Text('CircleNet',
             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12))
       ]);
+}
+
+class MoreScreen extends StatelessWidget {
+  const MoreScreen({
+    super.key,
+    required this.api,
+    required this.session,
+    required this.onSignOut,
+    required this.onSelectPrimaryPage,
+  });
+  final CircleNetApi api;
+  final AuthTokenBundle session;
+  final VoidCallback onSignOut;
+  final ValueChanged<int> onSelectPrimaryPage;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const _PageHeader(
+              eyebrow: 'ALL FUNCTIONALITIES',
+              title: 'More',
+              subtitle: 'Alerts, discovery, profile, privacy and account controls.'),
+          _primaryTile(Icons.notifications_outlined, 'Notifications',
+              'Review activity and important alerts.', 4),
+          _primaryTile(Icons.person_search_outlined, 'Find people & circles',
+              'Discover people and communities.', 5),
+          _primaryTile(Icons.person_outline, 'My profile',
+              'Manage your identity and profile details.', 6),
+          _moreTile(context, Icons.timeline_rounded, 'Life timeline',
+              'Review your diary entries in chronological order.',
+              TimelineScreen(api: api)),
+          _moreTile(context, Icons.shield_outlined, 'Privacy & settings',
+              'Blocked accounts and privacy controls.',
+              PrivacyCenterScreen(api: api)),
+          _moreTile(context, Icons.flag_outlined, 'My reports',
+              'Track reports you submitted.', ReportsScreen(api: api)),
+          _moreTile(context, Icons.admin_panel_settings_outlined, 'Moderation',
+              'Admin trust and safety queue.', ModerationScreen(api: api)),
+          _moreTile(context, Icons.devices_rounded, 'Account session',
+              'Review this login and sign out securely.',
+              SessionScreen(session: session, onSignOut: onSignOut)),
+        ],
+      );
+
+  Widget _primaryTile(
+          IconData icon, String title, String subtitle, int pageIndex) =>
+      Card(
+          child: ListTile(
+              leading: CircleAvatar(child: Icon(icon)),
+              title: Text(title,
+                  style: const TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text(subtitle),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => onSelectPrimaryPage(pageIndex)));
+
+  Widget _moreTile(BuildContext context, IconData icon, String title,
+          String subtitle, Widget destination) =>
+      Card(
+          child: ListTile(
+              leading: CircleAvatar(child: Icon(icon)),
+              title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text(subtitle),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: Text(title)), body: destination)))));
+}
+
+class TimelineScreen extends StatelessWidget {
+  const TimelineScreen({super.key, required this.api});
+  final CircleNetApi api;
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<Map<String, dynamic>>>(
+      future: api.socialFeed(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) return _ErrorState('${snapshot.error}');
+        final entries=(snapshot.data??[]).where((item)=>item['mine']==true).toList();
+        if(entries.isEmpty)return const Center(child: Text('Your timeline will grow as you add diary entries.'));
+        return ListView.builder(padding:const EdgeInsets.all(16),itemCount:entries.length,itemBuilder:(context,index){final item=entries[index];return Card(child:ListTile(leading:const Icon(Icons.auto_stories_rounded),title:Text((item['caption']??item['mediaName']??'Diary entry').toString(),maxLines:2,overflow:TextOverflow.ellipsis),subtitle:Text('${item['createdAt']??''} · ${(item['audience']??'PRIVATE').toString().toLowerCase()}')));});
+      });
+}
+
+class PrivacyCenterScreen extends StatelessWidget {
+  const PrivacyCenterScreen({super.key, required this.api});
+  final CircleNetApi api;
+  @override
+  Widget build(BuildContext context) => ListView(padding:const EdgeInsets.all(16),children:[
+    const Card(child:ListTile(leading:Icon(Icons.lock_rounded),title:Text('Private by default'),subtitle:Text('New diary entries are visible only to you unless you choose another audience.'))),
+    Card(child:ListTile(leading:const Icon(Icons.block_rounded),title:const Text('Blocked accounts'),subtitle:const Text('Review or unblock accounts.'),trailing:const Icon(Icons.chevron_right_rounded),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>BlockedAccountsScreen(api:api)))))
+  ]);
+}
+
+class ReportsScreen extends StatelessWidget {
+  const ReportsScreen({super.key, required this.api}); final CircleNetApi api;
+  @override Widget build(BuildContext context)=>FutureBuilder<List<Map<String,dynamic>>>(future:api.myReports(),builder:(context,snapshot){if(snapshot.connectionState!=ConnectionState.done)return const Center(child:CircularProgressIndicator());if(snapshot.hasError)return _ErrorState('${snapshot.error}');final reports=snapshot.data??[];if(reports.isEmpty)return const Center(child:Text('No reports submitted.'));return ListView.builder(padding:const EdgeInsets.all(16),itemCount:reports.length,itemBuilder:(context,index){final report=reports[index];return Card(child:ListTile(leading:const Icon(Icons.flag_outlined),title:Text((report['reason']??'Report').toString()),subtitle:Text('${report['status']??'OPEN'} · Report #${report['id']}')));});});
+}
+
+class ModerationScreen extends StatelessWidget {
+  const ModerationScreen({super.key,required this.api});final CircleNetApi api;
+  @override Widget build(BuildContext context)=>FutureBuilder<List<Map<String,dynamic>>>(future:api.moderationReports(),builder:(context,snapshot){if(snapshot.connectionState!=ConnectionState.done)return const Center(child:CircularProgressIndicator());if(snapshot.hasError)return Center(child:Padding(padding:const EdgeInsets.all(24),child:Text('Moderation is available to administrators only.\n\n${snapshot.error}',textAlign:TextAlign.center)));final reports=snapshot.data??[];return ListView.builder(padding:const EdgeInsets.all(16),itemCount:reports.length,itemBuilder:(context,index){final report=reports[index];return Card(child:ListTile(leading:const Icon(Icons.gavel_rounded),title:Text((report['reason']??'Report').toString()),subtitle:Text('${report['status']??'OPEN'} · #${report['id']}')));});});
+}
+
+class SessionScreen extends StatelessWidget {
+  const SessionScreen({super.key,required this.session,required this.onSignOut});final AuthTokenBundle session;final VoidCallback onSignOut;
+  @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.all(16),children:[Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Icon(Icons.verified_user_rounded,size:42,color:AppTheme.primary),const SizedBox(height:12),const Text('Current device is signed in',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),const SizedBox(height:6),Text('Access session lifetime: ${session.expiresIn} seconds'),const SizedBox(height:18),FilledButton.icon(onPressed:onSignOut,icon:const Icon(Icons.logout_rounded),label:const Text('Sign out of this device'))]))) ]);
 }
 
 class NotificationsScreen extends StatefulWidget {
@@ -336,8 +458,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> openNotification(Map<String, dynamic> item) async {
-    if (item['readAt'] == null)
+    if (item['readAt'] == null) {
       await widget.api.readNotification((item['id'] as num).toInt());
+    }
     final uri = Uri.tryParse(item['actionUrl']?.toString() ?? '');
     if (!mounted || uri == null) {
       await load();
@@ -357,33 +480,36 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             conversations.where((conversation) => conversation.userId == id);
         if (found.isNotEmpty) person = found.first.person;
       }
-      if (person != null && mounted)
+      if (person != null && mounted) {
         await Navigator.push(
             context,
             MaterialPageRoute(
                 builder: (_) =>
                     DirectChatScreen(api: widget.api, person: person!)));
+      }
     } else if (uri.queryParameters['callId'] != null) {
       final id = int.tryParse(uri.queryParameters['callId']!);
       if (id != null) {
         final call = await widget.api.call(id);
-        if (mounted)
+        if (mounted) {
           await Navigator.push(
               context,
               MaterialPageRoute(
                   builder: (_) =>
                       DirectCallScreen(api: widget.api, incomingCall: call)));
+        }
       }
     } else if (uri.queryParameters['circleId'] != null) {
       final id = int.tryParse(uri.queryParameters['circleId']!);
       final circles = await widget.api.circles();
       final matches = circles.where((c) => c.id == id);
-      if (matches.isNotEmpty && mounted)
+      if (matches.isNotEmpty && mounted) {
         await Navigator.push(
             context,
             MaterialPageRoute(
                 builder: (_) =>
                     CircleChatScreen(api: widget.api, circle: matches.first)));
+      }
     }
     await load();
   }
@@ -2123,11 +2249,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Future<void> load() async {
     try {
       final value = await widget.api.directConversations();
-      if (mounted)
+      if (mounted) {
         setState(() {
           items = value;
           error = null;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => error = '$e');
     }
@@ -2137,7 +2264,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Widget build(BuildContext context) => RefreshIndicator(
       onRefresh: load,
       child: CustomScrollView(slivers: [
-        SliverToBoxAdapter(
+        const SliverToBoxAdapter(
             child: _PageHeader(
                 eyebrow: 'PRIVATE MESSAGES',
                 title: 'Conversations',
@@ -2206,6 +2333,9 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
   String error = '';
   PlatformFile? selected;
   bool savedOnly = false;
+  String audience = 'PRIVATE';
+  int? selectedCircleId;
+  List<CircleModel> availableCircles = [];
   @override
   void initState() {
     super.initState();
@@ -2223,46 +2353,58 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     try {
       final values = await Future.wait([
         savedOnly ? widget.api.savedSocialPosts() : widget.api.socialFeed(),
-        widget.api.socialStories()
+        widget.api.socialStories(),
+        widget.api.circles()
       ]);
-      if (mounted)
+      if (mounted) {
         setState(() {
-          posts = values[0];
-          stories = values[1];
+          posts = values[0] as List<Map<String, dynamic>>;
+          stories = values[1] as List<Map<String, dynamic>>;
+          availableCircles = values[2] as List<CircleModel>;
           loading = false;
           error = '';
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           loading = false;
           error = '$e';
         });
+      }
     }
   }
 
   Future<void> pick() async {
-    final result = await FilePicker.platform
-        .pickFiles(type: FileType.media, withData: true);
-    if (result != null && mounted)
+    final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const [
+          'jpg','jpeg','png','webp','mp4','webm','mp3','m4a','wav','ogg',
+          'pdf','txt','doc','docx','xls','xlsx','ppt','pptx'
+        ],
+        withData: true);
+    if (result != null && mounted) {
       setState(() => selected = result.files.single);
+    }
   }
 
   Future<void> publish() async {
     if (caption.text.trim().isEmpty && selected == null) return;
     setState(() => loading = true);
     try {
-      await widget.api.createSocialPost(caption.text.trim(), 'RELATIONSHIPS',
+      await widget.api.createSocialPost(caption.text.trim(), audience,
+          circleId: audience == 'CIRCLE' ? selectedCircleId : null,
           bytes: selected?.bytes, fileName: selected?.name);
       caption.clear();
       selected = null;
       await load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           loading = false;
           error = '$e';
         });
+      }
     }
   }
 
@@ -2276,11 +2418,12 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
       await widget.api.createSocialStory('', f!.bytes!, f.name);
       await load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           loading = false;
           error = '$e';
         });
+      }
     }
   }
 
@@ -2379,9 +2522,9 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Text(savedOnly ? 'Saved moments' : 'Social feed',
+                Text(savedOnly ? 'Saved moments' : 'Digital diary & feed',
                     style: Theme.of(context).textTheme.headlineMedium),
-                const Text('Moments shared by your relationships and circles.')
+                const Text('Thoughts, memories, documents and shared moments.')
               ])),
           IconButton.filledTonal(
               tooltip: savedOnly ? 'Show all posts' : 'Saved posts',
@@ -2478,17 +2621,40 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                       controller: caption,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                          hintText: 'Share an update, photo or family moment…',
+                          hintText: 'What would you like to remember today?',
                           border: InputBorder.none)),
+                  DropdownButtonFormField<String>(
+                      initialValue: audience,
+                      decoration: const InputDecoration(
+                          labelText: 'Who can view this?'),
+                      items: const [
+                        DropdownMenuItem(value: 'PRIVATE', child: Text('Private — only me')),
+                        DropdownMenuItem(value: 'PUBLIC', child: Text('Public — everyone')),
+                        DropdownMenuItem(value: 'FRIENDS', child: Text('Friends')),
+                        DropdownMenuItem(value: 'RELATIVES', child: Text('Relatives')),
+                        DropdownMenuItem(value: 'RELATIONSHIPS', child: Text('All relationships')),
+                        DropdownMenuItem(value: 'CIRCLE', child: Text('Selected circle')),
+                      ],
+                      onChanged: (value) => setState(() {
+                        audience = value ?? 'PRIVATE';
+                        selectedCircleId = null;
+                      })),
+                  if (audience == 'CIRCLE')
+                    DropdownButtonFormField<int>(
+                        initialValue: selectedCircleId,
+                        decoration: const InputDecoration(labelText: 'Select circle'),
+                        items: availableCircles.map((circle) => DropdownMenuItem(
+                            value: circle.id, child: Text(circle.name))).toList(),
+                        onChanged: (value) => setState(() => selectedCircleId = value)),
                   Row(children: [
                     TextButton.icon(
                         onPressed: loading ? null : pick,
-                        icon: const Icon(Icons.photo_library_outlined),
-                        label: Text(selected?.name ?? 'Media')),
+                        icon: const Icon(Icons.attach_file_rounded),
+                        label: Text(selected?.name ?? 'Attach file')),
                     const Spacer(),
                     FilledButton(
-                        onPressed: loading ? null : publish,
-                        child: const Text('Publish'))
+                        onPressed: loading || (audience == 'CIRCLE' && selectedCircleId == null) ? null : publish,
+                        child: Text(audience == 'PRIVATE' ? 'Save privately' : 'Share entry'))
                   ])
                 ]))),
         if (error.isNotEmpty)
@@ -3343,18 +3509,20 @@ class _BlockedAccountsScreenState extends State<BlockedAccountsScreen> {
   Future<void> load() async {
     try {
       final value = await widget.api.blockedUsers();
-      if (mounted)
+      if (mounted) {
         setState(() {
           items = value;
           loading = false;
           error = null;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           loading = false;
           error = '$e';
         });
+      }
     }
   }
 
@@ -4071,11 +4239,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
     try {
       final result = await widget.searchMessages!(query);
-      if (mounted)
+      if (mounted) {
         setState(() {
           messages = result;
           showingSearchResults = true;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => error = '$e');
     }

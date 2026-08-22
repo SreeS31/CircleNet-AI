@@ -1,6 +1,7 @@
 package com.circlenet.config;
 
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -16,6 +17,7 @@ import com.circlenet.domain.user.UserRepository;
 import com.circlenet.domain.user.model.UserEntity;
 
 @Component
+@Profile("!prod")
 public class DataSeeder implements CommandLineRunner {
   private final UserRepository userRepository;
   private final PersonRepository personRepository;

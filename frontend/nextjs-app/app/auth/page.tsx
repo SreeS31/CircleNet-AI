@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
@@ -10,8 +11,8 @@ import CountryPhoneInput from '../components/CountryPhoneInput';
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [identifier, setIdentifier] = useState('admin@circlenet.ai');
-  const [password, setPassword] = useState('admin123');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState('Sign in with your CircleNet account.');
   const [mode, setMode] = useState<'signin' | 'register'>('signin');
@@ -62,6 +63,7 @@ function AuthForm() {
   return (
     <main className="auth-shell">
       <section className="auth-story">
+        <Image className="auth-logo" src="/circlenet-logo.png" width={112} height={112} alt="CircleNet logo" priority />
         <p className="eyebrow">CIRCLENET INTELLIGENCE CLOUD</p>
         <h1>People, progress and purpose—beautifully connected.</h1>
         <p>One secure workspace for teams to understand relationships, deliver projects and make better decisions with live operational intelligence.</p>
@@ -78,10 +80,11 @@ function AuthForm() {
             <span>Username, email, or mobile number</span>
             <input
               type="text"
+              autoComplete="username"
               required
               value={identifier}
               onChange={(event) => setIdentifier(event.target.value)}
-              placeholder="sreelatha, admin@circlenet.ai, or +15551234567"
+              placeholder="Username, email, or mobile number"
               style={{ padding: '0.8rem', borderRadius: '0.75rem', border: '1px solid #dbe3ee' }}
             />
           </label>
@@ -89,10 +92,11 @@ function AuthForm() {
             <span>Password</span>
             <input
               type="password"
+              autoComplete="current-password"
               required
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="demo-password"
+              placeholder="Enter your password"
               style={{ padding: '0.8rem', borderRadius: '0.75rem', border: '1px solid #dbe3ee' }}
             />
           </label>
@@ -105,7 +109,7 @@ function AuthForm() {
           <label><span>Mobile number</span><CountryPhoneInput required value={profile.phoneNumber} onChange={phoneNumber => setProfile({...profile, phoneNumber})}/></label>
           <label><span>Email (optional)</span><input type="email" value={profile.email} onChange={e => setProfile({...profile, email:e.target.value})} /></label>
           <label><span>Location</span><input required value={profile.location} onChange={e => setProfile({...profile, location:e.target.value})} placeholder="Bengaluru" /></label>
-          <label><span>Password</span><input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} /></label>
+          <label><span>Password</span><input type="password" autoComplete="new-password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} /></label>
           <button className="btn btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Creating account...' : 'Create account'}</button>
         </form>}
 

@@ -226,10 +226,11 @@ class _AuthScreenState extends State<AuthScreen> {
         return;
       }
       setState(() {
-        _statusMessage = error is AuthApiException &&
-                error.message.contains('status 401')
-            ? 'The mobile number/email or password is incorrect. Please check your details and try again.'
-            : 'Unable to sign in right now. Please try again.';
+        _statusMessage = error is AuthApiException
+            ? (error.message.contains('401') || error.message.toLowerCase().contains('credential')
+                ? 'The mobile number/email or password is incorrect. Please check your details and try again.'
+                : error.message)
+            : 'Unable to reach the server. Check your connection and try again.';
       });
     } finally {
       if (mounted) {

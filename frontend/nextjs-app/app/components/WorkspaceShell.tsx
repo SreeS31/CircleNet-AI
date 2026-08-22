@@ -1,18 +1,39 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import type { Route } from 'next';
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
-const navigation = [
-  { href: '/dashboard', icon: '⌂', label: 'Home' },
-  { href: '/feed', icon: '◉', label: 'Social feed' },
-  { href: '/messages', icon: '✉', label: 'Messages' },
-  { href: '/circles', icon: '◎', label: 'Circles' },
-  { href: '/notifications', icon: '♢', label: 'Notifications' },
-  { href: '/profile', icon: '♙', label: 'Profile' },
-  { href: '/timeline', icon: '◇', label: 'Timeline' },
+const navigationSections = [
+  {
+    label: 'Main',
+    items: [
+      { href: '/dashboard', icon: '⌂', label: 'Home dashboard' },
+      { href: '/feed', icon: '✎', label: 'Digital diary & feed' },
+      { href: '/messages', icon: '✉', label: 'Private messages' },
+      { href: '/circles', icon: '◎', label: 'My circles' },
+      { href: '/circle-search', icon: '⌕', label: 'Find people & circles' },
+      { href: '/notifications', icon: '♢', label: 'Notifications' },
+      { href: '/timeline', icon: '◇', label: 'Life timeline' },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      { href: '/profile', icon: '♙', label: 'My profile' },
+      { href: '/privacy', icon: '⚙', label: 'Privacy & settings' },
+      { href: '/session', icon: '◌', label: 'Account sessions' },
+    ],
+  },
+  {
+    label: 'Safety & control',
+    items: [
+      { href: '/reports', icon: '⚑', label: 'My reports' },
+      { href: '/moderation', icon: '◆', label: 'Moderation' },
+    ],
+  },
 ];
 
 const utilities = [
@@ -62,7 +83,7 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
     {upload&&<section className={`global-upload-status upload-${upload.status}`} role="status" aria-live="polite"><div><strong>{upload.message}</strong><span>{upload.fileName}</span></div><b>{upload.progress}%</b><progress max="100" value={upload.progress}>{upload.progress}%</progress></section>}
     <header className="workspace-topbar">
       <button className="workspace-menu-button" onClick={toggle} aria-label="Toggle main menu" aria-expanded={expanded || mobileOpen}>☰</button>
-      <Link href="/dashboard" className="workspace-brand" aria-label="CircleNet home"><span>CN</span><strong>CircleNet</strong></Link>
+      <Link href="/dashboard" className="workspace-brand" aria-label="CircleNet home"><Image src="/circlenet-logo.png" width={38} height={38} alt="" priority /><strong>CircleNet</strong></Link>
       <form className="workspace-global-search" onSubmit={search} role="search">
         <span aria-hidden="true">⌕</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search people, circles and messages" aria-label="Search CircleNet" />
         <button aria-label="Open search filters" type="submit">☷</button>
@@ -70,10 +91,8 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
       <nav className="workspace-top-actions" aria-label="Account tools"><Link href="/notifications" aria-label="Notifications">♢</Link><Link href="/privacy" aria-label="Settings">⚙</Link><Link href="/profile" className="workspace-account" aria-label="Profile">ME</Link></nav>
     </header>
     <aside className={`workspace-sidebar ${mobileOpen ? 'mobile-open' : ''}`} aria-label="Main navigation">
-      <Link className="workspace-primary-action" href="/feed"><span>＋</span><b>Share update</b></Link>
-      <nav>{navigation.map(item => <Link key={item.href} href={item.href as Route} title={item.label} className={isSelected(pathname, item.href) ? 'active' : ''}><span>{item.icon}</span><b>{item.label}</b></Link>)}</nav>
-      <div className="workspace-sidebar-divider" />
-      <nav><Link href="/reports" title="My reports" className={isSelected(pathname, '/reports') ? 'active' : ''}><span>⚑</span><b>My reports</b></Link><Link href="/session" title="Account session" className={isSelected(pathname, '/session') ? 'active' : ''}><span>◌</span><b>Account session</b></Link></nav>
+      <Link className="workspace-primary-action" href="/feed"><span>＋</span><b>New diary entry</b></Link>
+      {navigationSections.map(section => <section className="workspace-nav-section" key={section.label}><h2>{section.label}</h2><nav>{section.items.map(item => <Link key={item.href} href={item.href as Route} title={item.label} className={isSelected(pathname, item.href) ? 'active' : ''}><span>{item.icon}</span><b>{item.label}</b></Link>)}</nav></section>)}
       <small>Private by design</small>
     </aside>
     {mobileOpen && <button className="workspace-scrim" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />}

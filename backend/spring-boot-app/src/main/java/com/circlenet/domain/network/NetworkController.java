@@ -48,7 +48,9 @@ public class NetworkController {
   private final DirectMessageService directMessageService;
   private final DirectCallService directCallService;
   private final RelationshipBroadcastService broadcastService;
-  public NetworkController(NetworkService networkService,CircleConversationService circleConversationService,DirectMessageService directMessageService,DirectCallService directCallService,RelationshipBroadcastService broadcastService) { this.networkService = networkService; this.circleConversationService=circleConversationService; this.directMessageService=directMessageService; this.directCallService=directCallService; this.broadcastService=broadcastService; }
+  private final RelationshipBulkImportService bulkImportService;
+  private final RelationshipImportTemplateService templateService;
+  public NetworkController(NetworkService networkService,CircleConversationService circleConversationService,DirectMessageService directMessageService,DirectCallService directCallService,RelationshipBroadcastService broadcastService,RelationshipBulkImportService bulkImportService,RelationshipImportTemplateService templateService) { this.networkService = networkService; this.circleConversationService=circleConversationService; this.directMessageService=directMessageService; this.directCallService=directCallService; this.broadcastService=broadcastService; this.bulkImportService=bulkImportService; this.templateService=templateService; }
 
   @GetMapping("/search")
   public List<NetworkPersonDto> search(Principal principal, @RequestParam(defaultValue = "") String q) {
@@ -83,6 +85,21 @@ public class NetworkController {
   public ResponseEntity<Void> removeRelationship(Principal principal, @PathVariable Long id) {
     networkService.removeRelationship(userId(principal), id);
     return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping(value = "/relationships/bulk-import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public com.circlenet.domain.network.dto.RelationshipImportResultDto bulkImport(Principal principal,
+      @RequestPart("file") MultipartFile file) {
+    return bulkImportService.importFile(userId(principal), file);
+  }
+
+  @GetMapping("/relationships/bulk-import/template")
+  public ResponseEntity<Resource> bulkImportTemplate() {
+    byte[] bytes = templateService.build();
+    return ResponseEntity.ok()
+        .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"relationship_bulk_import_template.xlsx\"")
+        .body(new org.springframework.core.io.ByteArrayResource(bytes));
   }
 
   @GetMapping("/circles")
