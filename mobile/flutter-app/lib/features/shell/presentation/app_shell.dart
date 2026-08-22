@@ -1744,31 +1744,37 @@ class RelationshipTile extends StatelessWidget {
                     const Text('Choose how you want to connect.',
                         style: TextStyle(color: Color(0xFF718096))),
                     const SizedBox(height: 16),
-                    if (relationship.person.canConnect) ...[
-                      _ConnectAction(
-                          icon: Icons.chat_bubble_rounded,
-                          label: 'Text message',
-                          color: AppTheme.primary,
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => DirectChatScreen(
-                                        api: api,
-                                        person: relationship.person)));
-                          }),
-                      _ConnectAction(
-                          icon: Icons.call_rounded,
-                          label: 'Audio call',
-                          color: const Color(0xFF16875C),
-                          onTap: () => _startCall(context, 'AUDIO')),
-                      _ConnectAction(
-                          icon: Icons.videocam_rounded,
-                          label: 'Video call',
-                          color: const Color(0xFFD15C87),
-                          onTap: () => _startCall(context, 'VIDEO')),
-                    ],
+                    _ConnectAction(
+                        icon: Icons.chat_bubble_rounded,
+                        label: 'Text message',
+                        color: AppTheme.primary,
+                        onTap: () {
+                          if (!relationship.person.canConnect) {
+                            _showCommunicationUnavailable(context);
+                            return;
+                          }
+                          Navigator.pop(context);
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => DirectChatScreen(
+                                      api: api,
+                                      person: relationship.person)));
+                        }),
+                    _ConnectAction(
+                        icon: Icons.call_rounded,
+                        label: 'Audio call',
+                        color: const Color(0xFF16875C),
+                        onTap: () => relationship.person.canConnect
+                            ? _startCall(context, 'AUDIO')
+                            : _showCommunicationUnavailable(context)),
+                    _ConnectAction(
+                        icon: Icons.videocam_rounded,
+                        label: 'Video call',
+                        color: const Color(0xFFD15C87),
+                        onTap: () => relationship.person.canConnect
+                            ? _startCall(context, 'VIDEO')
+                            : _showCommunicationUnavailable(context)),
                     const Divider(height: 22),
                     _ConnectAction(
                         icon: Icons.person_add_alt_1_rounded,
@@ -1795,6 +1801,21 @@ class RelationshipTile extends StatelessWidget {
                           _remove(context);
                         })
                   ]))));
+
+  Future<void> _showCommunicationUnavailable(BuildContext context) =>
+      showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+                  icon: const Icon(Icons.pending_actions_outlined,
+                      color: AppTheme.primary),
+                  title: const Text('Communication not active yet'),
+                  content: Text(
+                      '${relationship.person.displayName} can receive messages and calls after activating their CircleNet account. The communication options will remain available here.'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Got it'))
+                  ]));
 
   Future<void> _addRelationship(BuildContext context) async {
     final name = TextEditingController();
